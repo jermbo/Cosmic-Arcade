@@ -9,9 +9,14 @@
 		"dev": "astro dev --open --port 3333",
 		"build": "astro build",
 		"preview": "astro preview",
-		"astro": "astro"
+		"astro": "astro",
+		"check": "astro check"
 	},
 	"dependencies": {
 		"astro": "7.4.5"
+	},
+	"devDependencies": {
+		"@astrojs/check": "0.9.12",
+		"typescript": "6.0.3"
 	}
 }
