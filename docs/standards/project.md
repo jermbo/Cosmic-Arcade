@@ -36,7 +36,7 @@ The `docs-wiki` and `code-standards` skills have the baseline rules. A file here
 
 | Rules      | Path |
 | ---------- | ---- |
-| Page rules | None                          |
+| Page rules | `docs/standards/page-rules.md` |
 | Code rules | `docs/standards/code-rules.md` |
 
 ## Forms

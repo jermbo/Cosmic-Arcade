@@ -10,7 +10,7 @@ Wiki
 
 # Cosmic Arcade
 
-The arcade is a personal site of games. Each game is built in the engine that fits it, and the site gives all of them one front door.
+The arcade is a personal site of games. Each game is built in the engine that fits it, and the site gives all of them one front door. The [vision](vision.md) tells why the arcade exists and who it is for.
 
 ## The problem: many engines, one home
 
