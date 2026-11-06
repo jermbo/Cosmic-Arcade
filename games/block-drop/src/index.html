@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+		<title>Glintwell</title>
+		<meta name="description" content="Drop glass blocks into the well, match colors and chain the clears. A puzzle game that works offline." />
+		<meta name="theme-color" content="#0d0a1f" />
+		<meta name="color-scheme" content="dark" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<meta name="apple-mobile-web-app-title" content="Glintwell" />
+		<link rel="manifest" href="manifest.webmanifest" />
+		<link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+		<link rel="icon" href="icons/icon-32.png" sizes="32x32" type="image/png" />
+		<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+		<link rel="stylesheet" href="css/style.css" />
+	</head>
+	<body>
+		<div class="app" id="app" data-screen="title">
+			<header class="hud" id="hud">
+				<div class="hud__score">
+					<span class="hud__label">Score</span>
+					<span class="hud__value" id="score">0</span>
+				</div>
+				<div class="hud__mid">
+					<div class="hud__time" id="time-box" hidden>
+						<span class="hud__time-text" id="time">1:30</span>
+						<span class="hud__bar"><span class="hud__bar-fill" id="time-fill"></span></span>
+					</div>
+					<span class="hud__chip" id="lab-chip" hidden>Lab</span>
+				</div>
+				<div class="hud__best">
+					<span class="hud__label">Best</span>
+					<span class="hud__value hud__value--small" id="best">0</span>
+				</div>
+				<button class="icon-button" id="pause-button" type="button" aria-label="Pause">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.5" /><rect x="14" y="5" width="4" height="14" rx="1.5" /></svg>
+				</button>
+			</header>
+
+			<canvas class="stage" id="stage" aria-label="Game board"></canvas>
+
+			<section class="screen screen--title" id="screen-title" aria-label="Title">
+				<div class="logo" aria-hidden="true">
+					<div class="logo__gems" id="logo-gems"></div>
+				</div>
+				<h1 class="logo__name">Glintwell</h1>
+				<p class="logo__tag">Drop glass. Match light. Chain the glow.</p>
+				<div class="menu">
+					<button class="button button--big" type="button" data-action="play-endless">
+						<span>Endless</span><small id="best-endless">Best 0</small>
+					</button>
+					<button class="button button--big" type="button" data-action="play-timed">
+						<span>Timed · 90s</span><small id="best-timed">Best 0</small>
+					</button>
+					<div class="menu__row">
+						<button class="button" type="button" data-action="tutorial">How to play</button>
+						<button class="button" type="button" data-action="settings">Settings</button>
+					</div>
+					<button class="button button--install" type="button" id="install-button" hidden>Install the game</button>
+				</div>
+				<div class="ios-hint" id="ios-hint" hidden>
+					<p>
+						To install: tap
+						<svg class="ios-hint__icon" viewBox="0 0 24 24" aria-label="Share"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5" /><path d="M6 11H5v10h14V11h-1" /></svg>
+						<b>Share</b>, then <b>Add to Home Screen</b>.
+					</p>
+					<button class="ios-hint__close" type="button" data-action="dismiss-ios" aria-label="Close hint">×</button>
+				</div>
+				<a class="arcade-link" id="arcade-link" href="../" hidden>‹ Back to the arcade</a>
+				<p class="version" id="version-title"></p>
+			</section>
+
+			<section class="screen screen--modal" id="screen-pause" aria-label="Paused" hidden>
+				<div class="panel">
+					<h2 class="panel__title">Paused</h2>
+					<div class="menu">
+						<button class="button button--big" type="button" data-action="resume">Resume</button>
+						<button class="button" type="button" data-action="restart">Restart</button>
+						<button class="button" type="button" data-action="settings">Settings</button>
+						<button class="button" type="button" data-action="quit">Quit to title</button>
+					</div>
+				</div>
+			</section>
+
+			<section class="screen screen--modal" id="screen-over" aria-label="Game over" hidden>
+				<div class="panel">
+					<p class="panel__kicker" id="over-reason">No room left</p>
+					<h2 class="panel__title">Game over</h2>
+					<p class="final" id="final-score">0</p>
+					<p class="new-best" id="new-best" hidden>New best!</p>
+					<dl class="stats">
+						<div><dt>Best</dt><dd id="over-best">0</dd></div>
+						<div><dt>Longest chain</dt><dd id="over-chain">0</dd></div>
+						<div><dt>Blocks cleared</dt><dd id="over-cleared">0</dd></div>
+						<div><dt>Power-ups earned · used</dt><dd id="over-specials">0 · 0</dd></div>
+					</dl>
+					<p class="panel__note" id="over-lab" hidden>Played with Lab rules.</p>
+					<div class="menu">
+						<button class="button button--big" type="button" data-action="restart">Play again</button>
+						<button class="button" type="button" data-action="quit">Title</button>
+					</div>
+				</div>
+			</section>
+
+			<section class="screen screen--modal" id="screen-settings" aria-label="Settings" hidden>
+				<div class="panel panel--scroll">
+					<h2 class="panel__title">Settings</h2>
+					<div class="settings">
+						<label class="toggle"><span>Sound effects</span><input type="checkbox" data-setting="sfx" /></label>
+						<label class="toggle"><span>Music</span><input type="checkbox" data-setting="music" /></label>
+						<label class="toggle" id="vibrate-row"><span>Vibration</span><input type="checkbox" data-setting="vibrate" /></label>
+						<label class="toggle"><span>Screen shake</span><input type="checkbox" data-setting="shake" /></label>
+					</div>
+
+					<h3 class="panel__sub">Lab</h3>
+					<p class="panel__note">Test other sizes. They start with the next game.</p>
+					<div class="lab">
+						<fieldset class="seg">
+							<legend>Grid size</legend>
+							<label><input type="radio" name="grid" value="small" /><span>Small</span></label>
+							<label><input type="radio" name="grid" value="medium" /><span>Medium</span></label>
+							<label><input type="radio" name="grid" value="large" /><span>Large</span></label>
+						</fieldset>
+						<fieldset class="seg">
+							<legend>Pieces per turn</legend>
+							<label><input type="radio" name="pieces" value="2" /><span>2</span></label>
+							<label><input type="radio" name="pieces" value="3" /><span>3</span></label>
+						</fieldset>
+						<button class="button button--small" type="button" data-action="lab-reset">Reset Lab</button>
+					</div>
+
+					<h3 class="panel__sub">Data</h3>
+					<div class="menu menu--left">
+						<button class="button button--small" type="button" data-action="tutorial">Replay tutorial</button>
+						<button class="button button--small button--danger" type="button" data-action="reset-best" id="reset-best">Reset best scores</button>
+					</div>
+					<p class="panel__note" id="storage-note" hidden>Saving is off in this browser. Scores last until you close the game.</p>
+					<p class="version" id="version-settings"></p>
+					<div class="menu">
+						<button class="button button--big" type="button" data-action="close-settings">Done</button>
+					</div>
+				</div>
+			</section>
+
+			<section class="screen screen--modal" id="screen-tutorial" aria-label="How to play" hidden>
+				<div class="panel">
+					<div class="tutorial" id="tutorial"></div>
+					<div class="tutorial__dots" id="tutorial-dots"></div>
+					<div class="menu menu--row">
+						<button class="button" type="button" data-action="tutorial-skip">Skip</button>
+						<button class="button button--big" type="button" data-action="tutorial-next" id="tutorial-next">Next</button>
+					</div>
+				</div>
+			</section>
+
+			<div class="banner" id="banner" hidden></div>
+			<button class="toast" id="update-toast" type="button" hidden>Update ready, tap to reload</button>
+		</div>
+		<script type="module" src="js/main.js"></script>
+	</body>
+</html>

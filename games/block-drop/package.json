@@ -1,0 +1,20 @@
+{
+	"name": "block-drop",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite src --open --port 4002",
+		"build": "node build.js",
+		"test": "node tools/rules-test.js",
+		"sim": "node tools/sim.js",
+		"icons": "node tools/make-icons.js"
+	},
+	"arcade": {
+		"engine": "none",
+		"outDir": "dist"
+	},
+	"devDependencies": {
+		"vite": "8.3.5"
+	}
+}
