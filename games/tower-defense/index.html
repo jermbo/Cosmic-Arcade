@@ -1,13 +1,22 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>tower-defense</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+	<head>
+		<meta charset="UTF-8" />
+		<link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+		<meta name="theme-color" content="#1d1a33" />
+		<title>Crystal Siege</title>
+	</head>
+	<body>
+		<div id="game">
+			<canvas id="view"></canvas>
+			<div id="world-ui"></div>
+			<div id="ui"></div>
+		</div>
+		<div id="rotate">
+			<div class="rotate-phone"></div>
+			<p>Turn your phone sideways to play.</p>
+		</div>
+		<script type="module" src="/src/main.ts"></script>
+	</body>
 </html>
