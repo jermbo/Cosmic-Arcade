@@ -7,7 +7,7 @@ export class Stage {
 	readonly camera = new THREE.PerspectiveCamera(32, 1, 0.1, 200);
 	readonly sun = new THREE.DirectionalLight(0xfff3e0, 2.4);
 	shakeEnabled = true;
-	/** Turns the camera around the board, for the title screen. */
+	/** Turns the camera around the board. The title screen sets it straight; play uses turn(). */
 	yaw = 0;
 	/** Space kept free for the HUD, as fractions of the screen. */
 	margins = { top: 0.12, bottom: 0.14, left: 0.03, right: 0.03 };
@@ -17,6 +17,8 @@ export class Stage {
 	private boardSize = new THREE.Vector2(10, 10);
 	private shake = 0;
 	private readonly tilt = THREE.MathUtils.degToRad(54);
+	private yawGoal: number | null = null;
+	private readonly sunOffset = new THREE.Vector3(-6, 14, 8);
 
 	constructor(canvas: HTMLCanvasElement) {
 		this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -28,7 +30,7 @@ export class Stage {
 
 		const sky = new THREE.HemisphereLight(0xe6f0ff, 0x6a4f7a, 1.5);
 		this.scene.add(sky);
-		this.sun.position.set(-6, 14, 8);
+		this.sun.position.copy(this.sunOffset);
 		this.sun.castShadow = true;
 		this.sun.shadow.mapSize.set(2048, 2048);
 		this.sun.shadow.bias = -0.0005;
@@ -47,6 +49,37 @@ export class Stage {
 	setBoard(width: number, depth: number): void {
 		this.boardSize.set(width, depth);
 		this.fit();
+	}
+
+	/** Turns the board a quarter turn left (-1) or right (1), with a smooth swing. */
+	turn(steps: number): void {
+		const quarter = Math.PI / 2;
+		const from = this.yawGoal ?? this.yaw;
+		this.yawGoal = Math.round(from / quarter) * quarter + steps * quarter;
+	}
+
+	/** Turns to an exact angle at once, for dragging. */
+	turnTo(yaw: number): void {
+		this.yawGoal = null;
+		this.yaw = yaw;
+		this.fit();
+	}
+
+	/** Sets the turn at once, in quarter turns. */
+	setQuarter(quarter: number): void {
+		this.yawGoal = null;
+		this.yaw = quarter * (Math.PI / 2);
+		this.fit();
+	}
+
+	/** The current turn in quarter turns, 0 to 3. */
+	get quarter(): number {
+		const q = Math.round((this.yawGoal ?? this.yaw) / (Math.PI / 2));
+		return ((q % 4) + 4) % 4;
+	}
+
+	get turning(): boolean {
+		return this.yawGoal !== null;
 	}
 
 	addShake(amount: number): void {
@@ -88,6 +121,8 @@ export class Stage {
 			return { ok, mid: (minY + maxY) / 2 };
 		};
 		this.target.set(0, 0, 0);
+		// Moving the aim along this ground direction moves the board up and down the screen.
+		const back = new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
 		let low = 4;
 		let high = 80;
 		for (let i = 0; i < 24; i++) {
@@ -101,12 +136,14 @@ export class Stage {
 			const { mid } = fits();
 			const wanted = m.bottom - m.top;
 			const worldPerNdc = (Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) * this.distance) / Math.sin(this.tilt);
-			this.target.z += (wanted - mid) * worldPerNdc;
+			this.target.addScaledVector(back, (wanted - mid) * worldPerNdc);
 		}
 		this.place(0);
 	}
 
 	private place(dt: number): void {
+		const sunTurn = this.sunOffset.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
+		this.sun.position.copy(sunTurn);
 		const offset = new THREE.Vector3(0, Math.sin(this.tilt), Math.cos(this.tilt)).multiplyScalar(this.distance);
 		offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
 		this.camera.position.copy(this.target).add(offset);
@@ -121,6 +158,15 @@ export class Stage {
 	}
 
 	render(dt: number): void {
+		if (this.yawGoal !== null) {
+			// Ease toward the goal and keep the whole board in view on the way.
+			const diff = this.yawGoal - this.yaw;
+			if (Math.abs(diff) < 0.002) {
+				this.yaw = this.yawGoal;
+				this.yawGoal = null;
+			} else this.yaw += diff * (1 - Math.exp(-dt * 9));
+			this.fit();
+		}
 		this.place(dt);
 		this.renderer.render(this.scene, this.camera);
 	}

@@ -26,6 +26,9 @@ All made in code. No image or audio files.
 | Heart Crystal (kit crystals, tinted and animated) | `src/game/board.ts` |
 | Frost shell on slowed UFOs, health bars | `src/game/enemy.ts` |
 | Road arrows, range rings, ghost towers | `src/game/game.ts` |
+| Bolt trails | `src/game/game.ts` |
+| Ballista bolt split out of the kit's arm mesh, so it can reload | `src/assets.ts` |
+| Turn buttons | `src/app.ts` |
 | Particles, blasts, rings, floating numbers | `src/game/effects.ts` |
 | Tower and UFO icons (rendered from the models) | `src/icons.ts` |
 | Coin and crystal icons, logo, stars, sky | `src/style.css` |

@@ -16,6 +16,8 @@ export type Action =
 	| 'target'
 	| 'prev'
 	| 'next'
+	| 'turnLeft'
+	| 'turnRight'
 	| 'tower1'
 	| 'tower2'
 	| 'tower3'
@@ -36,8 +38,8 @@ const KEYS: Record<string, Action> = {
 	f: 'speed',
 	p: 'pause',
 	t: 'target',
-	q: 'prev',
-	e: 'next',
+	q: 'turnLeft',
+	e: 'turnRight',
 	'1': 'tower1',
 	'2': 'tower2',
 	'3': 'tower3',
@@ -71,6 +73,7 @@ export class Input {
 	private held = new Set<number>();
 	private stickDir: Action | null = null;
 	private stickTime = 0;
+	private turnStick = 0;
 	private padDir = new Map<number, number>();
 
 	constructor() {
@@ -125,6 +128,14 @@ export class Input {
 					}
 				}
 			}
+			// Flick the right stick sideways to turn the board.
+			const rx = pad.axes[2] ?? 0;
+			const turn = rx > 0.7 ? 1 : rx < -0.7 ? -1 : 0;
+			if (turn && turn !== this.turnStick) {
+				this.setSource('pad');
+				this.onAction(turn > 0 ? 'turnRight' : 'turnLeft', 'pad');
+			}
+			if (Math.abs(rx) < 0.4 || turn) this.turnStick = turn;
 			const x = pad.axes[0] ?? 0;
 			const y = pad.axes[1] ?? 0;
 			let dir: Action | null = null;

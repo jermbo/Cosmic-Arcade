@@ -19,7 +19,7 @@ const TARGET_ORDER: Targeting[] = ['first', 'strong', 'close'];
 
 const TUTORIAL = [
 	'UFOs follow the glowing arrows to your Heart Crystal. {Select} a green tile next to the road.',
-	'Pick the Ballista to build it there.',
+	'Pick the Ballista in the tower bar to build it there.',
 	'Ready? Press Start wave{wave}. The UFOs come out of the purple portal.',
 	'',
 	'Wave cleared! {Select} your Ballista, then upgrade it.',
@@ -48,6 +48,15 @@ export class App {
 	private readonly ui = document.getElementById('ui')!;
 	private readonly hud: HTMLElement;
 	private readonly popup: HTMLElement;
+	private readonly buildDock: HTMLElement;
+	private readonly buildInfo: HTMLElement;
+	/** The tower button the player is looking at: hovered, focused or tapped once. */
+	private armed: TowerId | null = null;
+	/** The gold shown in the HUD. It counts toward the real gold. */
+	private shownGold = 0;
+	private turnDrag: { x: number; yaw: number; moved: boolean } | null = null;
+	/** The tower the side panel shows. */
+	private panelTower: Tower | null = null;
 	private readonly screenEl: HTMLElement;
 	private readonly tip: HTMLElement;
 	private readonly banner: HTMLElement;
@@ -68,10 +77,17 @@ export class App {
 					<div class="stat gold" title="Gold"><span class="ico coin"></span><b data-gold>0</b></div>
 					<div class="stat wave">Wave <b data-wave>0</b><span>/<i data-total>0</i></span></div>
 					<div class="grow"></div>
+					<div class="turn">
+						<button class="btn icon" data-turn="-1" title="Turn the board left (Q)" aria-label="Turn left"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 13a7.5 7.5 0 1 0 2.6-6.2" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M4.5 3.5v5h5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+						<button class="btn icon" data-turn="1" title="Turn the board right (E)" aria-label="Turn right"><svg class="flip" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 13a7.5 7.5 0 1 0 2.6-6.2" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M4.5 3.5v5h5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+					</div>
 					<button class="btn icon" data-speed title="Speed (F)">1x</button>
 					<button class="btn icon" data-pause title="Pause (P)"><span class="pause-ico"></span></button>
 				</div>
-				<div class="build-bar"></div>
+				<div class="build-dock">
+					<div class="build-info" hidden></div>
+					<div class="build-bar"></div>
+				</div>
 				<div class="wave-box">
 					<div class="preview"></div>
 					<button class="btn primary" data-next><span data-next-label>Next wave</span><kbd class="k">Space</kbd><kbd class="p">Select</kbd></button>
@@ -86,6 +102,8 @@ export class App {
 		`;
 		this.hud = el(this.ui, '.hud');
 		this.popup = el(this.ui, '.popup');
+		this.buildDock = el(this.hud, '.build-dock');
+		this.buildInfo = el(this.hud, '.build-info');
 		this.screenEl = el(this.ui, '.screen');
 		this.tip = el(this.ui, '.tip');
 		this.banner = el(this.ui, '.banner');
@@ -99,10 +117,7 @@ export class App {
 		this.input.onAction = (action, source) => this.onAction(action, source);
 		this.input.onSource = (source) => this.onSource(source);
 		document.body.dataset.input = 'mouse';
-		window.addEventListener('resize', () => {
-			this.stage.resize();
-			this.placePopup();
-		});
+		window.addEventListener('resize', () => this.layout());
 		document.addEventListener('visibilitychange', () => {
 			if (document.hidden && this.playing && this.screen === null && !this.debug) this.openPause();
 		});
@@ -139,6 +154,9 @@ export class App {
 			this.titleTime += dt;
 			this.stage.yaw = Math.sin(this.titleTime * 0.12) * 0.35;
 		}
+		if (this.game && this.playing && this.shownGold !== this.game.gold) this.tickGold(dt);
+		// Keep the tower panel on the far side of its tower while the board turns.
+		if (this.stage.turning && !this.popup.hidden) this.placePopup();
 		if (this.tipTimer > 0) {
 			this.tipTimer -= dt;
 			if (this.tipTimer <= 0) this.hideTip();
@@ -184,6 +202,7 @@ export class App {
 		});
 		game.select(null);
 		this.game = game;
+		this.stage.setQuarter(0);
 		this.stage.margins = { top: 0.05, bottom: 0.05, left: 0.02, right: 0.02 };
 		this.stage.resize();
 		sound.music('menu');
@@ -193,15 +212,15 @@ export class App {
 		this.game?.dispose();
 		this.mapIndex = index;
 		this.playing = true;
-		this.placing = null;
-		this.stage.yaw = 0;
-		this.stage.margins = { top: 0.1, bottom: 0.13, left: 0.02, right: 0.02 };
+		this.setPlacing(null);
+		this.stage.setQuarter(0);
 		const map = MAPS[index];
 		this.game = new Game(this.stage, map.id, (event) => this.onGameEvent(event));
 		if (this.debug) this.game.gold = 99999;
-		this.stage.resize();
+		this.shownGold = this.game.gold;
 		this.closeScreen();
 		this.hud.hidden = false;
+		this.layout();
 		el(this.hud, '[data-total]').textContent = String(this.game.totalWaves);
 		this.updateHud();
 		this.updateSpeed();
@@ -275,6 +294,9 @@ export class App {
 	private bindHud(): void {
 		el(this.hud, '[data-speed]').addEventListener('click', () => this.cycleSpeed());
 		el(this.hud, '[data-pause]').addEventListener('click', () => this.openPause());
+		this.hud.querySelectorAll<HTMLElement>('[data-turn]').forEach((button) => {
+			button.addEventListener('click', () => this.turn(Number(button.dataset.turn)));
+		});
 		el(this.hud, '[data-next]').addEventListener('click', () => this.callWave());
 		el(this.tip, '[data-skip]').addEventListener('click', () => {
 			save.tutorialDone = true;
@@ -288,20 +310,70 @@ export class App {
 		const bar = el(this.hud, '.build-bar');
 		bar.innerHTML = TOWER_ORDER.map((id) => {
 			const def = TOWERS[id];
-			return `<button class="tower-btn" data-place="${id}" title="${def.name} (${def.key})">
+			return `<button class="tower-btn" data-place="${id}" aria-label="${def.name}">
 				<img src="${towerIcon(id, 1)}" alt="" />
 				<span class="cost"><i class="ico coin"></i>${def.levels[0].cost}</span>
 				<kbd class="k">${def.key}</kbd>
 			</button>`;
 		}).join('');
 		bar.querySelectorAll<HTMLButtonElement>('[data-place]').forEach((button) => {
-			button.addEventListener('click', () => {
-				const id = button.dataset.place as TowerId;
-				this.game?.select(null);
-				this.setPlacing(this.placing === id ? null : id);
-				sound.play('click');
+			const id = button.dataset.place as TowerId;
+			button.addEventListener('pointerenter', (event) => {
+				if (event.pointerType === 'mouse') this.arm(id);
 			});
+			button.addEventListener('pointerleave', (event) => {
+				if (event.pointerType === 'mouse' && this.armed === id) this.arm(this.placing);
+			});
+			button.addEventListener('focus', () => {
+				// A tap also focuses the button. Only keys and the gamepad arm on focus.
+				if (this.input.source === 'key' || this.input.source === 'pad') this.arm(id);
+			});
+			button.addEventListener('blur', () => {
+				if (this.armed === id && !this.buildDock.contains(document.activeElement)) this.arm(this.placing);
+			});
+			button.addEventListener('click', () => this.pickTower(id));
 		});
+	}
+
+	/** A tower button was clicked or tapped. */
+	private pickTower(id: TowerId): void {
+		const game = this.game;
+		if (!game) return;
+		const cell = game.selected;
+		if (cell && game.board.buildable(cell)) {
+			// A tile is picked: build on it. On touch, the first tap only shows the tower.
+			if (this.input.source === 'touch' && this.armed !== id) {
+				this.arm(id);
+				sound.play('hover');
+				return;
+			}
+			this.buildAt(id, cell);
+			return;
+		}
+		game.select(null);
+		this.setPlacing(this.placing === id ? null : id);
+		sound.play('click');
+	}
+
+	/** Shows what a tower does above the bar, and a see-through copy on the picked tile. */
+	private arm(id: TowerId | null): void {
+		this.armed = id;
+		this.hud.querySelectorAll<HTMLElement>('[data-place]').forEach((button) => button.classList.toggle('armed', button.dataset.place === id));
+		const game = this.game;
+		if (game && game.board.buildable(game.selected)) game.showGhost(id);
+		if (!id) {
+			this.buildInfo.hidden = true;
+			return;
+		}
+		const def = TOWERS[id];
+		const level = def.levels[0];
+		const touchHint = this.input.source === 'touch' && game?.board.buildable(game.selected) ? '<em>Tap again to build</em>' : '';
+		const placeHint = this.placing === id ? `<em>${this.input.source === 'touch' ? 'Tap' : 'Click'} a green tile</em>` : '';
+		this.buildInfo.innerHTML = `
+			<div class="info-head"><b>${def.name}</b><span class="role">${def.role}</span><span class="cost"><i class="ico coin"></i>${level.cost}</span></div>
+			<p>${level.blurb}</p>
+			${touchHint || placeHint}`;
+		this.buildInfo.hidden = false;
 	}
 
 	private setPlacing(id: TowerId | null): void {
@@ -309,13 +381,63 @@ export class App {
 		this.hud.querySelectorAll<HTMLElement>('[data-place]').forEach((button) => button.classList.toggle('active', button.dataset.place === id));
 		document.body.classList.toggle('placing', !!id);
 		if (!id) this.game?.showGhost(null);
+		this.arm(id);
+	}
+
+	/** The bar waits for a tower choice for the picked tile. */
+	private setBuildTarget(on: boolean): void {
+		this.buildDock.classList.toggle('target', on);
+		if (!on && !this.placing) this.arm(null);
+	}
+
+	private turn(steps: number): void {
+		if (!this.game || !this.playing) return;
+		this.stage.turn(steps);
+		sound.play('hover');
+	}
+
+	private tickGold(dt: number): void {
+		const target = this.game!.gold;
+		const diff = target - this.shownGold;
+		// Count quickly, but always reach the number within about half a second.
+		const step = Math.max(1, Math.abs(diff) * Math.min(1, dt * 9));
+		this.shownGold = Math.abs(diff) <= step ? target : this.shownGold + Math.sign(diff) * step;
+		el(this.hud, '[data-gold]').textContent = String(Math.round(this.shownGold));
+	}
+
+	/** Keeps the board clear of the HUD, and puts the tutorial tip in a free spot. */
+	private layout(): void {
+		if (this.playing && !this.hud.hidden) {
+			const view = this.ui.getBoundingClientRect();
+			const h = view.height || innerHeight;
+			const w = view.width || innerWidth;
+			// On short, wide screens the bar stands on the left side, where there is free room anyway.
+			const side = this.hud.classList.toggle('side-bar', h < 560 && w / h > 1.6);
+			const top = el(this.hud, '.hud-top').getBoundingClientRect();
+			const bar = el(this.hud, '.build-bar').getBoundingClientRect();
+			const wave = el(this.hud, '.wave-box').getBoundingClientRect();
+			const bottom = Math.max(side ? 0 : h - bar.top, h - wave.top);
+			this.stage.margins = {
+				top: (top.bottom + 4) / h,
+				bottom: (bottom + 4) / h,
+				left: side ? (bar.right + 6) / w : 0.02,
+				right: 0.02,
+			};
+			this.placeTip();
+		}
+		this.stage.resize();
+		this.placePopup();
 	}
 
 	private updateHud(): void {
 		const game = this.game;
 		if (!game || !this.playing) return;
 		el(this.hud, '[data-lives]').textContent = String(game.lives);
-		el(this.hud, '[data-gold]').textContent = String(game.gold);
+		if (game.gold < this.shownGold) {
+			// Spending shows at once; income counts up.
+			this.shownGold = game.gold;
+			el(this.hud, '[data-gold]').textContent = String(game.gold);
+		}
 		el(this.hud, '[data-wave]').textContent = String(game.wave);
 		this.hud.querySelector('.lives')?.classList.toggle('low', game.lives <= 5);
 		this.hud.querySelectorAll<HTMLButtonElement>('[data-place]').forEach((button) => {
@@ -373,60 +495,34 @@ export class App {
 
 	private renderPopup(cell: Cell | null, tower: Tower | null): void {
 		const game = this.game;
-		if (!cell || !game || !this.playing) {
+		const buildHere = !!cell && !tower && !!game?.board.buildable(cell) && this.playing;
+		this.setBuildTarget(buildHere);
+		if (buildHere && (this.input.source === 'key' || this.input.source === 'pad')) {
+			const first = this.buildDock.querySelector<HTMLElement>('[data-place]:not(.poor)') ?? this.buildDock.querySelector<HTMLElement>('[data-place]');
+			first?.focus();
+		}
+		if (!cell || !game || !this.playing || !tower) {
 			this.hidePopup();
 			return;
 		}
-		if (tower) this.renderTowerPanel(tower);
-		else if (game.board.buildable(cell)) this.renderBuildMenu();
-		else {
-			this.hidePopup();
-			return;
-		}
+		const wasOpen = !this.popup.hidden;
+		this.panelTower = tower;
+		this.renderTowerPanel(tower);
 		this.popup.hidden = false;
-		this.popup.classList.remove('open');
-		void this.popup.offsetWidth;
-		this.popup.classList.add('open');
+		if (!wasOpen) {
+			this.popup.classList.remove('open');
+			void this.popup.offsetWidth;
+			this.popup.classList.add('open');
+		}
 		this.placePopup();
 		this.refreshPopupState();
 		if (this.input.source === 'key' || this.input.source === 'pad') this.focusPopup();
 	}
 
-	/** Focuses the first useful choice: a tower to build, or an upgrade. */
+	/** Focuses the first useful choice: an upgrade, or else the first button. */
 	private focusPopup(): void {
-		const first = this.popup.querySelector<HTMLElement>('[data-build]:not(:disabled), [data-upgrade]:not(:disabled)');
+		const first = this.popup.querySelector<HTMLElement>('[data-upgrade]:not(:disabled)');
 		(first ?? focusables(this.popup)[0])?.focus();
-	}
-
-	private renderBuildMenu(): void {
-		this.popup.dataset.kind = 'build';
-		this.popup.innerHTML = `
-			<div class="popup-head"><b>Build a tower</b><button class="close" data-close aria-label="Close" tabindex="-1">×</button></div>
-			<div class="popup-row options">
-				${TOWER_ORDER.map((id) => {
-					const def = TOWERS[id];
-					return `<button class="tower-opt" data-build="${id}">
-						<img src="${towerIcon(id, 1)}" alt="" />
-						<span class="name">${def.name}</span>
-						<span class="cost"><i class="ico coin"></i>${def.levels[0].cost}</span>
-						<kbd class="k">${def.key}</kbd>
-					</button>`;
-				}).join('')}
-			</div>
-			<p class="popup-info" data-info>Pick a tower.</p>
-		`;
-		this.popup.querySelectorAll<HTMLButtonElement>('[data-build]').forEach((button) => {
-			const id = button.dataset.build as TowerId;
-			const show = (): void => {
-				const def = TOWERS[id];
-				el(this.popup, '[data-info]').innerHTML = `<b>${def.name}</b> · ${def.role}. ${def.levels[0].blurb}`;
-				this.game?.showGhost(id);
-			};
-			button.addEventListener('pointerenter', show);
-			button.addEventListener('focus', show);
-			button.addEventListener('click', () => this.buildAt(id, this.game?.selected ?? null));
-		});
-		el(this.popup, '[data-close]').addEventListener('click', () => this.game?.select(null));
 	}
 
 	private statLine(stats: TowerStats, id: TowerId): string {
@@ -449,7 +545,7 @@ export class App {
 		let upgrades = '';
 		if (tower.level === 1) {
 			const next = def.levels[1];
-			upgrades = `<button class="upgrade" data-upgrade data-cost="${next.cost}">
+			upgrades = `<button class="upgrade" data-upgrade data-cost="${next.cost}" data-range="${next.stats.range}">
 				<img src="${towerIcon(def.id, 2)}" alt="" />
 				<span class="name">${next.name}</span>
 				<span class="blurb">${next.blurb}</span>
@@ -460,7 +556,7 @@ export class App {
 			upgrades = (['a', 'b'] as Branch[])
 				.map((branch) => {
 					const next = def.branches[branch];
-					return `<button class="upgrade branch-${branch}" data-upgrade="${branch}" data-cost="${next.cost}">
+					return `<button class="upgrade branch-${branch}" data-upgrade="${branch}" data-cost="${next.cost}" data-range="${next.stats.range}">
 						<img src="${towerIcon(def.id, 3, branch)}" alt="" />
 						<span class="name">${next.name}</span>
 						<span class="blurb">${next.blurb}</span>
@@ -489,6 +585,13 @@ export class App {
 		this.popup.querySelectorAll<HTMLButtonElement>('[data-upgrade]').forEach((button) => {
 			const branch = (button.dataset.upgrade || undefined) as Branch | undefined;
 			button.addEventListener('click', () => this.game?.upgrade(tower, branch));
+			// Show the range the upgrade would give.
+			const preview = (): void => this.game?.previewRange(Number(button.dataset.range));
+			const clear = (): void => this.game?.previewRange(null);
+			button.addEventListener('pointerenter', preview);
+			button.addEventListener('focus', preview);
+			button.addEventListener('pointerleave', clear);
+			button.addEventListener('blur', clear);
 		});
 		this.popup.querySelector('[data-target]')?.addEventListener('click', () => this.cycleTarget(tower));
 		el(this.popup, '[data-sell]').addEventListener('click', () => this.game?.sell(tower));
@@ -497,36 +600,60 @@ export class App {
 
 	private refreshPopupState(): void {
 		const gold = this.game?.gold ?? 0;
-		this.popup.querySelectorAll<HTMLButtonElement>('[data-build]').forEach((button) => {
-			button.disabled = gold < TOWERS[button.dataset.build as TowerId].levels[0].cost;
-		});
 		this.popup.querySelectorAll<HTMLButtonElement>('[data-upgrade]').forEach((button) => {
 			button.disabled = gold < Number(button.dataset.cost);
 		});
 	}
 
+	/** Docks the tower panel on the side of the screen away from its tower, so the tower and its range stay in view. */
 	private placePopup(): void {
-		const game = this.game;
-		const cell = game?.selected;
-		if (!game || !cell || this.popup.hidden) return;
-		const at = game.board.world(cell.c, cell.r);
-		const screen = this.stage.toScreen(at);
-		const rect = this.popup.getBoundingClientRect();
+		const tower = this.panelTower;
+		if (!tower || this.popup.hidden) return;
+		const screen = this.stage.toScreen(tower.pos);
 		const view = this.ui.getBoundingClientRect();
-		const gap = 46;
-		const below = screen.y < view.height * 0.45;
-		let y = below ? screen.y + gap : screen.y - gap - rect.height;
-		let x = screen.x - rect.width / 2;
-		x = Math.max(8, Math.min(view.width - rect.width - 8, x));
-		y = Math.max(8, Math.min(view.height - rect.height - 8, y));
-		this.popup.style.left = `${x}px`;
-		this.popup.style.top = `${y}px`;
-		this.popup.classList.toggle('below', below);
+		const right = screen.x < view.width / 2;
+		if (this.popup.classList.contains('right') !== right && this.popup.classList.contains('open')) {
+			this.popup.classList.remove('open');
+			void this.popup.offsetWidth;
+			this.popup.classList.add('open');
+		}
+		this.popup.classList.toggle('right', right);
+		this.popup.classList.toggle('left', !right);
+		const top = el(this.hud, '.hud-top').getBoundingClientRect().bottom + 8;
+		this.popup.style.top = `${top}px`;
+		this.popup.style.maxHeight = `${view.height - top - 8}px`;
+	}
+
+	/** Puts the tutorial tip in the free strip between the bottom bars, or at the top if there is no room. */
+	private placeTip(): void {
+		if (this.tip.hidden || this.hud.hidden) return;
+		const view = this.ui.getBoundingClientRect();
+		const bar = el(this.hud, '.build-bar').getBoundingClientRect();
+		const wave = el(this.hud, '.wave-box').getBoundingClientRect();
+		const left = bar.right + 12;
+		const right = wave.left - 12;
+		const room = right - left;
+		const style = this.tip.style;
+		if (room >= 280) {
+			style.left = `${left + room / 2}px`;
+			style.width = `${Math.min(room, 520)}px`;
+			style.top = 'auto';
+			style.bottom = `${view.height - wave.bottom}px`;
+			this.tip.classList.add('low');
+		} else {
+			style.left = '50%';
+			style.width = '';
+			style.bottom = 'auto';
+			style.top = `${el(this.hud, '.hud-top').getBoundingClientRect().bottom + 8}px`;
+			this.tip.classList.remove('low');
+		}
 	}
 
 	private hidePopup(): void {
 		this.popup.hidden = true;
+		this.panelTower = null;
 		this.popup.innerHTML = '';
+		this.game?.previewRange(null);
 	}
 
 	private cycleTarget(tower: Tower): void {
@@ -563,6 +690,14 @@ export class App {
 			return hit && this.game ? this.game.board.cellAtWorld(hit.x, hit.z) : null;
 		};
 		canvas.addEventListener('pointermove', (event) => {
+			const drag = this.turnDrag;
+			if (drag) {
+				// Grab the board and drag it around; it snaps to a quarter turn on release.
+				const dx = event.clientX - drag.x;
+				if (Math.abs(dx) > 6) drag.moved = true;
+				if (drag.moved) this.stage.turnTo(drag.yaw - dx * 0.008);
+				return;
+			}
 			if (!this.playing || !this.game || event.pointerType === 'touch') return;
 			// Browsers also send a move when the page changes under a still mouse. Ignore those.
 			if (event.movementX === 0 && event.movementY === 0) return;
@@ -580,10 +715,20 @@ export class App {
 		canvas.addEventListener('pointerleave', () => this.game?.setHover(null));
 		canvas.addEventListener('pointerdown', (event) => {
 			this.pointerDown = { x: event.clientX, y: event.clientY, id: event.pointerId };
+			if (event.button === 2 && this.playing) {
+				this.turnDrag = { x: event.clientX, yaw: this.stage.yaw, moved: false };
+				canvas.setPointerCapture(event.pointerId);
+			}
 		});
 		canvas.addEventListener('pointerup', (event) => {
 			const down = this.pointerDown;
 			this.pointerDown = null;
+			const drag = this.turnDrag;
+			this.turnDrag = null;
+			if (drag?.moved) {
+				this.stage.turn(0);
+				return;
+			}
 			if (!down || down.id !== event.pointerId) return;
 			if (Math.hypot(event.clientX - down.x, event.clientY - down.y) > 10) return;
 			if (!this.playing || !this.game || this.screen) return;
@@ -647,6 +792,7 @@ export class App {
 		const game = this.game;
 		if (!game || !this.playing) return;
 		const popupFocused = !this.popup.hidden && this.popup.contains(document.activeElement);
+		const barFocused = this.buildDock.contains(document.activeElement);
 		const selectedTower = game.towerAt(game.selected);
 
 		switch (action) {
@@ -655,11 +801,20 @@ export class App {
 			case 'left':
 			case 'right':
 				if (popupFocused) moveFocus(this.popup, action);
-				else this.moveCursor(action);
+				else if (barFocused && (action === 'left' || action === 'right')) moveFocus(this.buildDock, action);
+				else {
+					if (barFocused) (document.activeElement as HTMLElement).blur();
+					this.moveCursor(action);
+				}
+				break;
+			case 'turnLeft':
+			case 'turnRight':
+				this.turn(action === 'turnLeft' ? -1 : 1);
 				break;
 			case 'prev':
 			case 'next':
 				if (!this.popup.hidden) moveFocus(this.popup, action === 'prev' ? 'left' : 'right');
+				else if (barFocused) moveFocus(this.buildDock, action === 'prev' ? 'left' : 'right');
 				else {
 					const i = this.placing ? TOWER_ORDER.indexOf(this.placing) : -1;
 					const n = TOWER_ORDER.length;
@@ -668,11 +823,12 @@ export class App {
 				}
 				break;
 			case 'confirm':
-				if (popupFocused) (document.activeElement as HTMLElement).click();
+				if (popupFocused || barFocused) (document.activeElement as HTMLElement).click();
 				else if (!this.popup.hidden && source !== 'mouse') this.focusPopup();
 				else this.clickCell(this.cursorCell());
 				break;
 			case 'back':
+				if (barFocused) (document.activeElement as HTMLElement).blur();
 				if (this.placing || game.selected) this.cancel();
 				else this.openPause();
 				break;
@@ -733,8 +889,11 @@ export class App {
 		if (!cell) {
 			cell = board.cell(Math.floor(board.width / 2), Math.floor(board.depth / 2));
 		} else {
-			const dc = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
-			const dr = dir === 'up' ? -1 : dir === 'down' ? 1 : 0;
+			// Up on the screen is a different way on the board once it is turned.
+			const quarter = this.stage.quarter;
+			let dc = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
+			let dr = dir === 'up' ? -1 : dir === 'down' ? 1 : 0;
+			for (let i = 0; i < quarter; i++) [dc, dr] = [dr, -dc];
 			cell = board.cell(cell.c + dc, cell.r + dr) ?? cell;
 		}
 		game.setKeyCursor(cell);
@@ -769,6 +928,7 @@ export class App {
 		}
 		el(this.tip, 'p').textContent = text;
 		this.tip.hidden = false;
+		this.placeTip();
 		this.tip.classList.remove('show');
 		void this.tip.offsetWidth;
 		this.tip.classList.add('show');
@@ -991,8 +1151,8 @@ export class App {
 					<a class="btn ghost" href="../">Back to the arcade</a>
 				</div>
 				<div class="keys">
-					<p><kbd>1</kbd>–<kbd>4</kbd> build · <kbd>U</kbd> upgrade · <kbd>S</kbd> sell · <kbd>T</kbd> target · <kbd>Space</kbd> next wave · <kbd>F</kbd> speed · <kbd>Esc</kbd> back</p>
-					<p>Gamepad: <kbd>A</kbd> select · <kbd>B</kbd> back · <kbd>X</kbd> upgrade · <kbd>Y</kbd> sell · <kbd>Select</kbd> next wave · <kbd>RT</kbd> speed</p>
+					<p><kbd>1</kbd>–<kbd>4</kbd> build · <kbd>U</kbd> upgrade · <kbd>S</kbd> sell · <kbd>T</kbd> target · <kbd>Space</kbd> next wave · <kbd>F</kbd> speed · <kbd>Q</kbd> <kbd>E</kbd> turn the board (or drag with the right mouse button) · <kbd>Esc</kbd> back</p>
+					<p>Gamepad: <kbd>A</kbd> select · <kbd>B</kbd> back · <kbd>X</kbd> upgrade · <kbd>Y</kbd> sell · <kbd>Select</kbd> next wave · <kbd>RT</kbd> speed · right stick turns the board</p>
 				</div>
 				<button class="hidden-back" data-back tabindex="-1" aria-hidden="true"></button>
 			</div>`,

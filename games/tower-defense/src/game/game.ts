@@ -8,7 +8,7 @@ import type { Stage } from '../stage';
 import { Board, TOP, type Cell } from './board';
 import { Effects } from './effects';
 import { Enemy } from './enemy';
-import { buildTowerLook, Tower } from './tower';
+import { buildTowerLook, THROW_TIME, Tower } from './tower';
 
 export type GameEvent =
 	| { type: 'change' }
@@ -64,6 +64,12 @@ export interface WavePreview {
 }
 
 const MAX_LIVES = 20;
+// A thin glowing streak behind each flying bolt.
+const trailGeometry = new THREE.CylinderGeometry(0.012, 0.03, 1, 6, 1, true).rotateX(Math.PI / 2).translate(0, 0, -0.5);
+const trailMaterials = {
+	plain: new THREE.MeshBasicMaterial({ color: 0xfff1c4, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }),
+	rail: new THREE.MeshBasicMaterial({ color: 0x7fe6ff, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending }),
+};
 const SWARM_COUNT = 8;
 const SWARM_WINDOW = 1.6;
 
@@ -106,6 +112,10 @@ export class Game {
 	private ghost: THREE.Object3D | null = null;
 	private ghostKey = '';
 	private hoverCell: Cell | null = null;
+	private rangePreview: number | null = null;
+	/** The size the range ring shows, which eases toward the real range. */
+	private ringSize = 0;
+	private ringAt = new THREE.Vector3();
 	private keyCursor: Cell | null = null;
 	private readonly arrows: THREE.InstancedMesh;
 	private readonly flyArrows: THREE.InstancedMesh;
@@ -279,7 +289,9 @@ export class Game {
 		this.clearGhost();
 		sound.play('place');
 		this.emit({ type: 'built', tower });
-		this.select(cell);
+		// Show the reach once, then get out of the way.
+		if (!this.demo) this.fx.ring(tower.pos.clone().setY(TOP), 0xffe08a, tower.stats.range, 0.7, 0.45);
+		this.select(null);
 		this.emit({ type: 'change' });
 		return tower;
 	}
@@ -324,12 +336,18 @@ export class Game {
 	}
 
 	select(cell: Cell | null): void {
+		this.rangePreview = null;
 		for (const tower of this.towers) tower.setSelected(false);
 		this.selected = cell;
 		const tower = this.towerAt(cell);
 		if (tower) tower.setSelected(true);
 		this.clearGhost();
 		this.emit({ type: 'select', cell, tower });
+	}
+
+	/** Shows the range an upgrade would give the selected tower. Null shows the real range. */
+	previewRange(range: number | null): void {
+		this.rangePreview = range;
 	}
 
 	setHover(cell: Cell | null): void {
@@ -594,7 +612,7 @@ export class Game {
 
 	private fire(tower: Tower, aimPoint: THREE.Vector3, target: Enemy): void {
 		const stats = tower.stats;
-		const muzzle = tower.muzzle;
+		const muzzle = tower.launchPoint;
 		const shots = stats.shots ?? 1;
 		const id = tower.def.id;
 		if (!this.demo) sound.play(id === 'ballista' ? 'ballista' : id === 'cannon' ? 'cannon' : 'catapult');
@@ -605,8 +623,15 @@ export class Game {
 				dir.y = (target.pos.y - muzzle.y) * 0.9;
 				dir.normalize();
 				if (shots > 1) dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), (s - (shots - 1) / 2) * (stats.spread ?? 0.2));
-				const object = model('weapon-ammo-arrow');
-				object.scale.setScalar(stats.pierce && stats.pierce > 10 ? 1.3 : 0.9);
+				const rail = !!stats.pierce && stats.pierce > 10;
+				const object = model('ballista-bolt');
+				const trail = new THREE.Mesh(trailGeometry, rail ? trailMaterials.rail : trailMaterials.plain);
+				trail.name = 'trail';
+				trail.position.z = -0.3;
+				trail.scale.set(1, 1, 0.01);
+				object.add(trail);
+				object.userData.size = rail ? 1.25 : 1;
+				object.scale.setScalar(object.userData.size);
 				object.position.copy(muzzle);
 				object.lookAt(muzzle.clone().add(dir));
 				this.root.add(object);
@@ -645,7 +670,8 @@ export class Game {
 					from: muzzle.clone(),
 					to,
 					vel: new THREE.Vector3(),
-					t: -s * 0.08,
+					// Rocks leave when the arm reaches the top of its throw.
+					t: boulder ? -THROW_TIME - s * 0.08 : -s * 0.08,
 					dur: Math.max(0.25, dist / (stats.speed ?? 8)),
 					arc: boulder ? 1.4 + dist * 0.25 : 0.25 + dist * 0.06,
 					damage: stats.damage,
@@ -655,9 +681,8 @@ export class Game {
 					hitsFlying: !boulder,
 				});
 				if (!boulder) {
-					const smokeAt = muzzle.clone().add(new THREE.Vector3().subVectors(to, muzzle).setY(0).normalize().multiplyScalar(0.35));
-					this.fx.smoke(smokeAt, 4);
-					this.fx.flash(smokeAt, 0xffd27a, 0.22, 0.1);
+					this.fx.smoke(muzzle, 4);
+					this.fx.flash(muzzle, 0xffd27a, 0.22, 0.1);
 				}
 			}
 		}
@@ -674,6 +699,12 @@ export class Game {
 			shot.object.visible = true;
 			if (shot.kind === 'arrow') {
 				shot.object.position.addScaledVector(shot.vel, dt);
+				// The trail grows out of the bow, and the bolt shrinks away at the end of its flight.
+				const trail = shot.object.getObjectByName('trail');
+				const size = shot.object.userData.size as number;
+				if (trail) trail.scale.z = Math.min(1, shot.t / 0.08) * (size > 1 ? 1.6 : 0.9);
+				const left = shot.dur - shot.t;
+				if (left < 0.1) shot.object.scale.setScalar(Math.max(0.01, left / 0.1) * size);
 				const p = shot.object.position;
 				for (const enemy of this.enemies) {
 					if (!enemy.alive || shot.hit.has(enemy.id)) continue;
@@ -807,17 +838,23 @@ export class Game {
 			color = 0x8fd3ff;
 		} else if (selectedTower) {
 			rangeAt = selectedTower.pos;
-			range = selectedTower.stats.range;
-			color = 0xffe08a;
+			range = this.rangePreview ?? selectedTower.stats.range;
+			color = this.rangePreview ? 0x9cf29c : 0xffe08a;
 		} else if (hoverTower && !this.demo) {
 			rangeAt = hoverTower.pos;
 			range = hoverTower.stats.range;
+		}
+		if (rangeAt) {
+			// A new spot starts small and grows; the same spot eases to a new size.
+			if (!this.rangeRing.visible || rangeAt.x !== this.ringAt.x || rangeAt.z !== this.ringAt.z) this.ringSize = range * 0.6;
+			this.ringAt.copy(rangeAt);
+			this.ringSize += (range - this.ringSize) * Math.min(1, dt * 16);
 		}
 		for (const mesh of [this.rangeDisc, this.rangeRing]) {
 			mesh.visible = !!rangeAt && !this.over;
 			if (rangeAt) {
 				mesh.position.set(rangeAt.x, TOP + 0.04, rangeAt.z);
-				mesh.scale.setScalar(range);
+				mesh.scale.setScalar(this.ringSize);
 				(mesh.material as THREE.MeshBasicMaterial).color.setHex(color);
 			}
 		}

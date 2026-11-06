@@ -5,6 +5,12 @@ import { TOP, type Cell } from './board';
 
 const heights = new Map<string, number>();
 
+/** Catapult arm timing, in seconds: the throw, and when the wind back starts. */
+export const THROW_TIME = 0.12;
+const THROW_HOLD = 0.35;
+
+const smooth = (t: number): number => t * t * (3 - 2 * t);
+
 function heightOf(name: string, object: THREE.Object3D): number {
 	let h = heights.get(name);
 	if (h === undefined) {
@@ -90,6 +96,12 @@ export class Tower {
 	private drops: Drop[] = [];
 	private kick = 0;
 	private reload = 0;
+	private reloadMax = 1;
+	/** The moving part of the weapon: the ballista bow, the cannon barrel or the catapult arm. */
+	private arm: THREE.Object3D | null = null;
+	private armZ = 0;
+	/** The loaded ammo: the ballista bolt or the rock in the catapult bucket. */
+	private ammo: THREE.Object3D | null = null;
 	private yaw = 0;
 	private age = 0;
 	private highlight: THREE.MeshStandardMaterial[] = [];
@@ -129,6 +141,18 @@ export class Tower {
 		return new THREE.Vector3(this.pos.x, this.group.position.y + this.weaponY + 0.35, this.pos.z);
 	}
 
+	/** Where a shot leaves the weapon: the loaded bolt, the end of the barrel or the top of the throw. */
+	get launchPoint(): THREE.Vector3 {
+		if (this.ammo && this.def.id === 'ballista') {
+			this.group.updateMatrixWorld(true);
+			return this.ammo.getWorldPosition(new THREE.Vector3());
+		}
+		const forward = new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+		if (this.def.id === 'cannon') return this.muzzle.addScaledVector(forward, 0.3).setY(this.muzzle.y - 0.05);
+		if (this.def.id === 'catapult') return this.muzzle.addScaledVector(forward, 0.25).add(new THREE.Vector3(0, 0.27, 0));
+		return this.muzzle;
+	}
+
 	rebuild(animate: boolean): void {
 		this.group.clear();
 		const look = buildTowerLook(this.def, this.levelDef);
@@ -137,6 +161,16 @@ export class Tower {
 		this.weaponY = look.weaponY;
 		this.flag = look.flag;
 		this.weapon.rotation.y = this.yaw;
+		const armName = { ballista: 'arm', cannon: 'barrel', catapult: 'catapult', crystal: '' }[this.def.id];
+		this.arm = armName ? (this.weapon.getObjectByName(armName) ?? null) : null;
+		this.armZ = this.arm?.position.z ?? 0;
+		this.ammo = this.weapon.getObjectByName('bolt') ?? null;
+		if (this.def.id === 'catapult' && this.arm) {
+			this.ammo = model('weapon-ammo-boulder');
+			this.ammo.scale.setScalar(0.75);
+			this.ammo.position.set(0, 0.13, -0.32);
+			this.arm.add(this.ammo);
+		}
 		this.highlight = [];
 		this.drops = [];
 		if (animate) {
@@ -199,11 +233,28 @@ export class Tower {
 		if (this.kick > 0) this.kick = Math.max(0, this.kick - dt * 5);
 		if (this.reload > 0) this.reload = Math.max(0, this.reload - dt);
 		this.weapon.rotation.y = this.yaw;
-		const child = this.weapon.children[0];
-		if (child) {
-			if (this.def.id === 'cannon') child.position.z = -0.12 * this.kick;
-			if (this.def.id === 'ballista') child.visible = this.reload <= 0;
-			if (this.def.id === 'catapult') child.rotation.x = -1.3 * Math.sin(Math.min(1, this.kick) * Math.PI);
+		// How far into the reload we are: 0 just fired, 1 ready.
+		const ready = 1 - this.reload / this.reloadMax;
+		if (this.arm && this.def.id === 'ballista') {
+			// The bow jumps back, then a new bolt slides in from behind.
+			this.arm.position.z = this.armZ - 0.06 * this.kick;
+			if (this.ammo) {
+				const slide = Math.max(0, (ready - 0.35) / 0.65);
+				this.ammo.visible = ready > 0.35;
+				this.ammo.position.z = -0.35 * (1 - slide) * (1 - slide);
+			}
+		} else if (this.arm && this.def.id === 'cannon') {
+			this.arm.position.z = this.armZ - 0.12 * this.kick * this.kick;
+		} else if (this.arm && this.def.id === 'catapult') {
+			// A fast throw over the top, a short hold, then a slow wind back.
+			const since = this.reloadMax - this.reload;
+			const windBack = Math.max(0.2, this.reloadMax * 0.75 - THROW_HOLD);
+			let swing = 0;
+			if (since < THROW_TIME) swing = Math.sin((since / THROW_TIME) * (Math.PI / 2));
+			else if (since < THROW_HOLD) swing = 1;
+			else swing = 1 - smooth(Math.min(1, (since - THROW_HOLD) / windBack));
+			this.arm.rotation.x = 1.9 * swing;
+			if (this.ammo) this.ammo.visible = since < THROW_TIME * 0.8 || swing <= 0.001;
 		}
 		if (this.def.id === 'crystal') {
 			this.weapon.position.y = this.weaponY + Math.sin(this.age * 2) * 0.05;
@@ -226,6 +277,6 @@ export class Tower {
 
 	fired(): void {
 		this.kick = 1;
-		this.reload = this.stats.rate * 0.4;
+		this.reloadMax = this.reload = Math.max(0.3, this.stats.rate * 0.8);
 	}
 }

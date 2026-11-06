@@ -369,10 +369,31 @@ body[data-input='pad'] kbd.p {
 	border-right: 5px solid var(--ink);
 }
 
-.build-bar {
+.turn {
+	display: flex;
+	gap: 6px;
+}
+
+.turn svg.flip {
+	transform: scaleX(-1);
+}
+
+.build-dock {
 	position: absolute;
 	left: max(12px, env(safe-area-inset-left));
 	bottom: max(10px, env(safe-area-inset-bottom));
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 8px;
+	pointer-events: none;
+}
+
+.build-dock > * {
+	pointer-events: auto;
+}
+
+.build-bar {
 	display: flex;
 	gap: 8px;
 	background: var(--panel);
@@ -406,9 +427,104 @@ body[data-input='pad'] kbd.p {
 	transform: translateY(-2px);
 }
 
-.tower-btn.active {
+.tower-btn.active,
+.tower-btn.armed {
 	border-color: var(--gold);
 	background: rgba(255, 194, 61, 0.18);
+}
+
+/* A tile is picked: the bar asks for a tower. */
+.build-dock.target .build-bar {
+	border-color: var(--gold);
+	box-shadow:
+		0 5px 0 rgba(0, 0, 0, 0.25),
+		0 0 0 4px rgba(255, 194, 61, 0.25);
+}
+
+.build-dock.target .tower-btn:not(.poor) {
+	animation: nudge 1.2s ease-in-out infinite;
+}
+
+.build-dock.target .tower-btn:nth-child(2) {
+	animation-delay: 0.1s;
+}
+
+.build-dock.target .tower-btn:nth-child(3) {
+	animation-delay: 0.2s;
+}
+
+.build-dock.target .tower-btn:nth-child(4) {
+	animation-delay: 0.3s;
+}
+
+@keyframes nudge {
+	50% {
+		transform: translateY(-3px);
+	}
+}
+
+.build-info {
+	width: 280px;
+	max-width: calc(100vw - 24px);
+	background: var(--panel);
+	border: 2px solid var(--panel-edge);
+	border-radius: 14px;
+	padding: 8px 12px;
+	box-shadow: 0 5px 0 rgba(0, 0, 0, 0.25);
+	pointer-events: none !important;
+	animation: pop-in 0.12s ease-out;
+}
+
+.build-info .info-head {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+}
+
+.build-info .info-head b {
+	font-size: 16px;
+}
+
+.build-info .role {
+	flex: 1;
+	font-size: 11px;
+	font-weight: 800;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--cyan);
+}
+
+.build-info p {
+	margin: 3px 0 0;
+	font-size: 13px;
+	line-height: 1.3;
+	color: var(--muted);
+}
+
+.build-info em {
+	display: block;
+	margin-top: 4px;
+	font-style: normal;
+	font-size: 12px;
+	font-weight: 800;
+	color: var(--gold);
+}
+
+/* Short, wide screens: the bar stands on the left side. */
+.hud.side-bar .build-dock {
+	bottom: auto;
+	top: 50%;
+	translate: 0 -50%;
+	flex-direction: row-reverse;
+	align-items: center;
+}
+
+.hud.side-bar .build-bar {
+	flex-direction: column;
+}
+
+.hud.side-bar .build-info {
+	width: 230px;
 }
 
 .tower-btn.poor {
@@ -493,8 +609,9 @@ body[data-input='pad'] kbd.p {
 
 .popup {
 	position: absolute;
-	width: 364px;
+	width: 320px;
 	max-width: calc(100vw - 16px);
+	overflow-y: auto;
 	background: var(--panel);
 	border: 2px solid var(--panel-edge);
 	border-radius: 18px;
@@ -506,8 +623,34 @@ body[data-input='pad'] kbd.p {
 	z-index: 5;
 }
 
-.popup.open {
-	animation: pop-in 0.16s ease-out;
+.popup.left {
+	left: max(12px, env(safe-area-inset-left));
+}
+
+.popup.right {
+	right: max(12px, env(safe-area-inset-right));
+}
+
+.popup.open.left {
+	animation: slide-left 0.18s ease-out;
+}
+
+.popup.open.right {
+	animation: slide-right 0.18s ease-out;
+}
+
+@keyframes slide-left {
+	from {
+		transform: translateX(-30px);
+		opacity: 0;
+	}
+}
+
+@keyframes slide-right {
+	from {
+		transform: translateX(30px);
+		opacity: 0;
+	}
 }
 
 @keyframes pop-in {
@@ -638,29 +781,52 @@ body[data-input='pad'] kbd.p {
 	color: var(--cream);
 }
 
+/* Upgrades are rows: picture, name and what it does, cost. */
+.popup-row.upgrades {
+	flex-direction: column;
+	gap: 6px;
+}
+
+.upgrade {
+	display: grid;
+	grid-template-columns: 48px 1fr auto;
+	grid-template-rows: auto auto;
+	column-gap: 8px;
+	align-items: center;
+	text-align: left;
+	padding: 5px 8px 5px 5px;
+}
+
 .upgrade img {
-	width: 56px;
-	height: 56px;
+	grid-row: span 2;
+	width: 48px;
+	height: 48px;
 }
 
 .upgrade .name {
 	font-weight: 900;
 	font-size: 15px;
+	align-self: end;
 }
 
 .upgrade .blurb {
+	grid-column: 2;
+	grid-row: 2;
 	font-size: 11.5px;
 	color: var(--muted);
-	text-align: center;
 	line-height: 1.25;
-	margin: 2px 0 4px;
-	min-height: 2.5em;
+	align-self: start;
+}
+
+.upgrade .cost {
+	grid-column: 3;
+	grid-row: 1 / span 2;
 }
 
 .upgrade kbd {
 	position: absolute;
-	top: 6px;
-	right: 6px;
+	top: 3px;
+	left: 3px;
 }
 
 .upgrade.branch-a {
@@ -781,6 +947,7 @@ body[data-input='pad'] kbd.p {
 	left: 50%;
 	top: 76px;
 	translate: -50% 0;
+	pointer-events: none !important;
 	width: min(520px, calc(100vw - 24px));
 	background: var(--cream);
 	color: var(--ink);
@@ -806,6 +973,25 @@ body[data-input='pad'] kbd.p {
 
 .tip .link {
 	color: #7a7196;
+	pointer-events: auto;
+}
+
+.tip.low {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	text-align: left;
+	padding: 8px 14px;
+}
+
+.tip.low p {
+	margin: 0;
+	font-size: 14px;
+	line-height: 1.3;
+}
+
+.tip.low .link {
+	white-space: nowrap;
 }
 
 .vignette {
@@ -1322,7 +1508,7 @@ h1 {
 	}
 
 	.popup {
-		width: 300px;
+		width: 270px;
 		padding: 7px;
 	}
 
@@ -1331,13 +1517,17 @@ h1 {
 		height: 42px;
 	}
 
+	.upgrade {
+		grid-template-columns: 36px 1fr auto;
+	}
+
 	.upgrade img {
-		width: 34px;
-		height: 34px;
+		width: 36px;
+		height: 36px;
 	}
 
 	.upgrade .blurb {
-		display: none;
+		font-size: 10.5px;
 	}
 
 	.popup-info {
@@ -1393,6 +1583,14 @@ h1 {
 	.tip {
 		top: 58px;
 		padding: 8px 12px 4px;
+	}
+
+	.tip.low {
+		padding: 6px 10px;
+	}
+
+	.tip.low p {
+		font-size: 13px;
 	}
 
 	.tip p {
