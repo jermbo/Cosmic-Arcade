@@ -1,0 +1,43 @@
+/* Primitive */
+:root {
+	--ink-900: #16131f;
+	--ink-600: #5c566b;
+	--ink-200: #d9d5e3;
+	--ink-50: #f7f6fb;
+	--night-950: #0d0b14;
+	--night-800: #1d1a29;
+	--night-600: #3a3550;
+	--night-300: #a9a3bd;
+	--night-100: #ece9f5;
+	--violet-600: #6b3fd4;
+	--violet-300: #b9a3f5;
+	--white: #ffffff;
+
+	--size-0875: 0.875rem;
+	--size-1: 1rem;
+	--size-2: 2rem;
+	--size-05: 0.5rem;
+}
+
+/* Semantic */
+:root {
+	color-scheme: light dark;
+
+	--color-page: light-dark(var(--ink-50), var(--night-950));
+	--color-surface: light-dark(var(--white), var(--night-800));
+	--color-text: light-dark(var(--ink-900), var(--night-100));
+	--color-text-muted: light-dark(var(--ink-600), var(--night-300));
+	--color-border: light-dark(var(--ink-200), var(--night-600));
+	--color-accent: light-dark(var(--violet-600), var(--violet-300));
+	--color-on-accent: light-dark(var(--white), var(--night-950));
+
+	--text-small: var(--size-0875);
+	--text-body: var(--size-1);
+	--text-title: var(--size-2);
+
+	--space-small: var(--size-05);
+	--space-body: var(--size-1);
+	--space-large: var(--size-2);
+
+	--corner-card: var(--size-05);
+}

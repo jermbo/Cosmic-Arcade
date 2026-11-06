@@ -1,0 +1,56 @@
+---
+import { getCollection, getEntry } from 'astro:content';
+import Base from '../../layouts/base.astro';
+import GameCard from '../../components/game-card.astro';
+import { kindLabel } from '../../games/game-fields';
+import { gamePath } from '../../games/game-urls';
+
+const entries = await getCollection('games');
+const games = await Promise.all(
+	entries
+		.sort((a, b) => a.data.title.localeCompare(b.data.title))
+		.map(async (entry) => {
+			const build = entry.data.kind === 'video' && entry.data.build ? await getEntry(entry.data.build) : undefined;
+			return { entry, engine: build?.data.engine };
+		}),
+);
+---
+
+<Base title="Games" description="Every game in the Cosmic Arcade.">
+	<h1 class="games__title">Games</h1>
+	{
+		games.length === 0 ? (
+			<p>No games yet. Add an entry in src/content/games/ to list a game here.</p>
+		) : (
+			<ul class="games__list">
+				{games.map(({ entry, engine }) => (
+					<li>
+						<GameCard
+							href={gamePath(entry.id)}
+							title={entry.data.title}
+							tagline={entry.data.tagline}
+							kind={kindLabel(entry.data.kind)}
+							status={entry.data.status}
+							engine={engine}
+						/>
+					</li>
+				))}
+			</ul>
+		)
+	}
+</Base>
+
+<style>
+	.games__title {
+		font-size: var(--text-title);
+	}
+
+	.games__list {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+		gap: var(--space-body);
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+</style>

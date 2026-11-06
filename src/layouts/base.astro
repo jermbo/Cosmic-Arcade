@@ -1,0 +1,72 @@
+---
+import '../styles/tokens.css';
+import { GAMES_PATH } from '../games/game-urls';
+
+interface Props {
+	title: string;
+	description?: string;
+}
+
+const { title, description } = Astro.props;
+---
+
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" href="/favicon.ico" />
+		{description && <meta name="description" content={description} />}
+		<title>{title} · Cosmic Arcade</title>
+	</head>
+	<body class="site">
+		<header class="site__header">
+			<a class="site__home" href={GAMES_PATH}>Cosmic Arcade</a>
+		</header>
+		<main class="site__main">
+			<slot />
+		</main>
+	</body>
+</html>
+
+<style is:global>
+	.site {
+		margin: 0;
+		background: var(--color-page);
+		color: var(--color-text);
+		font-family: system-ui, sans-serif;
+		font-size: var(--text-body);
+		line-height: 1.5;
+	}
+
+	.site__header,
+	.site__main {
+		max-width: 60rem;
+		margin-inline: auto;
+		padding-inline: var(--space-body);
+	}
+
+	.site__header {
+		padding-block: var(--space-body);
+	}
+
+	.site__home {
+		color: var(--color-text);
+		font-weight: 700;
+		text-decoration: none;
+	}
+
+	.site__home:focus-visible,
+	.site a:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	.site__main {
+		padding-block-end: var(--space-large);
+	}
+
+	.site a {
+		color: var(--color-accent);
+	}
+</style>

@@ -36,8 +36,8 @@ The `docs-wiki` and `code-standards` skills have the baseline rules. A file here
 
 | Rules      | Path |
 | ---------- | ---- |
-| Page rules | None |
-| Code rules | None |
+| Page rules | None                          |
+| Code rules | `docs/standards/code-rules.md` |
 
 ## Forms
 
@@ -70,19 +70,21 @@ A model is a page that shows a form with real content.
 
 ## Sides of the code
 
-| Side     | Folders |
-| -------- | ------- |
-| Frontend | `src/`  |
-| Backend  | None    |
+| Side     | Folders                                                              |
+| -------- | -------------------------------------------------------------------- |
+| Frontend | `src/` (the site), and `games/<folder>/` (each game project)         |
+| Backend  | None                                                                 |
 
 ## Layers
 
-| Layer     | Folders or files |
-| --------- | ---------------- |
-| Shell     | `src/pages/`     |
-| Interface | None             |
-| State     | None             |
-| Domain    | None             |
+These are the layers of the site. Each game project has its own layers.
+
+| Layer     | Folders or files                                       |
+| --------- | ------------------------------------------------------ |
+| Shell     | `src/pages/`, `src/layouts/`, `scripts/`, `src/content.config.ts` |
+| Interface | `src/components/`                                      |
+| State     | None                                                   |
+| Domain    | `src/games/`                                           |
 
 ## Versions
 
@@ -116,9 +118,9 @@ One line for each limit of a persona that a design must pass, as a question.
 
 | Fact          | Value |
 | ------------- | ----- |
-| Design tokens | None  |
-| Design rules  | None  |
-| Shared parts  | None  |
+| Design tokens | `src/styles/tokens.css`           |
+| Design rules  | `docs/standards/design-rules.md`  |
+| Shared parts  | `src/components/`                 |
 
 ## UI prototypes
 

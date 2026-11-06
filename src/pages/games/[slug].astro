@@ -1,0 +1,108 @@
+---
+import { getCollection, getEntry, render } from 'astro:content';
+import Base from '../../layouts/base.astro';
+import { kindLabel } from '../../games/game-fields';
+import { playPath } from '../../games/game-urls';
+
+export async function getStaticPaths() {
+	const entries = await getCollection('games');
+	return entries.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+const game = entry.data;
+const build = game.kind === 'video' && game.build ? await getEntry(game.build) : undefined;
+---
+
+<Base title={game.title} description={game.tagline}>
+	<article class="game">
+		<header class="game__header">
+			<h1 class="game__title">{game.title}</h1>
+			{build && <a class="game__play" href={playPath(entry.id)}>Play</a>}
+		</header>
+		<p class="game__tagline">{game.tagline}</p>
+
+		<dl class="game__facts">
+			<dt>Kind</dt>
+			<dd>{kindLabel(game.kind)}</dd>
+			<dt>Status</dt>
+			<dd>{game.status}</dd>
+			{
+				build && (
+					<>
+						<dt>Engine</dt>
+						<dd>{build.data.engine}</dd>
+					</>
+				)
+			}
+			{
+				game.kind === 'video' && game.platforms && (
+					<>
+						<dt>Platforms</dt>
+						<dd>{game.platforms.join(', ')}</dd>
+					</>
+				)
+			}
+			{
+				game.kind === 'video' && game.inputs && (
+					<>
+						<dt>Inputs</dt>
+						<dd>{game.inputs.join(', ')}</dd>
+					</>
+				)
+			}
+		</dl>
+
+		<div class="game__body">
+			<Content />
+		</div>
+	</article>
+</Base>
+
+<style>
+	.game__header {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-body);
+	}
+
+	.game__title {
+		margin: 0;
+		font-size: var(--text-title);
+	}
+
+	.game__play {
+		display: inline-flex;
+		align-items: center;
+		min-height: 44px;
+		padding-inline: var(--space-body);
+		border-radius: var(--corner-card);
+		background: var(--color-accent);
+		color: var(--color-on-accent);
+		font-weight: 700;
+		text-decoration: none;
+	}
+
+	.game__tagline {
+		color: var(--color-text-muted);
+	}
+
+	.game__facts {
+		display: grid;
+		grid-template-columns: max-content 1fr;
+		gap: var(--space-small) var(--space-body);
+		font-size: var(--text-small);
+	}
+
+	.game__facts dt {
+		color: var(--color-text-muted);
+	}
+
+	.game__facts dd {
+		margin: 0;
+		text-transform: capitalize;
+	}
+</style>

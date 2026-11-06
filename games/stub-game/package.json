@@ -1,0 +1,12 @@
+{
+	"name": "@arcade/stub-game",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "node build.js"
+	},
+	"arcade": {
+		"engine": "none",
+		"outDir": "dist"
+	}
+}

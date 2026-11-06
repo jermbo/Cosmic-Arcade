@@ -1,0 +1,58 @@
+---
+interface Props {
+	href: string;
+	title: string;
+	tagline: string;
+	kind: string;
+	status: string;
+	engine?: string;
+}
+
+const { href, title, tagline, kind, status, engine } = Astro.props;
+---
+
+<article class="game-card">
+	<h2 class="game-card__title"><a class="game-card__link" href={href}>{title}</a></h2>
+	<p class="game-card__tagline">{tagline}</p>
+	<p class="game-card__facts">
+		<span>{kind}</span>
+		<span>{status}</span>
+		{engine && <span>{engine}</span>}
+	</p>
+</article>
+
+<style>
+	.game-card {
+		position: relative;
+		padding: var(--space-body);
+		border: 1px solid var(--color-border);
+		border-radius: var(--corner-card);
+		background: var(--color-surface);
+	}
+
+	.game-card__title {
+		margin: 0;
+		font-size: var(--text-body);
+	}
+
+	/* The link covers the whole card, so the full card is one tap target. */
+	.game-card__link::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+	}
+
+	.game-card__tagline {
+		margin-block: var(--space-small);
+	}
+
+	.game-card__facts {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-small);
+		margin: 0;
+		color: var(--color-text-muted);
+		font-size: var(--text-small);
+		text-transform: capitalize;
+	}
+</style>
