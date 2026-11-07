@@ -1,5 +1,7 @@
 // Game rules. No DOM here, so the rules also run in Node (see tools/sim.js).
 
+import { SHAPE_ART } from './shapes.js';
+
 export const GRID_SIZES = {
 	small: { cols: 6, rows: 8 },
 	medium: { cols: 7, rows: 9 },
@@ -11,16 +13,52 @@ export const DEFAULT_LAB = {
 	pieces: 2,
 };
 
-// Power-ups come from the length of a chain in one turn (the highest tier reached).
-// They go into a bag and the player uses them when they choose.
-// Design asked for 5 / 8 / 10, but the sim (tools/sim.js) shows chains of 5+ almost never
-// happen with linked matches, so the play-test build uses 3 / 5 / 7. Change the numbers here.
-export const CHAIN_REWARDS = [
-	{ chain: 7, kind: 'remix' }, // mixes the colors of every block on the board
-	{ chain: 5, kind: 'blast' }, // clears a 3x3 area the player picks
-	{ chain: 3, kind: 'prism' }, // paints one tray piece a single color
-];
+// A turn earns one power-up when it makes a chain of REWARD_CHAIN steps or clears a linked
+// group of REWARD_GROUP blocks. Which power-up comes from a shuffled deck, so the same one
+// never shows up twice in a row. Earned power-ups wait in a bag until the player uses them.
+export const POWER_KINDS = ['prism', 'blast', 'remix'];
+export const REWARD_CHAIN = 3;
+export const REWARD_GROUP = 6;
 export const BAG_SIZE = 3;
+
+// Group size multiplier: 3 and 4 blocks pay x1, then 5 pays x2, 6 pays x3, and so on.
+const GROUP_MULT_FROM = 5;
+const GROUP_MULT_MAX = 6;
+
+/** Score multiplier for one cleared group of this size. */
+export function groupMultiplier(size) {
+	if (size < GROUP_MULT_FROM) return 1;
+	return Math.min(GROUP_MULT_MAX, size - GROUP_MULT_FROM + 2);
+}
+
+// Glints are the meta currency. Combos earn them, and they are kept between games.
+// A step earns (chain step - 1) + (group multiplier - 1), and a full clear earns a bonus.
+export const GLINT_ALL_CLEAR = 10;
+export const WARMUP_ROUNDS = 20; // the game plays these rounds for you at the start (costs WARMUP_COST)
+export const WARMUP_COST = 25;
+export const SECOND_WIND_ROWS = 4; // rows cleared from the bottom of the stack when you buy a second wind
+export const SECOND_WIND_COST = 40;
+// Boosts bought at the start of a game, and things bought during or after a game.
+export const START_POWER_COST = 20; // begin with one power-up of your choice
+export const BAN_COST = 30; // keep one shape out of this game
+export const REROLL_COST = 10; // swap the tray for new pieces; each use in a game costs REROLL_STEP more
+export const REROLL_STEP = 5;
+export const EXTEND_COST = 20; // +EXTEND_SECONDS in Timed, once per game
+export const EXTEND_SECONDS = 15;
+export const DAILY_BONUS = 20; // the first daily challenge run of each day
+export const BAG_UPGRADE_COSTS = [150, 300]; // permanent: the bag holds 1 more power-up each time
+
+/** A number from a date text such as "2026-11-07", so everyone gets the same daily game. */
+export function dailySeed(text) {
+	let h = 2166136261;
+	for (const ch of text) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+	return h >>> 0;
+}
+
+/** Glints earned by one clear step. */
+export function glintsFor(chain, mult, allClear = false) {
+	return chain - 1 + (mult - 1) + (allClear ? GLINT_ALL_CLEAR : 0);
+}
 
 export const TIMED_SECONDS = 90;
 export const MAX_COLORS = 5;
@@ -32,15 +70,42 @@ const MIN_GROUP = 3;
 const ALL_CLEAR_MIN = 8; // the board needs this many blocks before a full clear pays the bonus
 const BLAST_RADIUS = 1;
 
-// Each shape is a list of [dx, dy]. Rotation makes the other forms.
-const SHAPES = [
-	[[0, 0], [1, 0], [2, 0]],
-	[[0, 0], [0, 1], [0, 2]],
-	[[0, 0], [1, 0], [0, 1]],
-	[[0, 0], [1, 0], [1, 1]],
-	[[1, 0], [0, 1], [1, 1]],
-	[[0, 0], [0, 1], [1, 1]],
-];
+/** Turns ASCII rows into a list of [dx, dy]. */
+export function parseArt(rows) {
+	const out = [];
+	rows.forEach((row, dy) => [...row].forEach((ch, dx) => ch === '#' && out.push([dx, dy])));
+	return out;
+}
+
+export const MAX_SHAPE_WIDTH = 5;
+
+/** Checks a list of { weight, art } and returns the usable ones. */
+export function cleanShapes(list) {
+	const out = [];
+	for (const item of Array.isArray(list) ? list : []) {
+		if (!item || !Array.isArray(item.art) || !item.art.every((row) => typeof row === 'string')) continue;
+		const cells = parseArt(item.art);
+		const width = cells.reduce((w, [dx]) => Math.max(w, dx + 1), 0);
+		if (cells.length < 2 || width > MAX_SHAPE_WIDTH) continue;
+		out.push({ weight: Math.min(9, Math.max(1, Math.round(Number(item.weight)) || 1)), art: item.art.slice() });
+	}
+	return out;
+}
+
+// The live shape list. setShapes() swaps it (the shape lab saves its own list in the browser).
+export let SHAPES = [];
+let SHAPE_WEIGHTS = [];
+let WEIGHT_TOTAL = 0;
+
+export function setShapes(list) {
+	const shapes = cleanShapes(list);
+	if (!shapes.length) return false;
+	SHAPES = shapes.map(({ art }) => parseArt(art));
+	SHAPE_WEIGHTS = shapes.map(({ weight }) => weight);
+	WEIGHT_TOTAL = SHAPE_WEIGHTS.reduce((a, b) => a + b, 0);
+	return true;
+}
+setShapes(SHAPE_ART);
 
 /** Small seeded random source (mulberry32). */
 export function makeRng(seed = Date.now()) {
@@ -63,12 +128,6 @@ function sizeOf(cells) {
 	return { w, h };
 }
 
-/** Turns a piece 90 degrees clockwise. Colors move with their cells. */
-export function rotatePiece(piece) {
-	const cells = piece.cells.map((c) => ({ dx: piece.h - 1 - c.dy, dy: c.dx, color: c.color }));
-	return { ...piece, cells, ...sizeOf(cells) };
-}
-
 /** How many colors are in play after a number of turns. */
 export function colorsForTurn(mode, turn) {
 	if (mode === 'timed') return 4;
@@ -79,13 +138,18 @@ export class Game {
 	/**
 	 * @param {{ mode?: 'endless'|'timed', lab?: typeof DEFAULT_LAB, seed?: number }} options
 	 */
-	constructor({ mode = 'endless', lab = DEFAULT_LAB, seed = Date.now() } = {}) {
+	constructor({ mode = 'endless', lab = DEFAULT_LAB, seed = Date.now(), bagSize = BAG_SIZE, banned = null } = {}) {
+		this.bagSize = bagSize;
+		this.banned = banned; // the index of a shape that never shows up this game, or null
+		this.rerolls = 0;
+		this.extensionUsed = false;
 		this.mode = mode;
 		this.lab = { ...DEFAULT_LAB, ...lab };
 		const size = GRID_SIZES[this.lab.grid] || GRID_SIZES.medium;
 		this.cols = size.cols;
 		this.rows = size.rows;
-		this.rng = makeRng(seed);
+		this.rng = makeRng(seed); // pieces only, so a daily seed deals the same pieces in the same order
+		this.rngMisc = makeRng((seed ^ 0x9e3779b9) >>> 0); // power-up deck, Remix and bot noise
 		this.grid = new Array(this.cols * this.rows).fill(null);
 		this.nextId = 1;
 		this.tick = 0;
@@ -93,6 +157,10 @@ export class Game {
 		this.score = 0;
 		this.pendingBlast = null;
 		this.bag = [];
+		this.deck = [];
+		this.lastPower = null;
+		this.glints = 0; // earned this run, warm-up included (the game keeps the wallet)
+		this.secondWindUsed = false;
 		this.stats = { cleared: 0, bestChain: 0, earned: 0, used: 0, turns: 0 };
 		this.pieces = [];
 		for (let i = 0; i < this.lab.pieces; i++) this.pieces.push(this.makePiece());
@@ -125,7 +193,16 @@ export class Game {
 	}
 
 	makePiece() {
-		const shape = SHAPES[Math.floor(this.rng() * SHAPES.length)];
+		const banned = this.banned !== null && SHAPES.length > 1 ? this.banned : -1;
+		let roll = this.rng() * (WEIGHT_TOTAL - (banned >= 0 ? SHAPE_WEIGHTS[banned] : 0));
+		let pick = 0;
+		for (let i = 0; i < SHAPES.length; i++) {
+			if (i === banned) continue;
+			pick = i;
+			if (roll < SHAPE_WEIGHTS[i]) break;
+			roll -= SHAPE_WEIGHTS[i];
+		}
+		const shape = SHAPES[pick];
 		let colors;
 		do {
 			colors = shape.map(() => this.randomColor());
@@ -165,40 +242,42 @@ export class Game {
 		return cols;
 	}
 
+	/** The piece moves as one rigid shape, so it fits only if every block of the whole shape has room. */
 	fits(piece, x) {
 		if (!piece || x < 0 || x + piece.w > this.cols) return false;
-		for (const [dx, list] of this.columnsOf(piece)) {
-			if (list.length > this.rows - this.height(x + dx)) return false;
-		}
-		return true;
+		return this.landing(piece, x).every((l) => l.y < this.rows && !this.get(l.x, l.y));
 	}
 
-	/** True if the piece fits somewhere in any rotation. */
-	canPlaceAny(piece) {
-		let p = piece;
-		for (let r = 0; r < 4; r++) {
-			for (let x = 0; x <= this.cols - p.w; x++) if (this.fits(p, x)) return true;
-			p = rotatePiece(p);
-		}
+	/** True if the piece fits in some column. */
+	canPlace(piece) {
+		for (let x = 0; x <= this.cols - piece.w; x++) if (this.fits(piece, x)) return true;
 		return false;
 	}
 
 	hasMove() {
-		return this.pieces.some((p) => p && this.canPlaceAny(p));
+		return this.pieces.some((p) => p && this.canPlace(p));
 	}
 
-	/** Where each cell of the piece lands if dropped at column x. */
+	/**
+	 * Where each cell of the piece comes to rest if dropped at column x. The piece rises as one rigid
+	 * shape until its first block in some column touches that column's stack (or the ceiling).
+	 * Blocks that rest with a gap above them rise to close it when the board settles.
+	 */
 	landing(piece, x) {
+		const cols = this.columnsOf(piece);
+		let top = 0;
+		for (const [dx, list] of cols) top = Math.max(top, this.height(x + dx) - list[0].dy);
 		const out = [];
-		for (const [dx, list] of this.columnsOf(piece)) {
-			const top = this.height(x + dx);
-			list.forEach((cell, k) => out.push({ cell, x: x + dx, y: top + k }));
-		}
+		for (const [dx, list] of cols) for (const cell of list) out.push({ cell, x: x + dx, y: top + cell.dy });
 		return out;
 	}
 
-	/** Puts a piece on the board. Returns the new blocks with their land cells. */
-	place(slot, x, piece = this.pieces[slot]) {
+	/**
+	 * Puts a piece on the board in its rigid shape. Returns the new blocks with their cells.
+	 * With settle: false, blocks with a gap above them stay put. The caller shows the rigid landing,
+	 * then calls settle(). By default the board settles at once.
+	 */
+	place(slot, x, piece = this.pieces[slot], { settle = true } = {}) {
 		if (!this.fits(piece, x)) return null;
 		this.tick++;
 		const placed = this.landing(piece, x).map(({ cell, x: bx, y }) => {
@@ -209,11 +288,29 @@ export class Game {
 		this.pieces[slot] = null;
 		this.turn++;
 		this.stats.turns++;
+		if (settle) this.settle();
 		return placed;
+	}
+
+	/** Lifts every block with a gap above it up to the ceiling or the block above. Returns the moves. */
+	settle() {
+		this.tick++;
+		return this.applyGravity();
 	}
 
 	refill(slot) {
 		this.pieces[slot] = this.makePiece();
+	}
+
+	/** What the next reroll costs. */
+	get rerollCost() {
+		return REROLL_COST + REROLL_STEP * this.rerolls;
+	}
+
+	/** Swaps every piece in the tray for a new one. The caller takes the Glints. */
+	reroll() {
+		this.rerolls++;
+		this.pieces = this.pieces.map((p) => (p ? this.makePiece() : p));
 	}
 
 	/** Finds groups of 3 or more blocks of one color that touch side to side. */
@@ -267,15 +364,27 @@ export class Game {
 		}));
 		for (const idx of clear) this.grid[idx] = null;
 
-		let points = cleared.length * POINTS_PER_BLOCK * chain;
+		// Each group pays by its own size. Blast-only blocks pay the base rate.
+		let points = 0;
+		let inGroups = 0;
+		let biggest = 0;
+		for (const g of groups) {
+			points += g.cells.size * POINTS_PER_BLOCK * chain * groupMultiplier(g.cells.size);
+			inGroups += g.cells.size;
+			biggest = Math.max(biggest, g.cells.size);
+		}
+		points += (cleared.length - inGroups) * POINTS_PER_BLOCK * chain;
 		const falls = this.applyGravity();
 		const allClear = before >= ALL_CLEAR_MIN && this.grid.every((b) => !b);
 		if (allClear) points += ALL_CLEAR_BONUS;
 
+		const mult = groupMultiplier(biggest);
+		const glints = glintsFor(chain, mult, allClear);
+		this.glints += glints;
 		this.score += points;
 		this.stats.cleared += cleared.length;
 		this.stats.bestChain = Math.max(this.stats.bestChain, chain);
-		return { chain, groups, cleared, blast, falls, points, allClear };
+		return { chain, groups, cleared, blast, falls, points, allClear, biggest, mult, glints };
 	}
 
 	/** Lifts every block to the free cell nearest the ceiling in its column. */
@@ -300,17 +409,35 @@ export class Game {
 
 	// ---- power-ups ----
 
-	/** The power-up a chain of this length earns, if any. */
-	rewardFor(chainLength) {
-		const tier = CHAIN_REWARDS.find((r) => chainLength >= r.chain);
-		return tier ? tier.kind : null;
+	/** True when a chain this long, or a group this big, earns a power-up. */
+	earnsReward(chainLength, biggestGroup = 0) {
+		return chainLength >= REWARD_CHAIN || biggestGroup >= REWARD_GROUP;
 	}
 
-	/** Puts the reward for a finished chain in the bag. Returns { kind, lost } or null. */
-	awardChain(chainLength) {
-		const kind = this.rewardFor(chainLength);
-		if (!kind) return null;
-		if (this.bag.length >= BAG_SIZE) return { kind, lost: true };
+	/** Next power-up from the shuffled deck. A new deck never starts with the last one drawn. */
+	drawPower() {
+		if (!this.deck.length) {
+			const deck = POWER_KINDS.slice();
+			do {
+				for (let k = deck.length - 1; k > 0; k--) {
+					const j = Math.floor(this.rngMisc() * (k + 1));
+					[deck[k], deck[j]] = [deck[j], deck[k]];
+				}
+			} while (deck[deck.length - 1] === this.lastPower && deck.length > 1);
+			this.deck = deck;
+		}
+		this.lastPower = this.deck.pop();
+		return this.lastPower;
+	}
+
+	/**
+	 * Puts the reward for a finished turn in the bag. Returns { kind, lost } or null.
+	 * A full bag loses the reward (kind is null) and the deck keeps its card.
+	 */
+	awardChain(chainLength, biggestGroup = 0) {
+		if (!this.earnsReward(chainLength, biggestGroup)) return null;
+		if (this.bag.length >= this.bagSize) return { kind: null, lost: true };
+		const kind = this.drawPower();
 		this.bag.push(kind);
 		this.stats.earned++;
 		return { kind, lost: false };
@@ -353,9 +480,9 @@ export class Game {
 	}
 
 	/**
-	 * Mixes the colors of the blocks on the board. Blocks stay where they are.
-	 * It tries not to leave a match, but a few can remain on a crowded board.
-	 * Returns the blocks that changed, or null when nothing was used.
+	 * Shuffles the blocks on the board. The same cells stay filled and every block keeps its color,
+	 * but the blocks swap places. It tries not to leave a match, but a few can remain on a crowded board.
+	 * Returns the moves [{ block, from, to }] (cell indexes), or null when nothing was used.
 	 */
 	useRemix() {
 		const cells = [];
@@ -374,7 +501,7 @@ export class Game {
 				const y = (i - x) / this.cols;
 				const options = left.map((n, c) => (n > 0 ? c : -1)).filter((c) => c >= 0);
 				for (let k = options.length - 1; k > 0; k--) {
-					const j = Math.floor(this.rng() * (k + 1));
+					const j = Math.floor(this.rngMisc() * (k + 1));
 					[options[k], options[j]] = [options[j], options[k]];
 				}
 				let pick = options.find((c) => this.linkedSize((n) => assigned[n], x, y, c) < MIN_GROUP);
@@ -387,14 +514,94 @@ export class Game {
 			}
 			if (!best || bad < best.bad) best = { assigned, bad };
 		}
-		this.tick++;
-		const changed = [];
+		// Hand each cell a block of the color planned for it, preferring one from another cell.
+		const pool = new Map();
 		for (const i of cells) {
 			const b = this.grid[i];
-			b.color = best.assigned[i];
-			changed.push(b);
+			if (!pool.has(b.color)) pool.set(b.color, []);
+			pool.get(b.color).push({ block: b, from: i });
 		}
-		return changed;
+		this.tick++;
+		const next = new Array(this.grid.length).fill(null);
+		const moves = [];
+		for (const to of cells) {
+			const list = pool.get(best.assigned[to]);
+			const away = list.filter((m) => m.from !== to);
+			const options = away.length ? away : list;
+			const pick = options[Math.floor(this.rngMisc() * options.length)];
+			list.splice(list.indexOf(pick), 1);
+			next[to] = pick.block;
+			pick.block.stamp = this.tick;
+			moves.push({ block: pick.block, from: pick.from, to });
+		}
+		this.grid = next;
+		return moves;
+	}
+
+	/** True when the player may still buy the second wind this run (once per run, and there must be blocks). */
+	get canSecondWind() {
+		return !this.secondWindUsed && this.grid.some(Boolean);
+	}
+
+	/**
+	 * The second wind: clears the bottom SECOND_WIND_ROWS rows of the stack (the rows farthest from the
+	 * ceiling) to make room. Returns the cleared cells, or null when it cannot be used.
+	 */
+	useSecondWind() {
+		if (!this.canSecondWind) return null;
+		let low = 0;
+		this.grid.forEach((b, i) => b && (low = Math.max(low, Math.floor(i / this.cols))));
+		const cleared = [];
+		this.grid.forEach((block, idx) => {
+			const y = Math.floor(idx / this.cols);
+			if (block && y > low - SECOND_WIND_ROWS) cleared.push({ idx, x: idx % this.cols, y, block });
+		});
+		for (const c of cleared) this.grid[c.idx] = null;
+		this.secondWindUsed = true;
+		this.tick++;
+		return cleared;
+	}
+
+	/** The move a simple bot would pick now: the best score, with a low stack. Returns { slot, x } or null. */
+	chooseMove() {
+		let best = null;
+		this.pieces.forEach((piece, slot) => {
+			if (!piece) return;
+			for (let x = 0; x <= this.cols - piece.w; x++) {
+				if (!this.fits(piece, x)) continue;
+				const c = this.clone();
+				const before = c.score;
+				c.place(slot, x, piece);
+				c.resolveAll();
+				let filled = 0;
+				let top = 0;
+				for (let cx = 0; cx < c.cols; cx++) {
+					const h = c.height(cx);
+					filled += h;
+					top = Math.max(top, h);
+				}
+				const value = c.score - before - filled * 4 - top * 6 + this.rngMisc();
+				if (!best || value > best.value) best = { slot, x, value };
+			}
+		});
+		return best;
+	}
+
+	/**
+	 * The game plays the first rounds for the player (the warm-up). Score and power-ups earned count.
+	 * Returns how many rounds it played. It stops early if no piece fits.
+	 */
+	autoPlay(rounds = WARMUP_ROUNDS) {
+		let played = 0;
+		for (; played < rounds; played++) {
+			const move = this.chooseMove();
+			if (!move) break;
+			this.place(move.slot, move.x);
+			const steps = this.resolveAll();
+			this.awardChain(steps.length, Math.max(0, ...steps.map((s) => s.biggest)));
+			this.refill(move.slot);
+		}
+		return played;
 	}
 
 	/** True when no piece fits and no blast is left to make room. */
@@ -419,8 +626,10 @@ export class Game {
 		g.grid = this.grid.map((b) => (b ? { ...b } : null));
 		g.pieces = this.pieces.slice();
 		g.bag = this.bag.slice();
+		g.deck = this.deck.slice();
 		g.stats = { ...this.stats };
 		g.rng = () => 0.5;
+		g.rngMisc = () => 0.5;
 		return g;
 	}
 }

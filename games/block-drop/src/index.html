@@ -30,6 +30,10 @@
 						<span class="hud__bar"><span class="hud__bar-fill" id="time-fill"></span></span>
 					</div>
 					<span class="hud__chip" id="lab-chip" hidden>Lab</span>
+					<div class="hud__wallet">
+						<span class="hud__glints" id="hud-glints" title="Glints">✦ <span id="glints">0</span></span>
+						<button class="hud__reroll" id="reroll" type="button" data-action="reroll" aria-label="Swap the tray for new pieces">↻ <span id="reroll-cost">✦10</span></button>
+					</div>
 				</div>
 				<div class="hud__best">
 					<span class="hud__label">Best</span>
@@ -48,6 +52,7 @@
 				</div>
 				<h1 class="logo__name">Glintwell</h1>
 				<p class="logo__tag">Drop glass. Match light. Chain the glow.</p>
+				<p class="wallet" id="wallet-title">✦ <span class="wallet__n">0</span> Glints</p>
 				<div class="menu">
 					<button class="button button--big" type="button" data-action="play-endless">
 						<span>Endless</span><small id="best-endless">Best 0</small>
@@ -55,6 +60,10 @@
 					<button class="button button--big" type="button" data-action="play-timed">
 						<span>Timed · 90s</span><small id="best-timed">Best 0</small>
 					</button>
+					<div class="menu__row">
+						<button class="button button--stack" type="button" data-action="play-daily"><span>Daily</span><small id="daily-sub">Same pieces for everyone</small></button>
+						<button class="button button--stack" type="button" data-action="shop"><span>Shop</span><small>Skins · upgrades</small></button>
+					</div>
 					<div class="menu__row">
 						<button class="button" type="button" data-action="tutorial">How to play</button>
 						<button class="button" type="button" data-action="settings">Settings</button>
@@ -71,6 +80,53 @@
 				</div>
 				<a class="arcade-link" id="arcade-link" href="../" hidden>‹ Back to the arcade</a>
 				<p class="version" id="version-title"></p>
+			</section>
+
+			<section class="screen screen--modal" id="screen-start" aria-label="Before you start" hidden>
+				<div class="panel panel--scroll">
+					<h2 class="panel__title">Before you start</h2>
+					<p class="wallet" id="start-wallet"></p>
+					<div class="menu">
+						<button class="button button--perk" type="button" data-action="start-warmup" aria-pressed="false">
+							<span>Warm-up · the game plays 20 rounds</span><small id="cost-warmup"></small>
+						</button>
+						<p class="panel__note">Start with a power-up</p>
+						<div class="menu__row">
+							<button class="button button--perk" type="button" data-action="start-power" data-kind="prism" aria-pressed="false"><span>Prism</span></button>
+							<button class="button button--perk" type="button" data-action="start-power" data-kind="blast" aria-pressed="false"><span>Blast</span></button>
+							<button class="button button--perk" type="button" data-action="start-power" data-kind="remix" aria-pressed="false"><span>Remix</span></button>
+						</div>
+						<p class="panel__note" id="cost-power"></p>
+						<button class="button button--perk" type="button" data-action="start-ban" aria-pressed="false">
+							<span id="ban-label">Ban a shape from this game</span><small id="cost-ban"></small>
+						</button>
+						<button class="button button--big" type="button" data-action="start-go"><span>Start</span><small id="start-total">Free</small></button>
+						<button class="button" type="button" data-action="start-skip">No thanks</button>
+					</div>
+				</div>
+			</section>
+
+			<section class="screen screen--modal" id="screen-ban" aria-label="Ban a shape" hidden>
+				<div class="panel panel--scroll">
+					<h2 class="panel__title">Ban a shape</h2>
+					<p class="panel__note">It will not show up this game.</p>
+					<div class="shapegrid" id="shape-grid"></div>
+					<div class="menu">
+						<button class="button" type="button" data-action="ban-none">No ban</button>
+					</div>
+				</div>
+			</section>
+
+			<section class="screen screen--modal" id="screen-shop" aria-label="Shop" hidden>
+				<div class="panel panel--scroll">
+					<h2 class="panel__title">Shop</h2>
+					<p class="wallet" id="shop-wallet"></p>
+					<div class="shop" id="shop-body"></div>
+					<p class="panel__note">Boosts for one game are offered when you start a game. Rerolls and second winds are bought when you need them.</p>
+					<div class="menu">
+						<button class="button button--big" type="button" data-action="shop-back">Back</button>
+					</div>
+				</div>
 			</section>
 
 			<section class="screen screen--modal" id="screen-pause" aria-label="Paused" hidden>
@@ -96,9 +152,21 @@
 						<div><dt>Longest chain</dt><dd id="over-chain">0</dd></div>
 						<div><dt>Blocks cleared</dt><dd id="over-cleared">0</dd></div>
 						<div><dt>Power-ups earned · used</dt><dd id="over-specials">0 · 0</dd></div>
+						<div><dt>Glints earned</dt><dd id="over-glints">✦ 0</dd></div>
+						<div><dt>Glints saved</dt><dd id="over-wallet">✦ 0</dd></div>
 					</dl>
+					<p class="panel__note" id="over-daily" hidden></p>
 					<p class="panel__note" id="over-lab" hidden>Played with Lab rules.</p>
 					<div class="menu">
+						<button class="button button--big button--perk" type="button" id="second-wind" data-action="second-wind" hidden>
+							<span>Keep going · clear the bottom 4 rows</span><small id="second-wind-cost"></small>
+						</button>
+						<button class="button button--perk" type="button" id="reroll-over" data-action="reroll-over" hidden>
+							<span>Reroll the tray</span><small id="reroll-over-cost"></small>
+						</button>
+						<button class="button button--big button--perk" type="button" id="extend-time" data-action="extend-time" hidden>
+							<span>Keep going · +15 seconds</span><small id="extend-time-cost"></small>
+						</button>
 						<button class="button button--big" type="button" data-action="restart">Play again</button>
 						<button class="button" type="button" data-action="quit">Title</button>
 					</div>

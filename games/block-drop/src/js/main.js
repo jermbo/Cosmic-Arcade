@@ -1,11 +1,19 @@
 // Glintwell: screens, input, and the flow of a game.
 
-import { Game, rotatePiece, TIMED_SECONDS, DEFAULT_LAB, CHAIN_REWARDS } from './engine.js';
-import { View, POWER_NAMES } from './view.js';
+import { Game, SHAPES, TIMED_SECONDS, DEFAULT_LAB, REWARD_CHAIN, REWARD_GROUP, POWER_KINDS, WARMUP_COST, WARMUP_ROUNDS, SECOND_WIND_COST, START_POWER_COST, BAN_COST, REROLL_COST, EXTEND_COST, EXTEND_SECONDS, DAILY_BONUS, BAG_UPGRADE_COSTS, dailySeed, setShapes } from './engine.js';
+import { SKINS, applySkin, BAG_BASE, BAG_MAX_UPGRADES } from './shop.js';
+import { View, POWER_NAMES, REMIX_STYLES, REMIX_STYLE_NAMES } from './view.js';
 import { audio } from './audio.js';
-import { store, persist, labIsDefault } from './storage.js';
+import { store, persist, labIsDefault, loadCustomShapes } from './storage.js';
 import { PALETTE, GOLD, roundRect } from './sprites.js';
 import { VERSION } from './version.js';
+
+// Shapes saved from the secret shape lab replace the built-in list.
+const customShapes = loadCustomShapes();
+const usingCustomShapes = Boolean(customShapes) && setShapes(customShapes);
+if (usingCustomShapes) console.info('Glintwell: playing with the custom shapes from the shape lab.');
+
+applySkin(store.perks.skin);
 
 const $ = (id) => document.getElementById(id);
 const app = $('app');
@@ -23,6 +31,8 @@ const state = {
 	timeLeft: 0,
 	lastTick: 0,
 	shownScore: 0,
+	freeGlints: 0, // glints the game had before the player took over (warm-up earnings are not banked)
+	bankedGlints: 0,
 	drag: null,
 	power: null, // power-up being used: { kind, stage, color }
 	aiming: null, // pointer id while a blast is being aimed
@@ -69,9 +79,51 @@ function formatTime(t) {
 
 // ---- HUD ----
 
+const todayKey = () => {
+	const d = new Date();
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/** The daily challenge starts fresh each day. */
+function syncDaily() {
+	if (store.daily.date === todayKey()) return;
+	store.daily = { date: todayKey(), best: 0, claimed: false };
+	save();
+}
+
+const bestOf = (mode) => (mode === 'daily' ? store.daily.best : store.best[mode]);
+
 function updateBestLabels() {
+	syncDaily();
+	$('daily-sub').textContent = store.daily.claimed ? `Today's best ${store.daily.best.toLocaleString()}` : `First run pays ✦${DAILY_BONUS}`;
 	$('best-endless').textContent = `Best ${store.best.endless.toLocaleString()}`;
 	$('best-timed').textContent = `Best ${store.best.timed.toLocaleString()}`;
+}
+
+// ---- Glints ----
+
+/** Shows the wallet on the HUD and title, and the state of the warm-up buttons. */
+function updateWallet(bumpIt = false) {
+	const n = store.glints.toLocaleString();
+	$('glints').textContent = n;
+	$('wallet-title').querySelector('.wallet__n').textContent = n;
+	if (bumpIt) bump($('hud-glints'));
+	const g = state.game;
+	const cost = g ? g.rerollCost : REROLL_COST;
+	$('reroll-cost').textContent = `✦${cost}`;
+	$('reroll').setAttribute('aria-disabled', String(!g || store.glints < cost));
+	if (!$('screen-start').hidden) renderStart();
+	if (!$('screen-shop').hidden) renderShop();
+}
+
+/** Moves glints the player just earned into the wallet. */
+function bankGlints() {
+	const g = state.game;
+	if (!g || g.glints <= state.bankedGlints) return;
+	store.glints += g.glints - state.bankedGlints;
+	state.bankedGlints = g.glints;
+	save();
+	updateWallet(true);
 }
 
 function bump(el) {
@@ -89,7 +141,7 @@ function updateHud(dt) {
 		if (state.shownScore > target) state.shownScore = target;
 		$('score').textContent = state.shownScore.toLocaleString();
 	}
-	$('best').textContent = Math.max(store.best[state.mode], g.score).toLocaleString();
+	$('best').textContent = Math.max(bestOf(state.mode), g.score).toLocaleString();
 	if (state.mode === 'timed') {
 		$('time').textContent = formatTime(state.timeLeft);
 		$('time-fill').style.transform = `scaleX(${Math.max(0, state.timeLeft / TIMED_SECONDS)})`;
@@ -105,12 +157,42 @@ function startGame(mode) {
 		openTutorial();
 		return;
 	}
+	if (mode === 'daily') syncDaily();
+	state.pendingMode = mode;
+	// With Glints to spend, offer boosts for this game first.
+	if (store.glints >= MIN_BOOST_COST) {
+		pre.warmup = false;
+		pre.power = null;
+		pre.ban = null;
+		renderStart();
+		showModal('screen-start');
+		return;
+	}
+	beginGame(mode, null);
+}
+
+function beginGame(mode, boosts) {
 	hideModals();
 	$('screen-title').hidden = true;
 	$('banner').hidden = true;
 	state.mode = mode;
-	state.game = new Game({ mode, lab: store.lab, seed: (Math.random() * 2 ** 31) | 0 });
-	state.usedLab = !labIsDefault();
+	const daily = mode === 'daily';
+	state.game = new Game({
+		mode,
+		lab: daily ? DEFAULT_LAB : store.lab,
+		seed: daily ? dailySeed(todayKey()) : (Math.random() * 2 ** 31) | 0,
+		bagSize: BAG_BASE + store.perks.bag,
+		banned: boosts && boosts.ban !== null ? boosts.ban : null,
+	});
+	let warmedUp = false;
+	if (boosts && boosts.power) state.game.bag.push(boosts.power);
+	if (boosts && boosts.warmup) {
+		state.game.autoPlay(WARMUP_ROUNDS);
+		warmedUp = true;
+	}
+	state.freeGlints = state.game.glints;
+	state.bankedGlints = state.game.glints;
+	state.usedLab = !daily && !labIsDefault();
 	state.screen = 'playing';
 	state.paused = false;
 	state.busy = false;
@@ -126,9 +208,11 @@ function startGame(mode) {
 	$('score').textContent = '0';
 	view.resize();
 	view.setGame(state.game);
-	view.hint = !store.hintDone;
+	view.hint = !store.hintDone && !warmedUp;
 	updateHud(0);
+	updateWallet();
 	audio.land(3);
+	if (warmedUp) showBanner('Warm-up done!', 1200);
 }
 
 function quitToTitle() {
@@ -144,6 +228,7 @@ function quitToTitle() {
 	view.fx.clear();
 	view.layout();
 	updateBestLabels();
+	updateWallet();
 	$('screen-title').hidden = false;
 }
 
@@ -164,7 +249,8 @@ async function dropPiece(slot, piece, col, left, top) {
 	const g = state.game;
 	state.busy = true;
 	g.pieces[slot] = piece;
-	const placed = g.place(slot, col, piece);
+	// The piece rises as one rigid shape. Only after it lands do loose blocks rise to close gaps.
+	const placed = g.place(slot, col, piece, { settle: false });
 	if (!placed) {
 		state.busy = false;
 		return;
@@ -177,9 +263,11 @@ async function dropPiece(slot, piece, col, left, top) {
 	vibrate(8);
 	view.dropIn(placed, left, top);
 	await waitFor(() => view.settled);
-	const length = await resolveChain();
+	if (g.settle().length) await waitFor(() => view.settled);
 	if (state.game !== g) return;
-	const won = g.awardChain(length);
+	const { length, biggest } = await resolveChain();
+	if (state.game !== g) return;
+	const won = g.awardChain(length, biggest);
 	if (won) announceReward(won);
 	g.refill(slot);
 	view.pieceSpawned(slot);
@@ -187,31 +275,34 @@ async function dropPiece(slot, piece, col, left, top) {
 	checkEnd();
 }
 
-/** Runs the chain until the board is still. Returns how many steps it took. */
+/** Runs the chain until the board is still. Returns how many steps it took and the biggest group cleared. */
 async function resolveChain() {
 	const g = state.game;
 	let steps = 0;
+	let biggest = 0;
 	for (let chain = 1; ; chain++) {
 		const step = g.resolveStep(chain);
 		if (!step) break;
 		steps = chain;
+		biggest = Math.max(biggest, step.biggest);
 		showStep(step);
+		bankGlints();
 		await waitFor(() => view.dying.length === 0);
 		view.holdFalls = false;
 		await waitFor(() => view.settled);
-		if (state.game !== g) return steps;
+		if (state.game !== g) return { length: steps, biggest };
 	}
-	return steps;
+	return { length: steps, biggest };
 }
 
 function announceReward(won) {
 	const { bar } = view;
-	const name = POWER_NAMES[won.kind];
 	if (won.lost) {
-		view.fx.pop(bar.x + bar.w / 2, bar.y - view.cell * 0.4, `Bag full: ${name} lost`, '', '#ff8fb1');
+		view.fx.pop(bar.x + bar.w / 2, bar.y - view.cell * 0.4, 'Bag full: power-up lost', '', '#ff8fb1');
 		audio.deny();
 		return;
 	}
+	const name = POWER_NAMES[won.kind];
 	view.fx.pop(bar.x + bar.w / 2, bar.y - view.cell * 0.4, `${name} earned!`, '', GOLD, true);
 	audio.forge('flare');
 	vibrate([15, 30, 15]);
@@ -242,8 +333,11 @@ function showStep(step) {
 	const n = Math.max(1, step.cleared.length);
 	const center = view.cellCenter(sx / n, sy / n);
 	const color = CHAIN_COLORS[Math.min(step.chain - 1, CHAIN_COLORS.length - 1)];
-	const sub = step.chain > 1 ? `Chain ×${step.chain}` : '';
-	view.fx.pop(center.x, center.y, `+${step.points.toLocaleString()}`, sub, color, step.chain > 2);
+	const parts = [];
+	if (step.chain > 1) parts.push(`Chain ×${step.chain}`);
+	if (step.mult > 1) parts.push(`Group ×${step.mult}`);
+	if (step.glints > 0) parts.push(`+${step.glints} ✦`);
+	view.fx.pop(center.x, center.y, `+${step.points.toLocaleString()}`, parts.join(' · '), color, step.chain > 2 || step.mult > 1);
 	bump($('score'));
 
 	const biggest = Math.max(3, ...step.groups.map((grp) => grp.cells.size));
@@ -292,10 +386,18 @@ function endGame(reason) {
 	cancelPower();
 	state.screen = 'ending';
 	const g = state.game;
-	const best = store.best[state.mode];
+	const best = bestOf(state.mode);
 	const isBest = g.score > best;
 	if (isBest) {
-		store.best[state.mode] = g.score;
+		if (state.mode === 'daily') store.daily.best = g.score;
+		else store.best[state.mode] = g.score;
+		save();
+	}
+	let dailyNote = '';
+	if (state.mode === 'daily' && !store.daily.claimed) {
+		store.daily.claimed = true;
+		store.glints += DAILY_BONUS;
+		dailyNote = `Daily bonus: +✦${DAILY_BONUS}`;
 		save();
 	}
 	showBanner(reason === 'time' ? 'Time!' : 'No room!', 0);
@@ -308,10 +410,27 @@ function endGame(reason) {
 		$('over-reason').textContent = reason === 'time' ? 'Time is up' : 'No room left';
 		$('final-score').textContent = g.score.toLocaleString();
 		$('new-best').hidden = !isBest || g.score === 0;
-		$('over-best').textContent = store.best[state.mode].toLocaleString();
+		$('over-best').textContent = bestOf(state.mode).toLocaleString();
+		$('over-daily').hidden = !dailyNote;
+		$('over-daily').textContent = dailyNote;
 		$('over-chain').textContent = g.stats.bestChain ? `×${g.stats.bestChain}` : '–';
 		$('over-cleared').textContent = g.stats.cleared;
 		$('over-specials').textContent = `${g.stats.earned} · ${g.stats.used}`;
+		$('over-glints').textContent = `✦ ${g.glints - state.freeGlints}`;
+		$('over-wallet').textContent = `✦ ${store.glints.toLocaleString()}`;
+		const price = (id, cost, note) => {
+			const ok = store.glints >= cost;
+			$(id).setAttribute('aria-disabled', String(!ok));
+			$(`${id}-cost`).textContent = ok ? `✦ ${cost}${note}` : `✦ ${cost} · you have ✦ ${store.glints}`;
+		};
+		const stuck = reason === 'stuck';
+		$('second-wind').hidden = !(stuck && g.canSecondWind);
+		$('reroll-over').hidden = !stuck;
+		$('extend-time').hidden = !(reason === 'time' && !g.extensionUsed);
+		price('second-wind', SECOND_WIND_COST, ' · once per game');
+		price('reroll-over', g.rerollCost, '');
+		price('extend-time', EXTEND_COST, ' · once per game');
+		updateWallet();
 		$('over-lab').hidden = !state.usedLab;
 		showModal('screen-over');
 		if (isBest && g.score > 0) audio.best();
@@ -327,14 +446,6 @@ function localPoint(e) {
 
 function canAct() {
 	return state.screen === 'playing' && !state.paused && !state.busy && !(state.mode === 'timed' && state.timeLeft <= 0);
-}
-
-function rotateSlot(slot) {
-	const g = state.game;
-	if (!g.pieces[slot]) return;
-	g.pieces[slot] = rotatePiece(g.pieces[slot]);
-	view.appear[slot] = 0.55;
-	audio.rotate();
 }
 
 function cancelDrag() {
@@ -367,16 +478,32 @@ function activatePower(index) {
 	else setPower({ kind, stage: kind === 'prism' ? 'color' : 'aim', color: null });
 }
 
+view.onRemix = (event, value, sound) => {
+	if (event === 'charge') {
+		if (!value) return; // a style with no wind-up
+		if (sound === 'rattle') audio.remixRattle(value);
+		else audio.remixCharge();
+		vibrate([20, 40, 30, 40, 40, 40, 60]);
+	} else if (event === 'boom') {
+		audio.remixBoom();
+		vibrate([60, 30, 80]);
+		showBanner('REMIX!', 1100);
+	} else if (event === 'rattle') {
+		audio.remixRattle(value);
+		vibrate([30, 30, 30, 30, 30, 30, 30]);
+	} else if (event === 'tick') {
+		audio.remixTick(Math.floor(value / 2));
+	}
+};
+
 async function useRemix() {
 	const g = state.game;
-	if (!g.useRemix()) return;
+	const moves = g.useRemix();
+	if (!moves) return;
 	state.busy = true;
-	view.glowAll();
-	view.fx.screenFlash(0.25, '#bfe6ff');
-	audio.forge('flare');
-	vibrate([15, 30, 15]);
-	showBanner('Remix!', 900);
-	await new Promise((resolve) => setTimeout(resolve, 450));
+	view.startRemix(moves);
+	await waitFor(() => !view.remix);
+	if (state.game !== g) return;
 	// On a crowded board a few matches can remain. They clear like any other chain.
 	await resolveChain();
 	if (state.game !== g) return;
@@ -498,10 +625,7 @@ canvas.addEventListener('pointerup', (e) => {
 	if (!d || e.pointerId !== d.id) return;
 	state.drag = null;
 	view.drag = null;
-	if (!d.moved) {
-		rotateSlot(d.slot);
-		return;
-	}
+	if (!d.moved) return;
 	const geo = d.geo;
 	if (geo && geo.valid && canAct()) {
 		dropPiece(d.slot, d.piece, geo.col, (geo.left - view.boardX) / view.cell, (geo.top - view.boardY) / view.cell);
@@ -554,7 +678,7 @@ document.addEventListener('keydown', (e) => {
 		return;
 	}
 	if (state.screen !== 'playing' || state.paused) return;
-	const keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' ', 'Enter', 'Tab', 'x', 'X', 'z', 'Z', '1', '2', '3'];
+	const keys = ['ArrowLeft', 'ArrowRight', 'ArrowDown', ' ', 'Enter', 'Tab', '1', '2', '3'];
 	if (!keys.includes(e.key)) return;
 	e.preventDefault();
 	if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
@@ -571,13 +695,6 @@ document.addEventListener('keydown', (e) => {
 		case 'ArrowRight':
 			if (had) kb.col = Math.min(g.cols - (piece ? piece.w : 1), kb.col + 1);
 			audio.move();
-			break;
-		case 'ArrowUp':
-		case 'x':
-		case 'X':
-		case 'z':
-		case 'Z':
-			rotateSlot(kb.slot);
 			break;
 		case 'ArrowDown':
 		case 'Tab': {
@@ -613,7 +730,285 @@ document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: fals
 
 // ---- buttons ----
 
+// ---- boosts at the start of a game ----
+
+const pre = { warmup: false, power: null, ban: null };
+const MIN_BOOST_COST = Math.min(WARMUP_COST, START_POWER_COST, BAN_COST);
+const preCost = () => (pre.warmup ? WARMUP_COST : 0) + (pre.power ? START_POWER_COST : 0) + (pre.ban !== null ? BAN_COST : 0);
+const preCanAdd = (cost) => store.glints - preCost() >= cost;
+
+function togglePre(what, kind) {
+	if (what === 'warmup') {
+		if (!pre.warmup && !preCanAdd(WARMUP_COST)) return audio.deny();
+		pre.warmup = !pre.warmup;
+	} else {
+		if (pre.power === null && !preCanAdd(START_POWER_COST)) return audio.deny();
+		pre.power = pre.power === kind ? null : kind;
+	}
+	renderStart();
+}
+
+/** A tiny picture of a shape (a list of [dx, dy]) for the ban picker. */
+function shapeThumb(cells) {
+	const el = document.createElement('div');
+	el.className = 'shapethumb';
+	const w = Math.max(...cells.map(([x]) => x)) + 1;
+	const h = Math.max(...cells.map(([, y]) => y)) + 1;
+	el.style.gridTemplateColumns = `repeat(${w}, 12px)`;
+	const on = new Set(cells.map(([x, y]) => `${x},${y}`));
+	for (let y = 0; y < h; y++) {
+		for (let x = 0; x < w; x++) {
+			const i = document.createElement('i');
+			if (on.has(`${x},${y}`)) i.style.background = PALETTE[(x * 7 + y * 13) % 5].base;
+			else i.style.visibility = 'hidden';
+			el.append(i);
+		}
+	}
+	return el;
+}
+
+function renderStart() {
+	const mark = (el, pressed, enabled) => {
+		el.setAttribute('aria-pressed', String(pressed));
+		el.setAttribute('aria-disabled', String(!pressed && !enabled));
+	};
+	const room = (cost) => preCanAdd(cost);
+	$('start-wallet').textContent = `✦ ${store.glints.toLocaleString()} Glints`;
+	const warm = document.querySelector('[data-action="start-warmup"]');
+	mark(warm, pre.warmup, room(WARMUP_COST));
+	$('cost-warmup').textContent = `✦ ${WARMUP_COST} · score and power-ups it earns are yours`;
+	for (const b of document.querySelectorAll('[data-action="start-power"]')) mark(b, pre.power === b.dataset.kind, pre.power !== null || room(START_POWER_COST));
+	$('cost-power').textContent = `✦ ${START_POWER_COST} for one`;
+	const ban = document.querySelector('[data-action="start-ban"]');
+	mark(ban, pre.ban !== null, room(BAN_COST));
+	const label = $('ban-label');
+	label.textContent = pre.ban === null ? 'Ban a shape from this game' : 'Banned shape (tap to change)';
+	if (pre.ban !== null && SHAPES[pre.ban]) label.append(' ', shapeThumb(SHAPES[pre.ban]));
+	$('cost-ban').textContent = `✦ ${BAN_COST}`;
+	const total = preCost();
+	$('start-total').textContent = total ? `✦ ${total}` : 'Free';
+}
+
+function renderBanGrid() {
+	const grid = $('shape-grid');
+	grid.textContent = '';
+	const total = SHAPES.length;
+	SHAPES.forEach((cells, i) => {
+		const card = document.createElement('button');
+		card.type = 'button';
+		card.className = 'shapecard';
+		card.setAttribute('aria-label', `Ban shape ${i + 1}, ${cells.length} blocks`);
+		card.append(shapeThumb(cells));
+		const small = document.createElement('small');
+		small.textContent = `${cells.length} blocks`;
+		card.append(small);
+		card.addEventListener('click', () => {
+			audio.ui();
+			pre.ban = i;
+			renderStart();
+			showModal('screen-start');
+		});
+		grid.append(card);
+	});
+	if (!total) grid.textContent = 'No shapes.';
+}
+
+// ---- shop ----
+
+function openShop() {
+	renderShop();
+	showModal('screen-shop');
+}
+
+function renderShop() {
+	$('shop-wallet').textContent = `✦ ${store.glints.toLocaleString()} Glints`;
+	const body = $('shop-body');
+	body.textContent = '';
+	const make = (tag, cls, text) => {
+		const el = document.createElement(tag);
+		if (cls) el.className = cls;
+		if (text !== undefined) el.textContent = text;
+		return el;
+	};
+	const buy = (label, enabled, onClick) => {
+		const b = make('button', 'button', label);
+		b.type = 'button';
+		b.setAttribute('aria-disabled', String(!enabled));
+		b.addEventListener('click', (e) => {
+			e.stopPropagation();
+			if (!enabled) return audio.deny();
+			audio.ui();
+			onClick();
+		});
+		return b;
+	};
+
+	const level = store.perks.bag;
+	const bag = make('div', 'shop__item');
+	bag.append(make('h3', '', 'Power-up bag'));
+	bag.append(make('p', '', level >= BAG_MAX_UPGRADES ? `Holds ${BAG_BASE + level}. Fully upgraded.` : `Holds ${BAG_BASE + level}. Upgrade to hold ${BAG_BASE + level + 1}.`));
+	if (level < BAG_MAX_UPGRADES) {
+		const cost = BAG_UPGRADE_COSTS[level];
+		bag.append(buy(`Buy ✦${cost}`, store.glints >= cost, () => {
+			store.glints -= cost;
+			store.perks.bag++;
+			save();
+			updateWallet(true);
+		}));
+	}
+	body.append(bag);
+
+	for (const skin of SKINS) {
+		const owned = store.perks.skins.includes(skin.id);
+		const active = store.perks.skin === skin.id;
+		const item = make('div', `shop__item${active ? ' is-on' : ''}`);
+		item.append(make('h3', '', `${skin.name} blocks`));
+		const sw = make('div', 'swatches');
+		for (const c of skin.colors) {
+			const i = document.createElement('i');
+			i.style.background = c.base;
+			sw.append(i);
+		}
+		item.append(sw);
+		if (active) {
+			const inUse = make('button', 'button', 'In use');
+			inUse.type = 'button';
+			inUse.setAttribute('aria-disabled', 'true');
+			item.append(inUse);
+		} else if (owned) item.append(buy('Use', true, () => useSkin(skin.id)));
+		else
+			item.append(
+				buy(`Buy ✦${skin.price}`, store.glints >= skin.price, () => {
+					store.glints -= skin.price;
+					store.perks.skins.push(skin.id);
+					save();
+					useSkin(skin.id);
+				}),
+			);
+		body.append(item);
+	}
+}
+
+function useSkin(id) {
+	store.perks.skin = id;
+	applySkin(id);
+	view.sprites = null;
+	view.layout();
+	buildLogo();
+	save();
+	updateWallet(true);
+	renderShop();
+}
+
+// ---- rerolling the tray and buying more time ----
+
+function swapTray() {
+	const g = state.game;
+	store.glints -= g.rerollCost;
+	save();
+	g.reroll();
+	g.pieces.forEach((_, i) => view.pieceSpawned(i));
+	audio.forge('flare');
+	vibrate(10);
+	updateWallet(true);
+}
+
+function rerollTray() {
+	const g = state.game;
+	if (!g || !canAct()) return audio.deny();
+	if (store.glints < g.rerollCost) return audio.deny();
+	cancelDrag();
+	swapTray();
+	checkEnd();
+}
+
+/** Out of room, but the new pieces might fit: pay for a reroll instead of ending. */
+function rerollFromOver() {
+	const g = state.game;
+	if (state.screen !== 'over' || !g) return;
+	if (store.glints < g.rerollCost) return audio.deny();
+	swapTray();
+	hideModals();
+	state.screen = 'playing';
+	state.paused = false;
+	state.busy = false;
+	checkEnd();
+}
+
+function extendTime() {
+	const g = state.game;
+	if (state.screen !== 'over' || !g || g.extensionUsed) return;
+	if (store.glints < EXTEND_COST) return audio.deny();
+	store.glints -= EXTEND_COST;
+	g.extensionUsed = true;
+	save();
+	updateWallet(true);
+	hideModals();
+	state.screen = 'playing';
+	state.paused = false;
+	state.busy = false;
+	state.timeLeft = EXTEND_SECONDS;
+	state.lastTick = EXTEND_SECONDS;
+	showBanner(`+${EXTEND_SECONDS} seconds!`, 900);
+}
+
+/** Game over, but the player pays to keep going: the bottom rows of the stack are cleared. Once per game. */
+async function secondWind() {
+	const g = state.game;
+	if (state.screen !== 'over' || !g || !g.canSecondWind) return;
+	if (store.glints < SECOND_WIND_COST) {
+		audio.deny();
+		return;
+	}
+	const cleared = g.useSecondWind();
+	if (!cleared || !cleared.length) return;
+	store.glints -= SECOND_WIND_COST;
+	save();
+	updateWallet(true);
+	hideModals();
+	state.screen = 'playing';
+	state.paused = false;
+	state.busy = true;
+	view.killBlocks(cleared.map((c) => ({ ...c, delay: (c.y / g.rows) * 0.2 + Math.random() * 0.15 })));
+	view.fx.shake(10);
+	audio.flare();
+	vibrate([30, 40, 30]);
+	showBanner('Second wind!', 1100);
+	await waitFor(() => view.dying.length === 0);
+	if (state.game !== g) return;
+	await waitFor(() => view.settled);
+	state.busy = false;
+	checkEnd();
+}
+
 const actions = {
+	'play-daily': () => startGame('daily'),
+	shop: openShop,
+	'shop-back': () => hideModals(),
+	reroll: rerollTray,
+	'reroll-over': rerollFromOver,
+	'extend-time': extendTime,
+	'start-warmup': () => togglePre('warmup'),
+	'start-power': (btn) => togglePre('power', btn.dataset.kind),
+	'start-ban': () => {
+		if (pre.ban === null && !preCanAdd(BAN_COST)) return audio.deny();
+		renderBanGrid();
+		showModal('screen-ban');
+	},
+	'ban-none': () => {
+		pre.ban = null;
+		renderStart();
+		showModal('screen-start');
+	},
+	'start-go': () => {
+		const total = preCost();
+		if (store.glints < total) return audio.deny();
+		store.glints -= total;
+		if (total) save();
+		beginGame(state.pendingMode, { ...pre });
+	},
+	'start-skip': () => beginGame(state.pendingMode, null),
+	'second-wind': secondWind,
 	'play-endless': () => startGame('endless'),
 	'play-timed': () => startGame('timed'),
 	resume,
@@ -660,7 +1055,7 @@ app.addEventListener('click', (e) => {
 	const btn = e.target.closest('[data-action]');
 	if (!btn || !actions[btn.dataset.action]) return;
 	audio.ui();
-	actions[btn.dataset.action]();
+	actions[btn.dataset.action](btn);
 });
 
 $('pause-button').addEventListener('click', () => {
@@ -717,27 +1112,25 @@ document.addEventListener('change', (e) => {
 
 // ---- tutorial ----
 
-const rewardAt = (kind) => CHAIN_REWARDS.find((r) => r.kind === kind).chain;
-
 const TUTORIAL = [
 	{
 		title: 'Drop into the well',
-		text: 'Drag a piece up into the well and let go. It <b>rises and sticks to the ceiling</b>. The ghost shows where each block lands. <b>Tap a piece to turn it.</b>',
+		text: 'Drag a piece up into the well and let go. It <b>rises and sticks to the ceiling</b>. The ghost shows where each block lands. <b>Pieces never turn: you get what you get.</b>',
 		draw: drawTutorialDrop,
 	},
 	{
 		title: 'Match 3 or more',
-		text: 'Link 3 or more blocks of one color. They can bend around corners, but <b>not diagonally</b>. They break, the blocks below rise, and new matches chain. <b>Each chain step raises the multiplier.</b>',
+		text: 'Link 3 or more blocks of one color. They can bend around corners, but <b>not diagonally</b>. They break, the blocks below rise, and new matches chain. <b>Each chain step raises the multiplier.</b> <b>Big groups pay more:</b> 5 blocks pay ×2, 6 pay ×3, and so on.',
 		draw: drawTutorialMatch,
 	},
 	{
-		title: 'Chain for power-ups',
-		text: `Long chains in one turn fill the bar under the well. Use them when you choose. <b>Prism</b> (chain ${rewardAt('prism')}) paints a piece one color. <b>Blast</b> (chain ${rewardAt('blast')}) clears a 3×3 area. <b>Remix</b> (chain ${rewardAt('remix')}) mixes the board colors.`,
+		title: 'Earn power-ups',
+		text: `A chain of ${REWARD_CHAIN} or a group of ${REWARD_GROUP} earns a power-up for the bar under the well. You get all three kinds in turn, never the same one twice in a row. <b>Prism</b> paints a piece one color. <b>Blast</b> clears a 3×3 area. <b>Remix</b> shuffles every block on the board.`,
 		draw: drawTutorialPowerUps,
 	},
 	{
 		title: 'Keep room to play',
-		text: 'The game ends when no piece fits. Endless has no clock. Timed gives you 90 seconds.<br /><span class="tutorial__keys">Keys: <kbd>←</kbd> <kbd>→</kbd> move · <kbd>↑</kbd> turn · <kbd>↓</kbd> next piece · <kbd>Space</kbd> drop</span>',
+		text: `The game ends when no piece fits. Endless has no clock. Timed gives you 90 seconds. <b>Combos earn Glints (✦).</b> Spend them in the Shop, on boosts before a game, on a Reroll, or to keep going when you run out of room.<br /><span class="tutorial__keys">Keys: <kbd>←</kbd> <kbd>→</kbd> move · <kbd>↓</kbd> next piece · <kbd>Space</kbd> drop</span>`,
 		draw: drawTutorialEnd,
 	},
 ];
@@ -878,7 +1271,6 @@ function drawTutorialPowerUps(ctx) {
 		ctx.stroke();
 		view.drawPowerIcon(kind, cx, 58, 34, ctx);
 		label(ctx, POWER_NAMES[kind], cx, 104, '#fff6dc', 13);
-		label(ctx, `chain ${rewardAt(kind)}`, cx, 122, '#b3a8d6', 11);
 	});
 }
 
@@ -1033,9 +1425,23 @@ window.addEventListener('resize', () => view.resize());
 if (window.visualViewport) window.visualViewport.addEventListener('resize', () => view.resize());
 
 $('version-title').textContent = `v${VERSION}`;
+// A secret door: tap the version number 7 times to open the shape lab.
+{
+	let taps = 0;
+	let timer = 0;
+	const door = () => {
+		taps++;
+		clearTimeout(timer);
+		timer = setTimeout(() => (taps = 0), 1500);
+		if (taps >= 7) location.href = 'shape-lab.html';
+	};
+	$('version-title').addEventListener('click', door);
+	$('version-settings').addEventListener('click', door);
+}
 $('version-settings').textContent = `Glintwell v${VERSION}`;
 $('vibrate-row').hidden = !('vibrate' in navigator);
 applySettings();
+updateWallet();
 audio.startMusic();
 view.resize();
 buildLogo();
@@ -1043,28 +1449,30 @@ updateBestLabels();
 save();
 requestAnimationFrame(frame);
 
-// ---- test hooks: add ?debug to the URL ----
+// ---- cheats and test hooks ----
+// On for localhost and for any page opened with ?debug. Off on a real host.
+// Keys (hold Shift): 1 Prism, 2 Blast, 3 Remix, 4 all three, 5 drop 50 blocks, 6 fill the well, 7 next Remix style, 8 play this style again, 9 add 100 Glints, 0 empty the bag.
+// Console: glintwell.help()
 
-if (new URLSearchParams(location.search).has('debug')) {
+const cheatsOn = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) || new URLSearchParams(location.search).has('debug');
+
+if (cheatsOn) {
 	/** Picks the move that scores best now and keeps the stacks low. */
 	const bestMove = () => {
 		const g = state.game;
 		let best = null;
 		g.pieces.forEach((piece, slot) => {
-			let p = piece;
-			for (let r = 0; r < 4 && p; r++) {
-				for (let x = 0; x <= g.cols - p.w; x++) {
-					if (!g.fits(p, x)) continue;
-					const c = g.clone();
-					const before = c.score;
-					c.place(slot, x, p);
-					c.resolveAll();
-					let filled = 0;
-					for (let i = 0; i < c.grid.length; i++) if (c.grid[i]) filled++;
-					const v = c.score - before - filled * 4 + Math.random();
-					if (!best || v > best.v) best = { v, slot, x, p };
-				}
-				p = rotatePiece(p);
+			if (!piece) return;
+			for (let x = 0; x <= g.cols - piece.w; x++) {
+				if (!g.fits(piece, x)) continue;
+				const c = g.clone();
+				const before = c.score;
+				c.place(slot, x, piece);
+				c.resolveAll();
+				let filled = 0;
+				for (let i = 0; i < c.grid.length; i++) if (c.grid[i]) filled++;
+				const v = c.score - before - filled * 4 + Math.random();
+				if (!best || v > best.v) best = { v, slot, x, p: piece };
 			}
 		});
 		return best;
@@ -1087,9 +1495,130 @@ if (new URLSearchParams(location.search).has('debug')) {
 		setTime(t) {
 			state.timeLeft = t;
 		},
-		/** Puts power-ups in the bag: give('prism', 'blast', 'remix'). */
+		/** Puts power-ups in the bag: give('prism', 'blast', 'remix'). The bag holds 3. */
 		give(...kinds) {
-			for (const kind of kinds) state.game.bag.push(kind);
+			const g = state.game;
+			if (!g) return [];
+			for (const kind of kinds) {
+				if (!POWER_KINDS.includes(kind)) {
+					console.warn(`Unknown power-up "${kind}". Use: ${POWER_KINDS.join(', ')}`);
+					continue;
+				}
+				if (g.bag.length >= g.bagSize) {
+					console.warn(`The bag is full (${g.bagSize}). Use one or call glintwell.empty().`);
+					break;
+				}
+				g.bag.push(kind);
+				view.fx.pop(view.bar.x + view.bar.w / 2, view.bar.y - view.cell * 0.4, `Cheat: ${POWER_NAMES[kind]}`, '', GOLD);
+			}
+			return g.bag.slice();
+		},
+		prism: () => cheat.give('prism'),
+		blast: () => cheat.give('blast'),
+		/** The Remix styles you can pick: remix('swirl'). */
+		remixStyles() {
+			return REMIX_STYLE_NAMES.slice();
+		},
+		/** Gives a Remix and fires it at once. Pass a style name to pick one (it stays picked). */
+		remix(style) {
+			if (!state.game || state.busy) return;
+			if (style) {
+				if (!REMIX_STYLES[style]) {
+					console.warn(`Unknown style "${style}". Use: ${REMIX_STYLE_NAMES.join(', ')}`);
+					return;
+				}
+				view.remixStyle = style;
+			}
+			const { bag } = state.game;
+			if (!bag.includes('remix')) {
+				if (bag.length >= state.game.bagSize) bag.pop();
+				cheat.give('remix');
+			}
+			const at = REMIX_STYLE_NAMES.indexOf(view.remixStyle) + 1;
+			view.fx.pop(view.boardX + view.boardW / 2, view.boardY + view.cell * 0.6, `${REMIX_STYLES[view.remixStyle].label} (${at}/${REMIX_STYLE_NAMES.length})`, '', GOLD, true);
+			useRemix();
+		},
+		/** Shows the next style, one after another. An empty well is filled first. */
+		async nextRemix() {
+			const g = state.game;
+			if (!g || state.busy) return;
+			if (!g.grid.some(Boolean)) {
+				cheat.fill(0.6);
+				await new Promise((resolve) => setTimeout(resolve, 1500));
+			}
+			cheat.demo = (cheat.demo + 1) % REMIX_STYLE_NAMES.length;
+			cheat.remix(REMIX_STYLE_NAMES[cheat.demo]);
+		},
+		demo: -1,
+		/** Adds Glints to the wallet: glints(500). */
+		glints(n = 100) {
+			store.glints = Math.max(0, store.glints + Math.floor(n));
+			save();
+			updateWallet(true);
+			return store.glints;
+		},
+		/** One of each power-up. */
+		all() {
+			cheat.empty();
+			return cheat.give(...POWER_KINDS);
+		},
+		empty() {
+			if (state.game) state.game.bag.length = 0;
+		},
+		/** Adds up to n random blocks (default 50) that rise into the well. They do not match, so nothing clears. */
+		drop(n = 50) {
+			const g = state.game;
+			if (!g || state.busy) return 0;
+			const colors = g.colors;
+			const heights = Array.from({ length: g.cols }, (_, x) => g.height(x));
+			let added = 0;
+			for (; added < n; added++) {
+				const open = heights.map((h, x) => (h < g.rows ? x : -1)).filter((x) => x >= 0);
+				if (!open.length) break;
+				const x = open[Math.floor(Math.random() * open.length)];
+				const y = heights[x]++;
+				const options = [...Array(colors).keys()].sort(() => Math.random() - 0.5);
+				const color = options.find((c) => g.linkedSize((i) => (g.grid[i] ? g.grid[i].color : -1), x, y, c) < 3) ?? options[0];
+				const block = g.makeBlock(color);
+				g.grid[g.index(x, y)] = block;
+				view.vis.set(block.id, view.newVis(x, y + g.rows + 1, added * 0.012));
+			}
+			return added;
+		},
+		/** Empties the well, then fills it: fill(0.6) is 60% full. */
+		fill(amount = 0.6) {
+			const g = state.game;
+			if (!g || state.busy) return 0;
+			g.grid.fill(null);
+			return cheat.drop(Math.round(g.cols * g.rows * Math.min(1, Math.max(0, amount))));
+		},
+		help() {
+			console.info(
+				[
+					'Glintwell cheats',
+					'  Hold Shift and press: 1 Prism, 2 Blast, 3 Remix, 4 all three, 5 drop 50 blocks, 6 fill the well, 7 next Remix style, 8 play it again, 9 add 100 Glints, 0 empty the bag',
+					'  glintwell.give("remix", "blast")  add power-ups (bag holds 3)',
+					'  glintwell.prism() / blast()       add one',
+					'  glintwell.remix("swirl")          fire a Remix in that style (glintwell.remixStyles() lists them)',
+					'  glintwell.nextRemix()             show the next Remix style',
+					'  glintwell.glints(500)             add Glints to the wallet',
+					'  glintwell.all() / empty()         one of each / clear the bag',
+					'  glintwell.drop(50)                drop 50 random blocks into the well',
+					'  glintwell.fill(0.6)               empty the well, then fill it 60%',
+					'  glintwell.bot(50)                 play 50 moves',
+					'  glintwell.setTime(5)              set the clock in Timed mode',
+				].join('\n'),
+			);
 		},
 	};
+	const cheat = window.glintwell;
+	document.addEventListener('keydown', (e) => {
+		if (!e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || state.screen !== 'playing' || state.paused || !state.game) return;
+		const codes = { Digit1: () => cheat.give('prism'), Digit2: () => cheat.give('blast'), Digit3: () => cheat.give('remix'), Digit4: () => cheat.all(), Digit7: () => cheat.nextRemix(), Digit8: () => cheat.remix(), Digit9: () => cheat.glints(100), Digit5: () => cheat.drop(50), Digit6: () => cheat.fill(0.6), Digit0: () => cheat.empty() };
+		const run = codes[e.code];
+		if (!run) return;
+		e.preventDefault();
+		run();
+	});
+	console.info('Glintwell cheats are on. Type glintwell.help()');
 }

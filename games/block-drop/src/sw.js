@@ -1,7 +1,7 @@
 // Offline cache for Glintwell. Bump VERSION (and js/version.js) for each release.
 // A new VERSION makes a new cache; the page then shows "Update ready, tap to reload".
 
-const VERSION = '1.1.0';
+const VERSION = '1.11.0';
 const CACHE = `glintwell-${VERSION}`;
 const FILES = [
 	'./',
@@ -10,6 +10,8 @@ const FILES = [
 	'css/style.css',
 	'js/main.js',
 	'js/engine.js',
+	'js/shapes.js',
+	'js/shop.js',
 	'js/view.js',
 	'js/fx.js',
 	'js/sprites.js',

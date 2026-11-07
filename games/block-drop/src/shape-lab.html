@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<meta name="robots" content="noindex, nofollow" />
+		<meta name="theme-color" content="#0d0a1f" />
+		<title>Glintwell Shape Lab</title>
+		<link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+		<style>
+			:root {
+				--ink: #0d0a1f;
+				--ink-2: #1a1438;
+				--ink-3: #2a2154;
+				--lead: #130f26;
+				--gold: #f2c879;
+				--gold-2: #ffe3a6;
+				--rose: #ff5d73;
+				--green: #47cf86;
+				--text: #f6eedd;
+				--muted: #b3a8d6;
+				--font: ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+				--cell: 38px;
+				color-scheme: dark;
+			}
+			*,
+			*::before,
+			*::after {
+				box-sizing: border-box;
+			}
+			body {
+				margin: 0;
+				background: radial-gradient(1200px 600px at 20% -10%, #2a2154 0%, var(--ink) 60%);
+				color: var(--text);
+				font-family: var(--font);
+				min-height: 100vh;
+				padding: 16px max(16px, env(safe-area-inset-right)) 48px max(16px, env(safe-area-inset-left));
+			}
+			h1 {
+				margin: 0;
+				font-size: 1.6rem;
+				color: var(--gold-2);
+			}
+			h2 {
+				margin: 0 0 10px;
+				font-size: 0.95rem;
+				letter-spacing: 0.06em;
+				text-transform: uppercase;
+				color: var(--muted);
+			}
+			p {
+				margin: 0;
+			}
+			a {
+				color: var(--gold);
+			}
+			header {
+				display: flex;
+				flex-wrap: wrap;
+				align-items: center;
+				gap: 12px 16px;
+				margin-bottom: 16px;
+			}
+			header .sub {
+				color: var(--muted);
+				font-size: 0.9rem;
+			}
+			.bar {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 8px;
+				margin-left: auto;
+			}
+			button {
+				font: inherit;
+				color: var(--text);
+				background: var(--ink-3);
+				border: 1px solid rgba(242, 200, 121, 0.35);
+				border-radius: 10px;
+				padding: 8px 12px;
+				cursor: pointer;
+			}
+			button:hover {
+				border-color: var(--gold);
+			}
+			button:focus-visible,
+			.cell:focus-visible,
+			.card:focus-visible {
+				outline: 2px solid var(--gold-2);
+				outline-offset: 2px;
+			}
+			button.primary {
+				background: linear-gradient(180deg, #f6d68f, #d9a443);
+				color: #2a1a05;
+				border-color: #f6d68f;
+				font-weight: 700;
+			}
+			button.danger:hover {
+				border-color: var(--rose);
+				color: #ffb3bf;
+			}
+			button:disabled {
+				opacity: 0.4;
+				cursor: default;
+			}
+			.layout {
+				display: grid;
+				gap: 16px;
+				grid-template-columns: 1fr;
+			}
+			@media (min-width: 980px) {
+				.layout {
+					grid-template-columns: 280px minmax(300px, 380px) 1fr;
+					align-items: start;
+				}
+			}
+			.panel {
+				background: rgba(26, 20, 56, 0.75);
+				border: 1px solid rgba(242, 200, 121, 0.18);
+				border-radius: 16px;
+				padding: 14px;
+			}
+			.row {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 8px;
+				margin-top: 10px;
+			}
+
+			/* shape list */
+			.list {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+				gap: 8px;
+				max-height: 62vh;
+				overflow: auto;
+				padding: 2px;
+			}
+			.card {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: space-between;
+				gap: 6px;
+				min-height: 84px;
+				padding: 8px 4px 6px;
+				border-radius: 12px;
+				background: var(--ink-2);
+				border: 2px solid transparent;
+				cursor: pointer;
+			}
+			.card.on {
+				border-color: var(--gold);
+				background: var(--ink-3);
+			}
+			.card.bad {
+				border-color: var(--rose);
+			}
+			.card small {
+				color: var(--muted);
+				font-size: 0.72rem;
+			}
+			.thumb {
+				display: grid;
+				gap: 2px;
+				align-content: center;
+				justify-content: center;
+				min-height: 40px;
+			}
+			.thumb i {
+				width: 11px;
+				height: 11px;
+				border-radius: 3px;
+			}
+			.thumb i.e {
+				background: transparent;
+			}
+
+			/* blocks */
+			.blk {
+				border-radius: 22%;
+				border: 2px solid var(--lead);
+				box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.35), inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+			}
+			.blk.c0 {
+				background: linear-gradient(135deg, #ffc0c8, #ff5d73 55%, #9e1f3c);
+			}
+			.blk.c1 {
+				background: linear-gradient(135deg, #ffeab0, #ffbe45 55%, #b06a12);
+			}
+			.blk.c2 {
+				background: linear-gradient(135deg, #c0f7d7, #47cf86 55%, #16774a);
+			}
+			.blk.c3 {
+				background: linear-gradient(135deg, #bfe6ff, #45b0ff 55%, #18589e);
+			}
+			.blk.c4 {
+				background: linear-gradient(135deg, #e6d6ff, #b285ff 55%, #5a2ab0);
+			}
+
+			/* editor grid */
+			.editor {
+				display: grid;
+				gap: 4px;
+				justify-content: center;
+				touch-action: none;
+				user-select: none;
+				-webkit-user-select: none;
+				padding: 8px;
+				background: var(--lead);
+				border-radius: 12px;
+				width: max-content;
+				max-width: 100%;
+				margin: 0 auto;
+			}
+			.cell {
+				width: var(--cell);
+				height: var(--cell);
+				border-radius: 22%;
+				background: rgba(255, 255, 255, 0.05);
+				border: 2px dashed rgba(255, 255, 255, 0.12);
+				cursor: pointer;
+			}
+			.cell.on {
+				border-style: solid;
+				border-color: var(--lead);
+			}
+			.stats {
+				margin-top: 12px;
+				color: var(--muted);
+				font-size: 0.92rem;
+				line-height: 1.5;
+			}
+			.stats b {
+				color: var(--text);
+			}
+			.warn {
+				margin: 8px 0 0;
+				padding: 0;
+				list-style: none;
+				font-size: 0.88rem;
+			}
+			.warn li {
+				padding: 6px 10px;
+				border-radius: 8px;
+				margin-top: 6px;
+			}
+			.warn .bad {
+				background: rgba(255, 93, 115, 0.16);
+				color: #ffc0c8;
+			}
+			.warn .note {
+				background: rgba(242, 200, 121, 0.12);
+				color: var(--gold-2);
+			}
+			.warn .ok {
+				background: rgba(71, 207, 134, 0.14);
+				color: #c0f7d7;
+			}
+			label.weight {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				margin-top: 12px;
+				color: var(--muted);
+			}
+			input[type='range'] {
+				flex: 1;
+				accent-color: var(--gold);
+			}
+
+			/* drop test */
+			.well {
+				display: grid;
+				gap: 2px;
+				width: max-content;
+				max-width: 100%;
+				padding: 8px;
+				background: var(--lead);
+				border: 2px solid rgba(242, 200, 121, 0.5);
+				border-radius: 14px;
+				position: relative;
+				touch-action: manipulation;
+			}
+			.slot {
+				width: calc(var(--cell) * 0.82);
+				height: calc(var(--cell) * 0.82);
+				border-radius: 22%;
+				background: rgba(255, 255, 255, 0.04);
+				position: relative;
+			}
+			.slot.ghost::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				border-radius: 22%;
+				border: 2px dashed var(--gold-2);
+				background: rgba(255, 246, 220, 0.22);
+			}
+			.slot.nofit::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				border-radius: 22%;
+				background: rgba(255, 93, 115, 0.3);
+			}
+			.slot.col {
+				box-shadow: inset 0 0 0 100px rgba(242, 200, 121, 0.05);
+			}
+			.hint {
+				color: var(--muted);
+				font-size: 0.85rem;
+				margin-top: 8px;
+				min-height: 1.3em;
+			}
+			.hint.bad {
+				color: #ffc0c8;
+			}
+			input[type='number'] {
+				font: inherit;
+				width: 4.5em;
+				color: var(--text);
+				background: var(--ink-3);
+				border: 1px solid rgba(242, 200, 121, 0.35);
+				border-radius: 8px;
+				padding: 6px 8px;
+			}
+			textarea {
+				width: 100%;
+				min-height: 160px;
+				margin-top: 10px;
+				font: 0.8rem ui-monospace, SFMono-Regular, Menlo, monospace;
+				color: var(--text);
+				background: var(--lead);
+				border: 1px solid rgba(242, 200, 121, 0.3);
+				border-radius: 10px;
+				padding: 10px;
+			}
+			.toast {
+				position: fixed;
+				left: 50%;
+				bottom: 20px;
+				transform: translateX(-50%);
+				background: var(--ink-3);
+				border: 1px solid var(--gold);
+				color: var(--gold-2);
+				padding: 10px 16px;
+				border-radius: 12px;
+				box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+				max-width: calc(100vw - 32px);
+				z-index: 10;
+			}
+			[hidden] {
+				display: none !important;
+			}
+			.dirty {
+				color: var(--gold-2);
+				font-size: 0.85rem;
+			}
+		</style>
+	</head>
+	<body>
+		<header>
+			<div>
+				<h1>Shape Lab</h1>
+				<p class="sub">Draw the pieces. Pieces never turn, so each form is its own shape. <a href="index.html">Back to the game</a></p>
+			</div>
+			<div class="bar">
+				<span class="dirty" id="dirty" hidden>Not saved to the game yet</span>
+				<button class="primary" id="save" type="button">Save to game</button>
+				<button id="copy" type="button">Copy code</button>
+				<button id="download" type="button">Download shapes.js</button>
+				<button class="danger" id="reset" type="button">Back to built-in shapes</button>
+			</div>
+		</header>
+
+		<main class="layout">
+			<section class="panel" aria-label="All shapes">
+				<h2>Shapes (<span id="count">0</span>)</h2>
+				<div class="list" id="list"></div>
+				<div class="row">
+					<button id="add" type="button">+ New</button>
+					<button id="dup" type="button">Duplicate</button>
+					<button class="danger" id="del" type="button">Delete</button>
+				</div>
+			</section>
+
+			<section class="panel" aria-label="Edit the selected shape">
+				<h2>Edit</h2>
+				<div class="editor" id="editor" role="group" aria-label="Shape grid. Press a square to add or remove a block."></div>
+				<div class="row">
+					<button id="flipH" type="button" title="Mirror left and right">Flip ↔</button>
+					<button id="flipV" type="button" title="Mirror top and bottom">Flip ↕</button>
+					<button id="turn" type="button" title="Turn this shape a quarter turn">Turn ⟳</button>
+					<button id="clear" type="button">Clear</button>
+				</div>
+				<div class="row">
+					<button id="addTurns" type="button" title="Add this shape turned 90, 180 and 270 degrees as new shapes">Add all turns</button>
+					<button id="addMirror" type="button" title="Add the mirror image as a new shape">Add mirror</button>
+					<button id="colors" type="button">New colors</button>
+				</div>
+				<label class="weight">Weight
+					<input id="weight" type="range" min="1" max="9" step="1" />
+					<b id="weightNum">3</b>
+				</label>
+				<div class="stats" id="stats"></div>
+				<ul class="warn" id="warn"></ul>
+			</section>
+
+			<section class="panel" aria-label="Drop test">
+				<h2>Drop test</h2>
+				<p class="stats" style="margin: 0 0 10px">The piece rises as one rigid shape, so it only fits if the whole shape fits. Hover a column to see where it rests. Click to drop it.</p>
+				<div class="row" style="margin: 0 0 10px; align-items: center">
+					<label>Stack height up to <input id="maxFill" type="number" min="0" max="9" value="6" /></label>
+					<button id="stacks" type="button">New stacks</button>
+					<button id="fullRow" type="button">Nearly full</button>
+				</div>
+				<div class="well" id="well" aria-label="A test well"></div>
+				<p class="hint" id="testHint"></p>
+			</section>
+		</main>
+
+		<section class="panel" id="exportPanel" hidden style="margin-top: 16px">
+			<h2>shapes.js</h2>
+			<p class="stats">Paste this over <b>src/js/shapes.js</b> to make these shapes the built-in ones.</p>
+			<textarea id="code" readonly spellcheck="false"></textarea>
+		</section>
+
+		<div class="toast" id="toast" role="status" hidden></div>
+		<script type="module" src="js/shape-lab.js"></script>
+	</body>
+</html>

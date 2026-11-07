@@ -2,13 +2,199 @@
 
 import { buildSprites, roundRect, PALETTE, GOLD, LEAD } from './sprites.js';
 import { Fx } from './fx.js';
-import { BAG_SIZE } from './engine.js';
 
 const GRAVITY = 70; // cells per second squared, pulling blocks up to the ceiling
 const TRAY_SCALE = 0.62;
 const MAX_CELL = 66;
 const CLEAR_TIME = 0.2;
 const BAR_SPACE = 0.95; // height of the power-up bar, in cells
+
+// ---- Remix styles ----
+// Each style says how long the blocks rattle first, and how each block flies from its old cell to
+// its new one. A style can also set swell (how much blocks grow while rattling, default 1), sound
+// ('rattle' for a shaking sound) and events: [{ at, name, value }] sent to onRemix after the launch.
+// plan() gets { from, to, mid, cols, rows, order } in cell coordinates and returns
+// { delay, dur, at(u) }. at(u) takes the progress 0..1 and returns { x, y, rot, s } (cell position,
+// turn in radians, size). The view keeps every block inside the well.
+const lerp = (a, b, t) => a + (b - a) * t;
+const rand = (a, b) => a + Math.random() * (b - a);
+const sign = () => (Math.random() < 0.5 ? -1 : 1);
+const inOut = (u) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
+const outCubic = (u) => 1 - Math.pow(1 - u, 3);
+const outBack = (u) => 1 + 2.4 * Math.pow(u - 1, 3) + 1.4 * Math.pow(u - 1, 2);
+const bounce = (u) => {
+	if (u < 1 / 2.75) return 7.5625 * u * u;
+	if (u < 2 / 2.75) return 7.5625 * (u -= 1.5 / 2.75) * u + 0.75;
+	if (u < 2.5 / 2.75) return 7.5625 * (u -= 2.25 / 2.75) * u + 0.9375;
+	return 7.5625 * (u -= 2.625 / 2.75) * u + 0.984375;
+};
+const mix = (from, to, e) => ({ x: lerp(from.x, to.x, e), y: lerp(from.y, to.y, e) });
+
+export const REMIX_STYLES = {
+	// Every block swings on its own curve, at its own time, spinning as it goes.
+	scatter: {
+		label: 'Scatter',
+		charge: 0.9,
+		rattle: 1,
+		plan({ from, to }) {
+			const side = sign();
+			const bend = { x: (to.y - from.y) * 0.35 * side + rand(-1, 1), y: (from.x - to.x) * 0.35 * side + rand(-1, 1) };
+			const spin = sign() * Math.PI * (2 + Math.floor(Math.random() * 3));
+			return {
+				delay: rand(0, 0.35),
+				dur: rand(0.55, 0.85),
+				at: (u) => {
+					const e = inOut(u);
+					const sw = Math.sin(Math.PI * u);
+					return { x: lerp(from.x, to.x, e) + bend.x * sw, y: lerp(from.y, to.y, e) + bend.y * sw, rot: spin * e, s: 1 + 0.22 * sw };
+				},
+			};
+		},
+	},
+	// Blocks near the middle go first and the rest follow, like a ripple.
+	wave: {
+		label: 'Wave',
+		charge: 0.7,
+		rattle: 1,
+		plan({ from, to, mid }) {
+			return {
+				delay: Math.hypot(from.x - mid.x, from.y - mid.y) * 0.09,
+				dur: 0.7,
+				at: (u) => ({ ...mix(from, to, inOut(u)), rot: Math.PI * 2 * inOut(u), s: 1 + 0.3 * Math.sin(Math.PI * u) }),
+			};
+		},
+	},
+	// Every block circles the middle of the well on its way.
+	swirl: {
+		label: 'Swirl',
+		charge: 0.6,
+		rattle: 1,
+		plan({ from, to, mid }) {
+			const r0 = Math.hypot(from.x - mid.x, from.y - mid.y);
+			const r1 = Math.hypot(to.x - mid.x, to.y - mid.y);
+			const a0 = Math.atan2(from.y - mid.y, from.x - mid.x);
+			const a1 = Math.atan2(to.y - mid.y, to.x - mid.x);
+			const turn = ((((a1 - a0) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) + Math.PI * 2;
+			return {
+				delay: rand(0, 0.12),
+				dur: 1.05,
+				at: (u) => {
+					const e = inOut(u);
+					const r = lerp(r0, r1, e) * (1 + 0.25 * Math.sin(Math.PI * u));
+					const a = a0 + turn * e;
+					return { x: mid.x + Math.cos(a) * r, y: mid.y + Math.sin(a) * r, rot: 0.6 * Math.sin(Math.PI * u), s: 1 };
+				},
+			};
+		},
+	},
+	// Blocks are tossed toward you and land with a little bounce, left column first.
+	toss: {
+		label: 'Toss',
+		charge: 0.6,
+		rattle: 1,
+		plan({ from, to }) {
+			return {
+				delay: to.x * 0.045 + rand(0, 0.08),
+				dur: 0.7,
+				at: (u) => ({ ...mix(from, to, outBack(u)), rot: 0, s: 1 + 0.55 * Math.sin(Math.PI * u) }),
+			};
+		},
+	},
+	// No wind-up. A quick, tidy swap.
+	snap: {
+		label: 'Snap',
+		charge: 0,
+		rattle: 0,
+		plan({ from, to }) {
+			return { delay: rand(0, 0.1), dur: 0.32, at: (u) => ({ ...mix(from, to, inOut(u)), rot: 0, s: 1 }) };
+		},
+	},
+		// Like an Etch A Sketch: shake it loose, the blocks drop to the bottom, then fall back into place.
+	// (The well hangs from the ceiling, so the bottom is the open end.)
+	shake: {
+		label: 'Shake',
+		charge: 0.8,
+		rattle: 2.4,
+		swell: 0.25,
+		sound: 'rattle',
+		plan({ from, to, cols, rows }) {
+			const a = 0.4; // the drop ends
+			const b = a + rand(0, 0.08); // each block leaves the pile a moment apart
+			const pile = { x: Math.min(cols - 1, Math.max(0, from.x + rand(-1.2, 1.2))), y: rows - 1 - rand(0, 1.7) };
+			const tilt = rand(-0.7, 0.7);
+			return {
+				delay: rand(0, 0.15),
+				dur: 1.9,
+				at: (u) => {
+					if (u < a) {
+						const k = u / a;
+						return { x: lerp(from.x, pile.x, outCubic(k)), y: lerp(from.y, pile.y, bounce(k)), rot: tilt * k, s: 1 };
+					}
+					if (u < b) return { ...pile, rot: tilt, s: 1 };
+					const k = (u - b) / (1 - b);
+					return { x: lerp(pile.x, to.x, outCubic(k)), y: lerp(pile.y, to.y, k * k), rot: tilt * (1 - k), s: 1 + 0.1 * Math.sin(Math.PI * k) };
+				},
+			};
+		},
+	},
+	// Blocks burst outward toward the walls, then come back in to their new cells.
+	explode: {
+		label: 'Explode',
+		charge: 0.6,
+		rattle: 1,
+		plan({ from, to, mid }) {
+			const out = { x: from.x + (from.x - mid.x) * 0.8 + rand(-0.8, 0.8), y: from.y + (from.y - mid.y) * 0.8 + rand(-0.8, 0.8) };
+			const spin = sign() * Math.PI * 2;
+			return {
+				delay: rand(0, 0.12),
+				dur: 1.15,
+				at: (u) => {
+					const p = u < 0.4 ? mix(from, out, outCubic(u / 0.4)) : mix(out, to, inOut((u - 0.4) / 0.6));
+					return { ...p, rot: spin * u, s: 1 + 0.2 * Math.sin(Math.PI * u) };
+				},
+			};
+		},
+	},
+	// Blocks drop in one after another, in reading order, tilting like dealt cards.
+	cards: {
+		label: 'Cards',
+		charge: 0.3,
+		rattle: 0.5,
+		plan({ from, to, order, cols, rows }) {
+			const tilt = sign() * rand(0.15, 0.35);
+			return {
+				delay: (order / (cols * rows)) * 0.7,
+				dur: 0.42,
+				at: (u) => ({ ...mix(from, to, outCubic(u)), rot: tilt * Math.sin(Math.PI * u), s: 1 + 0.08 * Math.sin(Math.PI * u) }),
+			};
+		},
+	},
+	// Blocks shrink into the middle, then grow back out into their new cells.
+	implode: {
+		label: 'Implode',
+		charge: 0.5,
+		rattle: 1,
+		plan({ from, to, mid }) {
+			const hub = { x: mid.x + rand(-0.4, 0.4), y: mid.y + rand(-0.4, 0.4) };
+			const spin = sign() * Math.PI * 2;
+			return {
+				delay: rand(0, 0.08),
+				dur: 1.05,
+				at: (u) => {
+					if (u < 0.5) {
+						const e = inOut(u / 0.5);
+						return { ...mix(from, hub, e), rot: spin * u, s: 1 - 0.75 * e };
+					}
+					const e = inOut((u - 0.5) / 0.5);
+					return { ...mix(hub, to, e), rot: spin * u, s: 0.25 + 0.75 * e };
+				},
+			};
+		},
+	},
+};
+// The order Shift+7 shows them in: favorites first.
+const FAVORITES = ['scatter', 'explode', 'implode', 'shake'];
+export const REMIX_STYLE_NAMES = [...FAVORITES, ...Object.keys(REMIX_STYLES).filter((name) => !FAVORITES.includes(name))];
 
 export const POWER_NAMES = { prism: 'Prism', blast: 'Blast', remix: 'Remix' };
 
@@ -31,8 +217,11 @@ export class View {
 		this.lastBag = 0;
 		this.time = 0;
 		this.onLand = null;
+		this.onRemix = null; // (event, value) for sound and haptics
+		this.remixStyle = 'scatter'; // a key of REMIX_STYLES
+		this.remix = null;
 		this.landCount = 0;
-		this.previewCache = { key: '', cells: null };
+		this.previewCache = { key: '', cells: null, ghost: new Set() };
 		this.appear = [];
 		this.stars = Array.from({ length: 46 }, () => ({ x: Math.random(), y: Math.random(), r: 0.4 + Math.random() * 1.2, p: Math.random() * 6 }));
 		this.floaters = Array.from({ length: 16 }, () => this.newFloater(true));
@@ -138,6 +327,7 @@ export class View {
 		this.game = game;
 		this.vis.clear();
 		this.dying = [];
+		this.remix = null;
 		this.drag = null;
 		this.returning = null;
 		this.kb = null;
@@ -223,9 +413,108 @@ export class View {
 		}
 	}
 
-	/** A soft glow over every block, used when the colors are mixed. */
-	glowAll() {
-		for (const v of this.vis.values()) v.forge = 1;
+	/**
+	 * The Remix show. The engine has already moved the blocks. Here they rattle and glow, then
+	 * every block flies on its own curve from its old cell to its new one.
+	 * `view.remix` is null again when the show is over.
+	 */
+	startRemix(moves, styleName = this.remixStyle) {
+		const g = this.game;
+		const style = REMIX_STYLES[styleName] || REMIX_STYLES.scatter;
+		const mid = { x: (g.cols - 1) / 2, y: (g.rows - 1) / 2 };
+		const items = [];
+		const sorted = moves.slice().sort((a, b) => a.to - b.to);
+		for (const m of moves) {
+			let v = this.vis.get(m.block.id);
+			if (!v) {
+				v = this.newVis(m.from % g.cols, Math.floor(m.from / g.cols));
+				this.vis.set(m.block.id, v);
+			}
+			const from = { x: m.from % g.cols, y: Math.floor(m.from / g.cols) };
+			const to = { x: m.to % g.cols, y: Math.floor(m.to / g.cols) };
+			v.x = from.x;
+			v.y = from.y;
+			v.vy = 0;
+			v.delay = 0;
+			v.fly = true;
+			const plan = style.plan({ from, to, mid, cols: g.cols, rows: g.rows, order: sorted.indexOf(m) });
+			items.push({ block: m.block, from, to, ...plan, done: false });
+		}
+		const events = (style.events || []).map((e) => ({ ...e, fired: false }));
+		this.remix = { phase: 'charge', t: 0, items, lands: 0, tickGap: 0, charge: style.charge, rattle: style.rattle, swell: style.swell ?? style.rattle, events };
+		this.onRemix?.('charge', style.charge, style.sound);
+		if (!style.charge) this.launchRemix();
+	}
+
+	updateRemix(dt) {
+		const r = this.remix;
+		const g = this.game;
+		if (!r || !g) return;
+		r.t += dt;
+
+		if (r.phase === 'charge') {
+			const k = Math.min(1, r.t / r.charge);
+			for (const item of r.items) {
+				const v = this.vis.get(item.block.id);
+				if (!v) continue;
+				v.jx = (Math.random() - 0.5) * k * 0.16 * r.rattle;
+				v.jy = (Math.random() - 0.5) * k * 0.16 * r.rattle;
+				v.sx = v.sy = 1 + k * 0.14 * r.swell;
+			}
+			if (r.t >= r.charge) this.launchRemix();
+			return;
+		}
+
+		// Flight: every block follows the path its style gave it.
+		r.tickGap -= dt;
+		for (const ev of r.events) {
+			if (!ev.fired && r.t >= ev.at) {
+				ev.fired = true;
+				this.onRemix?.(ev.name, ev.value);
+			}
+		}
+		for (const item of r.items) {
+			if (item.done) continue;
+			const v = this.vis.get(item.block.id);
+			if (!v) {
+				item.done = true;
+				continue;
+			}
+			const u = Math.min(1, Math.max(0, (r.t - item.delay) / item.dur));
+			if (u <= 0) {
+				v.jx = (Math.random() - 0.5) * 0.1 * r.rattle;
+				v.jy = (Math.random() - 0.5) * 0.1 * r.rattle;
+				continue;
+			}
+			const p = item.at(u);
+			v.jx = v.jy = 0;
+			// Paths stay inside the well.
+			v.x = Math.min(g.cols - 1, Math.max(0, p.x));
+			v.y = Math.min(g.rows - 1, Math.max(0, p.y));
+			v.rot = p.rot;
+			v.sx = v.sy = p.s;
+			if (u >= 1) {
+				item.done = true;
+				v.fly = false;
+				v.x = item.to.x;
+				v.y = item.to.y;
+				v.rot = 0;
+				v.sx = 1.25;
+				v.sy = 0.78;
+				if (r.tickGap <= 0) {
+					r.tickGap = 0.05;
+					this.onRemix?.('tick', r.lands++);
+				}
+			}
+		}
+		if (r.items.every((item) => item.done)) this.remix = null;
+	}
+
+	launchRemix() {
+		const r = this.remix;
+		r.phase = 'fly';
+		r.t = 0;
+		this.onRemix?.('boom');
 	}
 
 	update(dt) {
@@ -256,6 +545,7 @@ export class View {
 				v = this.newVis(gx, gy);
 				this.vis.set(b.id, v);
 			}
+			if (v.fly) continue; // the Remix show moves this block
 			if (v.delay > 0) {
 				v.delay -= dt;
 				continue;
@@ -284,6 +574,7 @@ export class View {
 			v.forge = Math.max(0, v.forge - dt * 1.8);
 		}
 		for (const id of this.vis.keys()) if (!alive.has(id)) this.vis.delete(id);
+		this.updateRemix(dt);
 
 		if (g.bag.length > this.lastBag) this.chipPop[g.bag.length - 1] = 0;
 		this.lastBag = g.bag.length;
@@ -390,40 +681,60 @@ export class View {
 		}
 	}
 
-	blockImage(block) {
-		return this.sprites[block.kind][block.color];
+	blockImage(block, color = block.color) {
+		return this.sprites[block.kind][color];
 	}
 
-	drawBlock(block, x, y, sx = 1, sy = 1, alpha = 1) {
+	drawBlock(block, x, y, sx = 1, sy = 1, alpha = 1, color = block.color, rot = 0) {
 		const { ctx, cell } = this;
 		const cx = this.boardX + (x + 0.5) * cell;
 		const top = this.boardY + y * cell;
 		const w = cell * sx;
 		const h = cell * sy;
 		ctx.globalAlpha = alpha;
-		ctx.drawImage(this.blockImage(block), cx - w / 2, top, w, h);
+		if (rot) {
+			ctx.save();
+			ctx.translate(cx, top + cell / 2);
+			ctx.rotate(rot);
+			ctx.drawImage(this.blockImage(block, color), -w / 2, -h / 2, w, h);
+			ctx.restore();
+		} else {
+			ctx.drawImage(this.blockImage(block, color), cx - w / 2, top, w, h);
+		}
 		ctx.globalAlpha = 1;
 	}
 
 	drawBlocks() {
 		const { game, ctx, cell } = this;
 		const preview = this.previewCells();
+		const flying = [];
 		for (let i = 0; i < game.grid.length; i++) {
 			const b = game.grid[i];
 			if (!b) continue;
 			const v = this.vis.get(b.id);
 			if (!v || v.delay > 0) continue;
-			this.drawBlock(b, v.x, v.y, v.sx, v.sy);
-			if (preview && preview.has(i)) this.drawMatchMark(v.x, v.y);
-			if (v.forge > 0) {
-				const c = this.cellCenter(v.x, v.y);
-				const s = cell * (1 + (1 - v.forge) * 1.6);
-				ctx.globalCompositeOperation = 'lighter';
-				ctx.globalAlpha = v.forge;
-				ctx.drawImage(this.sprites.glowWhite, c.x - s / 2, c.y - s / 2, s, s);
-				ctx.globalAlpha = 1;
-				ctx.globalCompositeOperation = 'source-over';
+			if (v.fly) {
+				flying.push([b, v]);
+				continue;
 			}
+			this.drawOneBlock(b, v);
+			if (preview && preview.has(i)) this.drawMatchMark(v.x, v.y);
+		}
+		// Blocks in the air draw on top of the ones that landed.
+		for (const [b, v] of flying) this.drawOneBlock(b, v);
+	}
+
+	drawOneBlock(b, v) {
+		const { ctx, cell } = this;
+		this.drawBlock(b, v.x + (v.jx || 0), v.y + (v.jy || 0), v.sx, v.sy, 1, b.color, v.rot || 0);
+		if (v.forge > 0) {
+			const c = this.cellCenter(v.x, v.y);
+			const s = cell * (1 + (1 - v.forge) * 1.6);
+			ctx.globalCompositeOperation = 'lighter';
+			ctx.globalAlpha = v.forge;
+			ctx.drawImage(this.sprites.glowWhite, c.x - s / 2, c.y - s / 2, s, s);
+			ctx.globalAlpha = 1;
+			ctx.globalCompositeOperation = 'source-over';
 		}
 	}
 
@@ -473,10 +784,13 @@ export class View {
 		const g = this.game.clone();
 		const slot = 0;
 		g.pieces[slot] = t.piece;
-		g.place(slot, t.col, t.piece);
+		const placed = g.place(slot, t.col, t.piece);
 		const cells = new Set();
 		for (const group of g.findGroups()) for (const c of group.cells) cells.add(c);
-		this.previewCache = { key, cells };
+		// Ghost cells show where the rigid piece rests, so note which of them end up in a match.
+		const ghost = new Set();
+		for (const p of placed) if (cells.has(g.grid.indexOf(p.block))) ghost.add(`${p.x},${p.y}`);
+		this.previewCache = { key, cells, ghost };
 		return cells;
 	}
 
@@ -514,7 +828,7 @@ export class View {
 			roundRect(ctx, x + 3, y + 3, cell - 6, cell - 6, cell * 0.18);
 			ctx.stroke();
 			ctx.setLineDash([]);
-			if (preview && preview.has(game.index(l.x, l.y))) this.drawMatchMark(l.x, l.y);
+			if (preview && this.previewCache.ghost.has(`${l.x},${l.y}`)) this.drawMatchMark(l.x, l.y);
 		}
 	}
 
@@ -535,9 +849,10 @@ export class View {
 		const power = this.power;
 		const cancel = { type: 'cancel', x: bar.x + bar.w - cell * 0.9, y: bar.y, w: cell * 0.9, h: bar.h };
 		if (!power) {
-			const w = Math.min(cell * 2.2, (bar.w - gap * (BAG_SIZE - 1)) / BAG_SIZE);
-			const x0 = bar.x + (bar.w - (w * BAG_SIZE + gap * (BAG_SIZE - 1))) / 2;
-			for (let i = 0; i < BAG_SIZE; i++) rects.push({ type: 'chip', index: i, x: x0 + i * (w + gap), y: bar.y, w, h: bar.h });
+			const n = game.bagSize;
+			const w = Math.min(cell * 2.2, (bar.w - gap * (n - 1)) / n);
+			const x0 = bar.x + (bar.w - (w * n + gap * (n - 1))) / 2;
+			for (let i = 0; i < n; i++) rects.push({ type: 'chip', index: i, x: x0 + i * (w + gap), y: bar.y, w, h: bar.h });
 		} else if (power.kind === 'prism' && power.stage === 'color') {
 			const d = bar.h * 0.9;
 			const n = game.colors;
@@ -746,7 +1061,7 @@ export class View {
 			if (this.drag && this.drag.slot === i && this.drag.moved) return;
 			if (this.returning && this.returning.slot === i) return;
 			const pos = this.slotPiecePos(i, piece);
-			const fits = game.canPlaceAny(piece);
+			const fits = game.canPlace(piece);
 			const a = this.appear[i] ?? 1;
 			const pop = a < 1 ? 0.5 + 0.5 * (1 - Math.pow(1 - a, 3)) + Math.sin(a * Math.PI) * 0.12 : 1;
 			const lifted = this.drag && this.drag.slot === i ? 1.08 : 1;
@@ -758,29 +1073,7 @@ export class View {
 			ctx.scale(k, k);
 			this.drawPieceAt(piece, -(piece.w * pos.c) / 2, -(piece.h * pos.c) / 2, pos.c, fits ? 1 : 0.3);
 			ctx.restore();
-			// Small turn arrow, so players know a tap turns the piece.
-			this.drawTurnIcon(s.x + s.w - 22, s.y + 16, fits ? 0.55 : 0.25);
 		});
-	}
-
-	drawTurnIcon(x, y, alpha) {
-		const { ctx } = this;
-		ctx.globalAlpha = alpha;
-		ctx.strokeStyle = GOLD;
-		ctx.lineWidth = 2;
-		ctx.beginPath();
-		ctx.arc(x, y, 6, -Math.PI * 0.9, Math.PI * 0.6);
-		ctx.stroke();
-		ctx.fillStyle = GOLD;
-		ctx.beginPath();
-		const ax = x + Math.cos(Math.PI * 0.6) * 6;
-		const ay = y + Math.sin(Math.PI * 0.6) * 6;
-		ctx.moveTo(ax - 4, ay - 1);
-		ctx.lineTo(ax + 3, ay - 3);
-		ctx.lineTo(ax + 1, ay + 4);
-		ctx.closePath();
-		ctx.fill();
-		ctx.globalAlpha = 1;
 	}
 
 	drawDragged() {
