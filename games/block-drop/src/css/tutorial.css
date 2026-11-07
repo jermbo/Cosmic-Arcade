@@ -1,0 +1,51 @@
+/* The tutorial pages. */
+
+.tutorial {
+	min-height: 330px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 12px;
+}
+
+.tutorial__picture {
+	width: 220px;
+	height: 150px;
+}
+
+.tutorial__title {
+	margin: 0;
+	font-size: 1.35rem;
+	color: var(--gold-2);
+}
+
+.tutorial__text {
+	margin: 0;
+	color: var(--text);
+	line-height: 1.45;
+	max-width: 290px;
+}
+
+.tutorial__key {
+	font-family: inherit;
+	font-size: 0.8rem;
+	padding: 1px 6px;
+	border-radius: 6px;
+	border: 1px solid var(--muted);
+}
+
+.tutorial__dots {
+	display: flex;
+	gap: 8px;
+}
+
+.tutorial__dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.2);
+}
+
+.tutorial__dot.is-on {
+	background: var(--gold);
+}

@@ -6,7 +6,7 @@
 	"scripts": {
 		"dev": "vite src --open --port 4002",
 		"build": "node build.js",
-		"test": "node tools/rules-test.js",
+		"test": "node tools/engine-test.js && node tools/shape-list-test.js && node tools/bot-test.js && node tools/wallet-test.js",
 		"sim": "node tools/sim.js",
 		"icons": "node tools/make-icons.js"
 	},

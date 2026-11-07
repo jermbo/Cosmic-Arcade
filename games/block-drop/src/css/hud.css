@@ -1,0 +1,176 @@
+/* The bar above the game: score, clock, best, the Glints wallet, and the pause button. */
+
+.hud {
+	display: grid;
+	grid-template-columns: 1fr auto 1fr auto;
+	align-items: center;
+	gap: 10px;
+	padding: 10px 14px 0;
+	min-height: 58px;
+}
+
+.app[data-screen='title'] .hud {
+	visibility: hidden;
+}
+
+.hud__label {
+	display: block;
+	font-size: 0.68rem;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.hud__value {
+	display: block;
+	font-size: 1.7rem;
+	font-weight: 800;
+	line-height: 1.05;
+	font-variant-numeric: tabular-nums;
+	color: var(--gold-2);
+	text-shadow: 0 0 14px rgba(242, 200, 121, 0.45);
+}
+
+.hud__value--small {
+	font-size: 1.15rem;
+	color: var(--text);
+	text-shadow: none;
+}
+
+.hud__value.is-bump {
+	animation: bump 0.25s ease-out;
+}
+
+.hud__best {
+	text-align: right;
+}
+
+.hud__mid {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+}
+
+.hud__time {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+}
+
+.hud__time-text {
+	font-weight: 800;
+	font-size: 1.1rem;
+	font-variant-numeric: tabular-nums;
+}
+
+.hud__time.is-low .hud__time-text {
+	color: var(--rose);
+	animation: bump 0.5s ease-out infinite;
+}
+
+.hud__bar {
+	display: block;
+	width: 92px;
+	height: 6px;
+	border-radius: 3px;
+	background: rgba(255, 255, 255, 0.1);
+	overflow: hidden;
+}
+
+.hud__bar-fill {
+	display: block;
+	height: 100%;
+	width: 100%;
+	background: linear-gradient(90deg, var(--gold), var(--gold-2));
+	transform-origin: left;
+}
+
+.hud__time.is-low .hud__bar-fill {
+	background: var(--rose);
+}
+
+.hud__chip {
+	font-size: 0.65rem;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	padding: 2px 8px;
+	border-radius: 99px;
+	border: 1px solid rgba(178, 133, 255, 0.6);
+	color: #d9c6ff;
+}
+
+.icon-button {
+	width: 44px;
+	height: 44px;
+	display: grid;
+	place-items: center;
+	border-radius: 14px;
+	border: 2px solid rgba(242, 200, 121, 0.55);
+	background: rgba(26, 20, 56, 0.8);
+	cursor: pointer;
+}
+
+.icon-button__icon {
+	width: 20px;
+	height: 20px;
+	fill: var(--gold);
+}
+
+.icon-button:active {
+	transform: scale(0.94);
+}
+
+.icon-button:focus-visible {
+	outline: 3px solid var(--gold-2);
+	outline-offset: 2px;
+}
+
+.hud__wallet {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.hud__glints {
+	font-weight: 800;
+	font-size: 0.95rem;
+	color: #9fd8ff;
+	text-shadow: 0 0 10px rgba(69, 176, 255, 0.5);
+	font-variant-numeric: tabular-nums;
+}
+
+.hud__glints.is-bump {
+	animation: bump 0.25s ease-out;
+}
+
+.hud__reroll {
+	position: relative;
+	min-height: 28px;
+	padding: 2px 9px;
+	border-radius: 99px;
+	border: 1px solid rgba(69, 176, 255, 0.7);
+	background: rgba(21, 62, 114, 0.6);
+	color: #cfeaff;
+	font-weight: 800;
+	font-size: 0.8rem;
+	cursor: pointer;
+	font-variant-numeric: tabular-nums;
+}
+
+.hud__reroll[aria-disabled='true'] {
+	opacity: 0.45;
+}
+
+/* The chip is 28px high. Its tap area is 44px. */
+.hud__reroll::after {
+	content: '';
+	position: absolute;
+	inset: -8px -4px;
+}
+
+.hud__reroll:focus-visible {
+	outline: 3px solid var(--gold-2);
+	outline-offset: 2px;
+}

@@ -31,10 +31,12 @@ class Audio {
 			try {
 				this.ctx = new AC();
 			} catch {
+				// The browser refuses to make a sound engine: the game stays silent.
 				return;
 			}
 			this.build();
 		}
+		// A browser can refuse to wake the sound before a tap. The next tap tries again.
 		if (this.ctx.state !== 'running') this.ctx.resume().catch(() => {});
 		if (!this.primed) {
 			// A silent buffer wakes iOS Safari.
@@ -100,10 +102,12 @@ class Audio {
 	}
 
 	suspend() {
+		// A refused suspend leaves the sound on, which does no harm.
 		if (this.ctx && this.ctx.state === 'running') this.ctx.suspend().catch(() => {});
 	}
 
 	resume() {
+		// A browser can refuse to wake the sound before a tap. The next tap tries again.
 		if (this.ctx && this.ctx.state !== 'running') this.ctx.resume().catch(() => {});
 	}
 
@@ -264,12 +268,6 @@ class Audio {
 		if (!this.ctx || this.timer) return;
 		this.nextBeat = this.ctx.currentTime + 0.1;
 		this.timer = setInterval(() => this.schedule(), 90);
-	}
-
-	stopMusic() {
-		this.musicWanted = false;
-		clearInterval(this.timer);
-		this.timer = null;
 	}
 
 	schedule() {

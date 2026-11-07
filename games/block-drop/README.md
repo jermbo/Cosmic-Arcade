@@ -13,7 +13,7 @@ src/
   index.html             the page
   manifest.webmanifest   name, icons, portrait, standalone, dark theme
   sw.js                  service worker: caches every file on the first visit
-  css/style.css
+  css/                   styles, one file for each block
   js/                    game code (ES modules)
   icons/                 192, 512, maskable 192 and 512, Apple touch icon, favicons
 ```
@@ -139,7 +139,7 @@ When you have Glints to spend, starting any game opens a "Before you start" box 
 
 The Daily button starts a game with the same seed for everyone that day, so the pieces come in the same order (power-ups and Remix do not change which pieces you get). It ignores Lab rules. The first run of each day pays ✦20. The best daily score resets each day. Restarting plays the same day again.
 
-All prices and amounts are constants at the top of `src/js/engine.js` (and `src/js/shop.js` for skins). `npm run sim` prints Glints earned per 100 turns.
+All prices and amounts are constants in `src/js/prices.js` (and `src/js/shop.js` for skins). `npm run sim` prints Glints earned per 100 turns.
 
 ## Tools
 

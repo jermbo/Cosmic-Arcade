@@ -2,7 +2,9 @@
 // Open shape-lab.html (or tap the version number on the title screen 7 times).
 // "Save to game" keeps the list in this browser, and the game reads it when it starts.
 
-import { Game, parseArt, cleanShapes, MAX_SHAPE_WIDTH } from './engine.js';
+import { Game } from './engine.js';
+import { capturePointer } from './dom.js';
+import { parseArt, cleanShapes, MAX_SHAPE_WIDTH } from './shape-list.js';
 import { SHAPE_ART } from './shapes.js';
 import { loadCustomShapes, saveCustomShapes, clearCustomShapes } from './storage.js';
 
@@ -171,11 +173,7 @@ function buildEditor() {
 		e.preventDefault();
 		drag = { paint: !c.classList.contains('on') };
 		setCell(c, drag.paint);
-		try {
-			ed.setPointerCapture(e.pointerId);
-		} catch {
-			// Capture can fail if the pointer is already gone.
-		}
+		capturePointer(ed, e.pointerId);
 	});
 	ed.addEventListener('pointermove', (e) => {
 		if (!drag) return;
@@ -268,7 +266,6 @@ function selectShape(i) {
 // ---- drop test ----
 
 const test = { game: null, hover: -1, busy: false };
-const TEST_COLS = 7;
 
 function pieceFrom(art) {
 	const cells = parseArt(art).map(([dx, dy]) => ({ dx, dy, color: colorAt(dx, dy) }));
@@ -277,7 +274,7 @@ function pieceFrom(art) {
 }
 
 function newStacks(mode) {
-	const g = new Game({ lab: { grid: 'medium' } });
+	const g = new Game({ lab: { grid: 'medium' }, seed: Date.now() });
 	g.grid.fill(null);
 	const max = Math.max(0, Math.min(g.rows, Number($('maxFill').value) || 0));
 	for (let x = 0; x < g.cols; x++) {
@@ -344,7 +341,7 @@ function renderTest() {
 	}
 	slotEls.forEach((s, i) => {
 		const b = g.grid[i];
-		const x = i % g.cols;
+		const x = g.columnOf(i);
 		s.className = 'slot';
 		if (b) s.classList.add('blk', `c${b.color}`);
 		if (ghost.has(i)) s.classList.add('ghost');
@@ -382,7 +379,7 @@ function setupWell() {
 		test.busy = true;
 		test.hover = -1;
 		g.pieces[0] = piece;
-		g.place(0, col, piece, { settle: false });
+		g.placeRigid(0, col, piece);
 		$('testHint').textContent = 'The shape rests as drawn...';
 		renderTest();
 		setTimeout(() => {

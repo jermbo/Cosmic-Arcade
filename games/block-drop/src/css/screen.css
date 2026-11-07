@@ -1,0 +1,133 @@
+/* A full screen over the game: the title, and the modals. */
+
+.screen {
+	position: absolute;
+	inset: 0;
+	padding: calc(var(--safe-top) + 16px) calc(var(--safe-right) + 18px) calc(var(--safe-bottom) + 16px) calc(var(--safe-left) + 18px);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	z-index: 5;
+}
+
+.screen--title {
+	gap: 10px;
+	text-align: center;
+}
+
+.screen--modal {
+	background: rgba(8, 6, 20, 0.72);
+	-webkit-backdrop-filter: blur(6px);
+	backdrop-filter: blur(6px);
+	animation: fade-in 0.2s ease-out;
+}
+
+@keyframes fade-in {
+	from {
+		opacity: 0;
+	}
+}
+
+.logo__gems {
+	display: flex;
+	gap: 6px;
+	justify-content: center;
+	margin-bottom: 4px;
+}
+
+.logo__gem {
+	width: 44px;
+	height: 44px;
+	animation: gem-bob 2.4s ease-in-out infinite;
+}
+
+@keyframes gem-bob {
+	50% {
+		transform: translateY(-7px) rotate(4deg);
+	}
+}
+
+.logo__name {
+	margin: 0;
+	font-size: clamp(2.8rem, 14vw, 4.2rem);
+	font-weight: 900;
+	letter-spacing: 0.04em;
+	line-height: 1;
+	background: linear-gradient(180deg, #fff4d6 10%, var(--gold) 55%, #d98a4a 100%);
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+	filter: drop-shadow(0 3px 0 var(--lead)) drop-shadow(0 0 18px rgba(242, 200, 121, 0.45));
+}
+
+.logo__tag {
+	margin: 0 0 18px;
+	color: var(--muted);
+	font-size: 0.95rem;
+}
+
+.menu {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	width: min(100%, 300px);
+}
+
+.menu--row {
+	flex-direction: row;
+	justify-content: center;
+	width: 100%;
+}
+
+.menu--left {
+	align-items: flex-start;
+}
+
+.menu__row {
+	display: flex;
+	gap: 10px;
+}
+
+.menu__row > * {
+	flex: 1;
+}
+
+.arcade-link {
+	display: inline-flex;
+	align-items: center;
+	min-height: 44px;
+	color: var(--muted);
+	font-size: 0.9rem;
+	margin-top: 6px;
+}
+
+.arcade-link:focus-visible {
+	outline: 3px solid var(--gold-2);
+	outline-offset: 2px;
+}
+
+.version {
+	margin: 8px 0 0;
+	font-size: 0.72rem;
+	color: rgba(179, 168, 214, 0.75);
+}
+
+.wallet {
+	margin: -4px 0 10px;
+	font-weight: 800;
+	color: #9fd8ff;
+	text-shadow: 0 0 12px rgba(69, 176, 255, 0.5);
+	letter-spacing: 0.04em;
+	text-align: center;
+}
+
+@container page (max-height: 640px) {
+	.logo__gem {
+		width: 34px;
+		height: 34px;
+	}
+	.logo__tag {
+		margin-bottom: 8px;
+	}
+}

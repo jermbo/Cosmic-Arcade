@@ -1,6 +1,8 @@
-// Checks the match, chain and power-up rules on hand-made boards. Run: node tools/rules-test.js
+// Checks the match, chain and power-up rules on hand-made boards. Run: node tools/engine-test.js
 import assert from 'node:assert/strict';
-import { Game, dailySeed, REROLL_COST, REROLL_STEP, glintsFor, SECOND_WIND_ROWS, WARMUP_ROUNDS, SHAPES, parseArt, MAX_SHAPE_WIDTH, POWER_KINDS, REWARD_CHAIN, REWARD_GROUP, BAG_SIZE, groupMultiplier } from '../src/js/engine.js';
+import { Game, dailySeed, glintsFor, glintsForAllClear, SECOND_WIND_ROWS, POWER_KINDS, REWARD_CHAIN, REWARD_GROUP, BAG_SIZE, groupMultiplier } from '../src/js/engine.js';
+import { REROLL_COST, REROLL_STEP } from '../src/js/prices.js';
+import { SHAPES } from '../src/js/shape-list.js';
 
 /** rows are listed from the ceiling down: '.' empty, a digit is a color. */
 function board(rows, lab = {}) {
@@ -124,13 +126,6 @@ g.bag = ['blast'];
 assert.equal(g.useBlast(4, 0), false);
 assert.deepEqual(g.bag, ['blast']);
 
-// Every shape is different, fits a 5-wide well, and can be a tray piece.
-const GRID_MIN_COLS = MAX_SHAPE_WIDTH;
-assert.equal(new Set(SHAPES.map((sh) => JSON.stringify(sh))).size, SHAPES.length, 'no shape is listed twice');
-for (const sh of SHAPES) {
-	assert.ok(sh.length >= 2, 'a piece has at least 2 blocks');
-	assert.ok(Math.max(...sh.map(([dx]) => dx)) < GRID_MIN_COLS, 'a piece is at most 5 wide');
-}
 g = new Game({ lab: { grid: 'large' }, seed: 11 });
 const seen = new Set();
 for (let i = 0; i < 4000; i++) {
@@ -175,7 +170,7 @@ const ess = { id: 97, w: 3, h: 2, cells: [{ dx: 1, dy: 0, color: 0 }, { dx: 2, d
 g = new Game({ lab: { grid: 'small' }, seed: 5 });
 g.grid.fill(null);
 g.pieces[0] = ess;
-g.place(0, 0, ess, { settle: false });
+g.placeRigid(0, 0, ess);
 assert.equal(g.get(0, 1).color, 2, 'the left block rests one row down, as drawn');
 assert.equal(g.get(0, 0), null, 'with a gap above it');
 g.settle();
@@ -189,7 +184,7 @@ stack(0, 3);
 const bar = { id: 96, w: 3, h: 1, cells: [0, 1, 2].map((dx) => ({ dx, dy: 0, color: dx })) };
 assert.deepEqual(g.landing(bar, 0).map((l) => l.y), [3, 3, 3]);
 g.pieces[0] = bar;
-g.place(0, 0, bar, { settle: false });
+g.placeRigid(0, 0, bar);
 assert.equal(g.get(1, 3).color, 1, 'the bar rests under the stack as one flat row');
 g.settle();
 assert.equal(g.get(1, 0).color, 1, 'then the loose blocks rise');
@@ -202,8 +197,6 @@ g.pieces[0] = bar;
 g.place(0, 0, bar);
 assert.equal(g.get(2, 0).color, 2);
 
-// Shapes with a hole inside a column are fine now (the shape lab can make them).
-assert.deepEqual(parseArt(['#', '.', '#']), [[0, 0], [0, 2]]);
 
 // A new game starts with an empty board.
 g = new Game({ lab: { grid: 'medium' }, seed: 7 });
@@ -250,7 +243,7 @@ assert.equal(g.stuck, false);
 assert.equal(glintsFor(1, 1), 0, 'a plain clear earns nothing');
 assert.equal(glintsFor(2, 1), 1);
 assert.equal(glintsFor(3, 3), 4);
-assert.equal(glintsFor(1, 1, true), 10);
+assert.equal(glintsForAllClear(1, 1), 10);
 g = board(['11111.']);
 assert.equal(g.resolveStep(1).glints, 1, 'a group of 5 earns 1');
 assert.equal(g.glints, 1, 'the run total keeps the glints');
@@ -277,14 +270,6 @@ for (const [x, h] of [[0, 8], [1, 4], [2, 6]]) for (let y = 0; y < h; y++) g.gri
 g.useSecondWind();
 assert.deepEqual([0, 1, 2].map((x) => g.height(x)), [4, 4, 4], 'rows 4 to 7 go; shorter columns keep what is above that');
 
-// The warm-up plays rounds for the player, keeps the stack legal, and keeps the run total of glints.
-g = new Game({ lab: { grid: 'medium' }, seed: 21 });
-const played = g.autoPlay(WARMUP_ROUNDS);
-assert.equal(played, WARMUP_ROUNDS, 'it plays every round on an empty board');
-assert.equal(g.stats.turns, WARMUP_ROUNDS);
-assert.ok(g.pieces.every(Boolean), 'the tray is refilled');
-assert.equal(g.findGroups().length, 0, 'the board is still after the last round');
-for (let x = 0; x < g.cols; x++) for (let y = 1; y < g.rows; y++) if (g.get(x, y)) assert.ok(g.get(x, y - 1), 'no gaps in a column');
 
 // The daily seed: the same date gives the same pieces in the same order, whatever else happens.
 assert.equal(dailySeed('2026-11-07'), dailySeed('2026-11-07'));
@@ -333,4 +318,28 @@ for (let i = 0; i < 5; i++) assert.equal(g.awardChain(REWARD_CHAIN).lost, false)
 assert.equal(g.awardChain(REWARD_CHAIN).lost, true);
 assert.equal(g.bag.length, 5);
 
-console.log('rules ok');
+// A column is in danger when fewer than 3 rows are free, and the danger grows with each block.
+g = new Game({ lab: { grid: 'small' }, seed: 36 });
+g.grid.fill(null);
+assert.equal(g.rows, 8);
+stack(0, 5); // 3 free rows
+stack(1, 6); // 2 free rows
+stack(2, 8); // 0 free rows
+assert.equal(g.dangerOf(0), 0, '3 free rows is still safe');
+assert.equal(g.dangerOf(1), 1);
+assert.equal(g.dangerOf(2), 3);
+assert.equal(g.dangerOf(3), 0, 'an empty column is safe');
+
+// A cell index turns into its column and row.
+g = new Game({ lab: { grid: 'small' }, seed: 37 });
+assert.equal(g.columnOf(g.index(4, 2)), 4);
+assert.equal(g.rowOf(g.index(4, 2)), 2);
+
+// A cell touches 2 neighbors in a corner, 3 on an edge, and 4 in the middle. Diagonals do not count.
+const bySize = (list) => list.slice().sort((a, b) => a - b);
+assert.deepEqual(bySize(g.neighborsOf(g.index(0, 0))), bySize([g.index(1, 0), g.index(0, 1)]));
+assert.equal(g.neighborsOf(g.index(g.cols - 1, g.rows - 1)).length, 2);
+assert.equal(g.neighborsOf(g.index(3, 0)).length, 3);
+assert.equal(g.neighborsOf(g.index(3, 3)).length, 4);
+
+console.log('engine ok');
