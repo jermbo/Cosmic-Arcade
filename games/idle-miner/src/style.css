@@ -96,6 +96,23 @@ svg {
 	transform: scale(0.92);
 }
 
+/* Pressed buttons shrink. While pressed, this keeps the hit area full size,
+   so a click that ends near the edge still lands on the button. */
+.icon-btn,
+.pill,
+.btn {
+	position: relative;
+}
+
+.icon-btn:active::before,
+.pill:active::before,
+.btn:active::before,
+.tool:active::before {
+	content: '';
+	position: absolute;
+	inset: -8px;
+}
+
 .icon-btn svg path[d^='M6 6'],
 .pill svg path[d^='M15 5'] {
 	fill: none;

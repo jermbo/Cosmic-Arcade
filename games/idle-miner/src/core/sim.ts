@@ -3,6 +3,8 @@
 
 import {
 	BELT_SPACING,
+	BLAST_COST,
+	BLAST_GROWTH,
 	BUF_IN,
 	BUF_OUT,
 	CELLS,
@@ -173,7 +175,7 @@ export type PlaceCheck = { ok: true; cost: number } | { ok: false; why: string; 
 export function canPlace(g: Game, pi: number, x: number, y: number, t: MachineType): PlaceCheck {
 	const cost = buildCost(g, pi, t);
 	if (!inGrid(x, y)) return { ok: false, why: 'Off the map', cost };
-	const tile = tilesOf(pi)[idx(x, y)];
+	const tile = tilesOf(pi, g.blasted[pi])[idx(x, y)];
 	const here = g.planets[pi].cells[idx(x, y)];
 	if (tile === TILE_ROCK) return { ok: false, why: 'Rock in the way', cost };
 	if (here) return { ok: false, why: 'Space is taken', cost };
@@ -260,6 +262,29 @@ export function buyShipUp(g: Game, pi: number, u: ShipUpgrade): boolean {
 		p.ships.push(s);
 	}
 	return true;
+}
+
+// ---------- rocks ----------
+
+export function blastCost(g: Game, pi: number) {
+	return Math.ceil(BLAST_COST * PLANETS[pi].value * Math.pow(BLAST_GROWTH, g.blasted[pi].length));
+}
+
+export function canBlast(g: Game, pi: number, c: number): PlaceCheck {
+	const cost = blastCost(g, pi);
+	if (tilesOf(pi, g.blasted[pi])[c] !== TILE_ROCK) return { ok: false, why: 'No rock here', cost };
+	if (!g.research.blast) return { ok: false, why: 'Research Blast Charges to clear rocks', cost };
+	if (g.credits < cost) return { ok: false, why: 'Not enough credits', cost };
+	return { ok: true, cost };
+}
+
+/** Clears a rock for good. Returns the price paid, or -1. */
+export function blastRock(g: Game, pi: number, c: number): number {
+	const check = canBlast(g, pi, c);
+	if (!check.ok) return -1;
+	g.credits -= check.cost;
+	g.blasted[pi].push(c);
+	return check.cost;
 }
 
 export function buyResearch(g: Game, r: ResearchId): boolean {
@@ -373,11 +398,15 @@ export function boostAt(p: PlanetState, i: number) {
 
 // ---------- the tick ----------
 
+/** Can this machine use item k as an input at all? */
+function uses(m: Machine, k: number): boolean {
+	if (isCrate(k)) return false;
+	if (m.t === 'compactor') return true;
+	return MACHINES[m.t].inputs.includes(formOfKind(k));
+}
+
 function accepts(m: Machine, k: number): boolean {
-	if (m.t === 'compactor') return !isCrate(k) && m.inb.length < 10;
-	const def = MACHINES[m.t];
-	if (!def.inputs.length || isCrate(k)) return false;
-	return def.inputs.includes(formOfKind(k)) && m.inb.length < BUF_IN;
+	return uses(m, k) && m.inb.length < (m.t === 'compactor' ? 10 : BUF_IN);
 }
 
 function padCap(p: PlanetState) {
@@ -405,9 +434,19 @@ function push(p: PlanetState, x: number, y: number, dir: Dir, k: number): boolea
 		case 'pylon':
 			return false;
 		default:
-			if (!accepts(m, k)) return false;
-			m.inb.push(k);
-			return true;
+			if (accepts(m, k)) {
+				m.inb.push(k);
+				return true;
+			}
+			// Items a machine cannot use slide straight through it, so mixed belts never jam.
+			if (!uses(m, k)) {
+				const thru = (m.thru ??= []);
+				const last = thru[thru.length - 1];
+				if (thru.length + m.out.length >= BUF_OUT || (last && last.p < BELT_SPACING)) return false;
+				thru.push({ k, p: 0, e: dir });
+				return true;
+			}
+			return false;
 	}
 }
 
@@ -422,6 +461,22 @@ function tryOutput(p: PlanetState, i: number, m: Machine, dt: number) {
 		m.out.shift();
 		m.stuck = 0;
 	} else if (m.out.length >= BUF_OUT) m.stuck = (m.stuck || 0) + dt;
+}
+
+/** Moves pass-through items across a machine, like a short belt that ends in its output. */
+function moveThru(m: Machine, bs: number) {
+	const thru = m.thru;
+	if (!thru || !thru.length) return;
+	const front = thru[0];
+	front.p = Math.min(1, front.p + bs);
+	if (front.p >= 1 && m.out.length < BUF_OUT) {
+		m.out.push(front.k);
+		thru.shift();
+	}
+	for (let n = thru[0] === front ? 1 : 0; n < thru.length; n++) {
+		const lim = n === 0 ? 1 : thru[n - 1].p - BELT_SPACING;
+		thru[n].p = Math.min(thru[n].p + bs, lim);
+	}
 }
 
 function startJob(m: Machine): boolean {
@@ -454,7 +509,7 @@ function tickPlanet(g: Game, pi: number, dt: number) {
 	const p = g.planets[pi];
 	const boost = derived(p);
 	const bs = beltSpeed(g.research.belt, !!g.perks.belts) * dt;
-	const tiles = tilesOf(pi);
+	const tiles = tilesOf(pi, g.blasted[pi]);
 	for (let i = 0; i < CELLS; i++) {
 		const m = p.cells[i];
 		if (!m) continue;
@@ -509,6 +564,7 @@ function tickPlanet(g: Game, pi: number, dt: number) {
 						startJob(m);
 					}
 				}
+				moveThru(m, bs);
 				tryOutput(p, i, m, dt);
 			}
 		}

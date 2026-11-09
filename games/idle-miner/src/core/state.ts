@@ -31,6 +31,8 @@ export interface Machine {
 	glow?: number;
 	/** view only: input side for belt curves, -1 for straight */
 	bend?: number;
+	/** items passing through that this machine cannot use, front first */
+	thru?: BeltItem[];
 	/** blocked for a while (seconds), for hints */
 	stuck?: number;
 }
@@ -71,6 +73,8 @@ export interface Stats {
 
 export interface Game {
 	v: 1;
+	/** per planet: rock cells that were blasted away. Kept through a nova. */
+	blasted: number[][];
 	credits: number;
 	/** earned this run */
 	runEarned: number;
@@ -118,7 +122,8 @@ export function newGame(keep?: Game): Game {
 		runEarned: 0,
 		stardust: keep ? keep.stardust : 0,
 		perks,
-		research: { belt: 0, tap: 0, market: 0, offline: 0, beacon: 0 },
+		research: { belt: 0, tap: 0, market: 0, offline: 0, blast: 0, beacon: 0 },
+		blasted: keep ? keep.blasted.map((a) => a.slice()) : PLANETS.map(() => []),
 		planets: PLANETS.map((_, i) => makePlanet(i, i === 0, extra)),
 		goals: [],
 		unlocks: [],
@@ -155,8 +160,22 @@ function rng(seed: number) {
 
 const tileCache: Uint8Array[] = [];
 
-/** The ground of a planet: ore, rock, plain. Same every time for a planet. */
-export function tilesOf(index: number): Uint8Array {
+const blastCache = new WeakMap<readonly number[], { n: number; tiles: Uint8Array }>();
+
+/** The ground of a planet now: the base map, minus any rocks that were blasted. */
+export function tilesOf(index: number, blasted?: readonly number[]): Uint8Array {
+	const base = baseTilesOf(index);
+	if (!blasted || !blasted.length) return base;
+	const hit = blastCache.get(blasted);
+	if (hit && hit.n === blasted.length) return hit.tiles;
+	const tiles = base.slice();
+	for (const c of blasted) if (tiles[c] === TILE_ROCK) tiles[c] = TILE_GROUND;
+	blastCache.set(blasted, { n: blasted.length, tiles });
+	return tiles;
+}
+
+/** The ground of a planet as first made: ore, rock, plain. Same every time for a planet. */
+export function baseTilesOf(index: number): Uint8Array {
 	if (tileCache[index]) return tileCache[index];
 	const def = PLANETS[index];
 	const r = rng(def.seed * 7919);
@@ -210,7 +229,7 @@ export function serialize(g: Game): string {
 		...g,
 		planets: g.planets.map((p) => ({
 			...p,
-			cells: p.cells.map((m) => (m ? { t: m.t, d: m.d, lv: m.lv, inb: m.inb, out: m.out, prog: round(m.prog), job: m.job, kind: m.kind, items: m.items.map((i) => ({ k: i.k, p: round(i.p), e: i.e })) } : null)),
+			cells: p.cells.map((m) => (m ? { t: m.t, d: m.d, lv: m.lv, inb: m.inb, out: m.out, prog: round(m.prog), job: m.job, kind: m.kind, items: m.items.map((i) => ({ k: i.k, p: round(i.p), e: i.e })), thru: m.thru?.length ? m.thru.map((i) => ({ k: i.k, p: round(i.p), e: i.e })) : undefined } : null)),
 		})),
 	};
 	return JSON.stringify(plain);
@@ -225,7 +244,8 @@ export function deserialize(text: string): Game | null {
 		const g = newGame();
 		Object.assign(g, raw);
 		g.settings = { ...defaultSettings(), ...raw.settings };
-		g.research = { belt: 0, tap: 0, market: 0, offline: 0, beacon: 0, ...raw.research };
+		g.research = { belt: 0, tap: 0, market: 0, offline: 0, blast: 0, beacon: 0, ...raw.research };
+		g.blasted = PLANETS.map((_, i) => (Array.isArray(raw.blasted?.[i]) ? raw.blasted[i].filter(Number.isInteger) : []));
 		g.planets = PLANETS.map((_, i) => {
 			const base = makePlanet(i, i === 0, 0);
 			const src = raw.planets[i];

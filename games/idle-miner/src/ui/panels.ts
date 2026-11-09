@@ -39,7 +39,7 @@ export function openResearch() {
 		title: 'Research',
 		render: () => {
 			const g = host.game();
-			const ids: ResearchId[] = ['tap', 'belt', 'market', 'offline'];
+			const ids: ResearchId[] = ['tap', 'belt', 'blast', 'market', 'offline'];
 			if (g.planets[5].unlocked || g.beaconLit) ids.push('beacon');
 			const rows = ids
 				.map((id) => {
@@ -47,7 +47,7 @@ export function openResearch() {
 					const lv = g.research[id];
 					const cost = sim.researchCost(g, id);
 					const maxed = lv >= def.max;
-					const level = def.max > 1 ? `<small>Lv ${lv}/${def.max}</small>` : maxed ? '<small>Lit</small>' : '';
+					const level = def.max > 1 ? `<small>Lv ${lv}/${def.max}</small>` : maxed ? `<small>${id === 'beacon' ? 'Lit' : 'Done'}</small>` : '';
 					return `<div class="row ${maxed ? 'row--done' : ''}"><div><div class="row__name">${def.name}${level}</div><div class="row__desc">${def.desc}${effect(g, id)}</div></div>${buyButton('research', id, cost, g.credits >= cost, maxed)}</div>`;
 				})
 				.join('');
@@ -79,6 +79,10 @@ function effect(g: Game, id: ResearchId) {
 			return ` Now: +${g.research.market * 20}%.`;
 		case 'offline':
 			return ` Now: ${sim.offlineCapHours(g)} hours.`;
+		case 'blast': {
+			const n = g.blasted.reduce((t, a) => t + a.length, 0);
+			return n ? ` Rocks cleared: ${n}.` : '';
+		}
 		default:
 			return '';
 	}
@@ -327,7 +331,8 @@ export function openHow() {
 			<li><b>Tap a planet</b> on the space map to mine by hand.</li>
 			<li><b>Open a planet</b> and pick a tool. Put <b>drills</b> on glowing ore tiles.</li>
 			<li><b>Drag</b> to lay belts. Belts point the way you drag. Drag from a drill to the <b>launch pad</b>.</li>
-			<li>Put a <b>smelter</b> on the line to turn ore into bars. Bars sell for more.</li>
+			<li>Put a <b>smelter</b> on the line to turn ore into bars. Bars sell for more. Items a machine cannot use pass straight through it.</li>
+			<li><b>Rocks</b> block building. Research <b>Blast Charges</b>, then tap a rock with <b>Remove</b> to clear it.</li>
 			<li><b>Tap a machine</b> to upgrade, turn or remove it. Tap a belt with the belt tool to turn it.</li>
 			<li><b>Ships</b> fly cargo home. If the pad fills up, buy more ships or cargo space.</li>
 			<li>Follow the <b>Next</b> bar at the top when you are not sure what to do.</li>

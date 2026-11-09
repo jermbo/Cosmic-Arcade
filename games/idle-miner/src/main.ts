@@ -527,7 +527,7 @@ function updateInspect() {
 	let stats = '';
 	let desc = def.desc;
 	if (m.t === 'drill') {
-		const ore = tilesOf(pv.pi)[c] === TILE_ORE;
+		const ore = tilesOf(pv.pi, g.blasted[pv.pi])[c] === TILE_ORE;
 		stats = `<span>Digs <b>${((levelSpeed(m.lv) * boost) / def.time).toFixed(2)}</b>/s</span>`;
 		if (!ore) desc = 'This drill is not on ore.';
 	} else if (m.t === 'belt') {
@@ -1078,4 +1078,4 @@ requestAnimationFrame(frame);
 
 // For quick checks in the console: window.__game(), and in dev, window.__speed(n) to run faster.
 (window as unknown as { __game: () => Game }).__game = () => g;
-if (import.meta.env.DEV) Object.assign(window, { __speed: (n: number) => (devSpeed = n), __sim: sim, __open: (i: number) => toPlanet(i) });
+if (import.meta.env.DEV) Object.assign(window, { __speed: (n: number) => (devSpeed = n), __sim: sim, __open: (i: number) => toPlanet(i), __pv: pv });

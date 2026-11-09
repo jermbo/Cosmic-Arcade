@@ -3,8 +3,8 @@
 import { COLS, DX, DY, MACHINES, PLANETS, ROWS, TILE_ORE, TILE_ROCK, beltSpeed, shipCargo } from '../core/data.ts';
 import type { Dir, MachineType } from '../core/data.ts';
 import * as sim from '../core/sim.ts';
-import { tilesOf } from '../core/state.ts';
-import type { Game, Machine } from '../core/state.ts';
+import { baseTilesOf, tilesOf } from '../core/state.ts';
+import type { BeltItem, Game, Machine } from '../core/state.ts';
 import { drawBelt, drawItem, drawMachine, drawShip, glow, mix, roundRect, withAlpha } from './draw.ts';
 import { burst, popup, ring, spray } from './fx.ts';
 import { fmt as fmtShort } from '../core/format.ts';
@@ -12,7 +12,7 @@ import { fmt as fmtShort } from '../core/format.ts';
 export type Tool = MachineType | 'remove' | null;
 
 export interface PlanetHooks {
-	sound: (name: 'place' | 'belt' | 'remove' | 'error' | 'click') => void;
+	sound: (name: 'place' | 'belt' | 'remove' | 'error' | 'click' | 'blast') => void;
 	toast: (text: string) => void;
 	select: (cell: number | null) => void;
 	changed: () => void;
@@ -126,7 +126,7 @@ export class PlanetView {
 		}
 		const mode = this.tool === 'belt' ? 'belt' : this.tool === 'remove' ? 'remove' : this.tool ? 'machine' : 'none';
 		this.drag = { path: [c], moved: false, mode, pointer: id, startX: sx, startY: sy };
-		if (mode === 'remove') this.removeCell(g, c);
+		if (mode === 'remove') this.removeCell(g, c, true);
 	}
 
 	pointerMove(g: Game, sx: number, sy: number, id: number) {
@@ -178,6 +178,9 @@ export class PlanetView {
 		} else if (d.mode === 'none') {
 			const m = g.planets[this.pi].cells[d.path[0]];
 			this.hooks.select(m ? d.path[0] : null);
+			if (!m && !d.moved && tilesOf(this.pi, g.blasted[this.pi])[d.path[0]] === TILE_ROCK) {
+				this.hooks.toast(g.research.blast ? `Rock. Tap it with Remove to blast it for ${fmtShort(sim.blastCost(g, this.pi))}.` : 'Rock. Research Blast Charges to clear rocks.');
+			}
 		}
 	}
 
@@ -230,7 +233,7 @@ export class PlanetView {
 
 	private commitBelts(g: Game, path: number[]) {
 		const p = g.planets[this.pi];
-		const tiles = tilesOf(this.pi);
+		const tiles = tilesOf(this.pi, g.blasted[this.pi]);
 		const dirs = this.pathDirs(g, path);
 		let placed = 0;
 		let short = false;
@@ -283,8 +286,9 @@ export class PlanetView {
 		this.hooks.changed();
 	}
 
-	private removeCell(g: Game, c: number) {
+	private removeCell(g: Game, c: number, tap = false) {
 		const m = g.planets[this.pi].cells[c];
+		if (!m && tap) this.blastCell(g, c);
 		if (!m || m.t === 'pad') return;
 		const refund = sim.removeAt(g, this.pi, cx(c), cy(c));
 		const s = this.cellCenter(c);
@@ -292,6 +296,25 @@ export class PlanetView {
 		if (refund > 0) popup(s.x, s.y, '+' + fmtShort(refund), '#9dffb0', 12);
 		if (this.selected === c) this.hooks.select(null);
 		this.hooks.sound('remove');
+		this.hooks.changed();
+	}
+
+	private blastCell(g: Game, c: number) {
+		if (tilesOf(this.pi, g.blasted[this.pi])[c] !== TILE_ROCK) return;
+		const check = sim.canBlast(g, this.pi, c);
+		if (!check.ok) {
+			this.hooks.toast(check.why);
+			this.hooks.sound('error');
+			return;
+		}
+		sim.blastRock(g, this.pi, c);
+		const def = PLANETS[this.pi];
+		const s = this.cellCenter(c);
+		burst(s.x, s.y, '#ffd9a8', 16, 260, { size: 2.5, life: 0.45 });
+		burst(s.x, s.y, mix(def.dark, '#8a8fa6', 0.5), 18, 170, { size: 4, life: 0.8, grav: 260, spark: false });
+		ring(s.x, s.y, '#ffb347', this.ts * 0.25, 160, 0.5);
+		popup(s.x, s.y - this.ts * 0.4, '-' + fmtShort(check.cost), '#ffb3b3', 13);
+		this.hooks.sound('blast');
 		this.hooks.changed();
 	}
 
@@ -324,16 +347,17 @@ export class PlanetView {
 		} else ctx.translate(this.ox, this.oy);
 
 		// board
-		const key = `${this.pi}:${s}`;
+		const blasted = g.blasted[this.pi];
+		const key = `${this.pi}:${s}:${blasted.length}`;
 		if (key !== this.boardKey || !this.boardCache) {
-			this.boardCache = this.renderBoard(s);
+			this.boardCache = this.renderBoard(s, blasted);
 			this.boardKey = key;
 		}
 		glow(ctx, (COLS * s) / 2, (ROWS * s) / 2, COLS * s * 0.75, def.color, 0.12);
 		ctx.drawImage(this.boardCache, -8, -8, COLS * s + 16, ROWS * s + 16);
 
 		// ore sparkle
-		const tiles = tilesOf(this.pi);
+		const tiles = tilesOf(this.pi, blasted);
 		for (let i = 0; i < tiles.length; i++) {
 			if (tiles[i] !== TILE_ORE || p.cells[i]) continue;
 			const tw = Math.sin(time * 2 + i * 1.7);
@@ -368,19 +392,7 @@ export class PlanetView {
 		for (let i = 0; i < p.cells.length; i++) {
 			const m = p.cells[i];
 			if (!m || m.t !== 'belt') continue;
-			const x0 = (cx(i) + 0.5) * s;
-			const y0 = (cy(i) + 0.5) * s;
-			for (const it of m.items) {
-				const ax = x0 - DX[it.e] * s * 0.5;
-				const ay = y0 - DY[it.e] * s * 0.5;
-				const bx = x0 + DX[m.d] * s * 0.5;
-				const by = y0 + DY[m.d] * s * 0.5;
-				const q = it.p;
-				const k1 = (1 - q) * (1 - q);
-				const k2 = 2 * (1 - q) * q;
-				const k3 = q * q;
-				drawItem(ctx, it.k, ax * k1 + x0 * k2 + bx * k3, ay * k1 + y0 * k2 + by * k3, u);
-			}
+			for (const it of m.items) drawMoving(ctx, it, m.d, i, s, u);
 		}
 
 		// machines
@@ -399,6 +411,11 @@ export class PlanetView {
 			}
 			// items waiting inside, as small dots
 			if (m.out.length && m.t !== 'pad') drawItem(ctx, m.out[0], cx(i) * s + s * 0.8, cy(i) * s + s * 0.8, s * 0.09);
+		}
+		// items this machine cannot use, sliding across on top of it
+		for (let i = 0; i < p.cells.length; i++) {
+			const m = p.cells[i];
+			if (m?.thru?.length) for (const it of m.thru) drawMoving(ctx, it, m.d, i, s, u);
 		}
 
 		this.drawOverlay(ctx, g, time);
@@ -477,7 +494,7 @@ export class PlanetView {
 			const dirs = this.pathDirs(g, d.path);
 			let cost = 0;
 			const price = sim.buildCost(g, this.pi, 'belt');
-			const tiles = tilesOf(this.pi);
+			const tiles = tilesOf(this.pi, g.blasted[this.pi]);
 			for (let k = 0; k < d.path.length; k++) {
 				const c = d.path[k];
 				const m = p.cells[c];
@@ -517,7 +534,16 @@ export class PlanetView {
 			this.ghost = null;
 		} else if (ghostCell !== null && this.tool === 'remove') {
 			const m = p.cells[ghostCell];
+			const rock = !m && tilesOf(this.pi, g.blasted[this.pi])[ghostCell] === TILE_ROCK;
 			roundRect(ctx, cx(ghostCell) * s + 1, cy(ghostCell) * s + 1, s - 2, s - 2, s * 0.15);
+			if (rock) {
+				const check = sim.canBlast(g, this.pi, ghostCell);
+				ctx.strokeStyle = check.ok ? '#ffb347' : withAlpha('#ff5d73', 0.6);
+				ctx.lineWidth = 2;
+				ctx.stroke();
+				this.ghost = { cell: ghostCell, ok: check.ok, text: check.ok ? `Blast ${fmtShort(check.cost)}` : g.research.blast ? `Blast ${fmtShort(check.cost)}` : 'Needs Blast Charges' };
+				return;
+			}
 			ctx.strokeStyle = m && m.t !== 'pad' ? '#ff5d73' : withAlpha('#ff5d73', 0.3);
 			ctx.lineWidth = 2;
 			ctx.stroke();
@@ -550,7 +576,7 @@ export class PlanetView {
 		}
 	}
 
-	private renderBoard(s: number): HTMLCanvasElement {
+	private renderBoard(s: number, blasted: readonly number[]): HTMLCanvasElement {
 		const def = PLANETS[this.pi];
 		const c = document.createElement('canvas');
 		const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -566,7 +592,8 @@ export class PlanetView {
 		g.strokeStyle = withAlpha(def.color, 0.35);
 		g.lineWidth = 2;
 		g.stroke();
-		const tiles = tilesOf(this.pi);
+		// Walk the first map, so the random detail on other tiles stays the same after a blast.
+		const tiles = baseTilesOf(this.pi);
 		let seed = def.seed;
 		const r = () => {
 			seed = (seed * 16807) % 2147483647;
@@ -604,6 +631,16 @@ export class PlanetView {
 					g.fillStyle = def.light;
 					g.fill();
 				}
+			} else if (tiles[i] === TILE_ROCK && blasted.includes(i)) {
+				// a shallow crater where a rock was
+				for (let k = 0; k < 7; k++) r();
+				g.beginPath();
+				g.ellipse(x + s / 2, y + s / 2, s * 0.3, s * 0.24, 0, 0, Math.PI * 2);
+				g.fillStyle = withAlpha('#000000', 0.18);
+				g.fill();
+				g.strokeStyle = withAlpha(def.light, 0.1);
+				g.lineWidth = 1.5;
+				g.stroke();
 			} else if (tiles[i] === TILE_ROCK) {
 				g.beginPath();
 				const n = 7;
@@ -659,3 +696,18 @@ function label(ctx: CanvasRenderingContext2D, x: number, y: number, text: string
 	ctx.fillText(text, x, y + 1);
 }
 
+
+/** An item moving across a cell: in from side `it.e`, out the side `out`, along a curve. */
+function drawMoving(ctx: CanvasRenderingContext2D, it: BeltItem, out: Dir, i: number, s: number, u: number) {
+	const x0 = (cx(i) + 0.5) * s;
+	const y0 = (cy(i) + 0.5) * s;
+	const ax = x0 - DX[it.e] * s * 0.5;
+	const ay = y0 - DY[it.e] * s * 0.5;
+	const bx = x0 + DX[out] * s * 0.5;
+	const by = y0 + DY[out] * s * 0.5;
+	const q = it.p;
+	const k1 = (1 - q) * (1 - q);
+	const k2 = 2 * (1 - q) * q;
+	const k3 = q * q;
+	drawItem(ctx, it.k, ax * k1 + x0 * k2 + bx * k3, ay * k1 + y0 * k2 + by * k3, u);
+}

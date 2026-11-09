@@ -137,6 +137,11 @@ export const sfx = {
 		tone(300, { type: 'sawtooth', dur: 0.15, vol: 0.06, slide: 0.4, filter: 1200 });
 		hiss({ dur: 0.15, vol: 0.06, from: 3000, to: 400 });
 	},
+	blast() {
+		tone(95, { type: 'sine', dur: 0.4, vol: 0.35, slide: 0.35 });
+		hiss({ dur: 0.5, vol: 0.16, from: 2400, to: 140, q: 0.7 });
+		tone(pick(2, 4), { type: 'triangle', dur: 0.16, vol: 0.06, start: 0.09 });
+	},
 	upgrade() {
 		[0, 2, 4, 7].forEach((n, i) => tone(SCALE[Math.min(10, n + 2)] * 1, { type: 'triangle', start: i * 0.05, dur: 0.18, vol: 0.12 }));
 		hiss({ dur: 0.25, vol: 0.05, from: 1000, to: 6000, start: 0.05 });

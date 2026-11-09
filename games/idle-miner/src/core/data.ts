@@ -115,16 +115,20 @@ export const SHIP_UPS: Record<ShipUpgrade, UpgradeDef> = {
 export const shipCargo = (lv: number) => 8 + 5 * lv;
 export const shipSpeed = (lv: number) => 1 + 0.25 * lv;
 
-export type ResearchId = 'belt' | 'tap' | 'market' | 'offline' | 'beacon';
+export type ResearchId = 'belt' | 'tap' | 'market' | 'offline' | 'blast' | 'beacon';
 export const RESEARCH: Record<ResearchId, UpgradeDef> = {
 	belt: { name: 'Mag Belts', desc: 'All belts move 30% faster.', cost: 120, growth: 4, max: 10 },
 	tap: { name: 'Power Gloves', desc: 'Each tap mines 2x more.', cost: 80, growth: 6, max: 12 },
 	market: { name: 'Trade Deals', desc: 'All cargo sells for 20% more.', cost: 2000, growth: 4.5, max: 20 },
 	offline: { name: 'Night Shift', desc: 'Work 1 more hour while you are away.', cost: 25e3, growth: 12, max: 6 },
+	blast: { name: 'Blast Charges', desc: 'Clear rocks: tap one with the Remove tool. Cleared rocks stay gone, even after a nova.', cost: 1000, growth: 1, max: 1 },
 	beacon: { name: 'Star Beacon', desc: 'Light a beacon at the edge of the system. The final project.', cost: 25e9, growth: 1, max: 1 },
 };
 export const beltSpeed = (lv: number, fastPerk: boolean) => (1.5 + 0.4 * lv) * (fastPerk ? 1.5 : 1);
 export const tapPower = (lv: number) => Math.pow(2, lv);
+/** Clearing a rock costs this times the planet's ore value, and grows with each rock cleared there. */
+export const BLAST_COST = 40;
+export const BLAST_GROWTH = 2.5;
 
 export type PerkId = 'hands' | 'hull' | 'start' | 'blueprint' | 'nap' | 'belts';
 export interface PerkDef {
