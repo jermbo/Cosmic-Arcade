@@ -1,6 +1,6 @@
 // The shape of a game, a fresh game, the planet maps, and save / load.
 
-import { MACHINES, PLANETS, TILE_GROUND, TILE_ORE, TILE_ROCK, upgradeCost } from './data.ts';
+import { BLAST_COST, BLAST_GROWTH, CREW, CREW_MAX, MACHINES, PERKS, PLANETS, RESEARCH, SLOT_COSTS, TILE_GROUND, TILE_ORE, TILE_ROCK, upgradeCost } from './data.ts';
 import {
 	CENTER_PLOT,
 	MAX_CELLS,
@@ -8,14 +8,14 @@ import {
 	MAX_ROWS,
 	PLOT_RADIUS,
 	PLOTS,
-	STRIDE,
 	cellIdx,
+	inStride,
 	plotBounds,
 	plotIdx,
 	plotRing,
 } from './grid.ts';
 import type { Bounds } from './grid.ts';
-import { ensureOreAccessible, oreHasGroundExit, rockSealsOre, validatePlanetTiles } from './tile-access.ts';
+import { plotDoors, plotIssues, validatePlanetTiles } from './tile-access.ts';
 import type { CrewId, Dir, MachineType, PerkId, ResearchId, ShipUpgrade } from './data.ts';
 
 export interface BeltItem {
@@ -92,8 +92,13 @@ export interface Stats {
 	allEarned: number;
 }
 
+/** Bump when baseTilesOf changes, so saves made on the old maps get fixed up on load. */
+export const MAP_VERSION = 2;
+
 export interface Game {
 	v: 1;
+	/** which map generator the layout was built on */
+	map: number;
 	/** per planet: rock cells that were blasted away. Kept through a nova. */
 	blasted: number[][];
 	credits: number;
@@ -147,12 +152,16 @@ function crewHome(at: Partial<Record<CrewId, number>>) {
 	return out;
 }
 
+/** Credits a run starts with after a nova, per stardust held, so the rebuild gets going fast. */
+export const NOVA_KIT = 250;
+
 export function newGame(keep?: Game): Game {
 	const perks = keep ? keep.perks : {};
 	const extra = perks.hull ? 1 : 0;
 	const g: Game = {
 		v: 1,
-		credits: perks.start ? 1000 : 0,
+		map: MAP_VERSION,
+		credits: (perks.start ? 1000 : 0) + (keep ? keep.stardust * NOVA_KIT : 0),
 		runEarned: 0,
 		stardust: keep ? keep.stardust : 0,
 		perks,
@@ -228,7 +237,24 @@ export function baseTilesOf(index: number): Uint8Array {
 	const free = (x: number, y: number) =>
 		x >= 0 && y >= 0 && x < MAX_COLS && y < MAX_ROWS && !nearPad(x, y) && tiles[cellIdx(x, y)] === TILE_GROUND;
 	const inBox = (b: Bounds, x: number, y: number) => x >= b.x0 && y >= b.y0 && x <= b.x1 && y <= b.y1;
-	const placeOre = (b: Bounds, want: number) => {
+	// Ore patches keep a gap of ground between them, diagonals included.
+	const nearOtherOre = (x: number, y: number, patch: Set<number>) => {
+		for (let dy = -1; dy <= 1; dy++) {
+			for (let dx = -1; dx <= 1; dx++) {
+				const c = cellIdx(x + dx, y + dy);
+				if (inStride(x + dx, y + dy) && tiles[c] === TILE_ORE && !patch.has(c)) return true;
+			}
+		}
+		return false;
+	};
+	// Sets a tile only if the plot still follows its rules (see plotIssues).
+	const trySet = (plot: number, c: number, t: number) => {
+		tiles[c] = t;
+		if (!plotIssues(tiles, plot).length) return true;
+		tiles[c] = TILE_GROUND;
+		return false;
+	};
+	const placeOre = (plot: number, b: Bounds, doors: Set<number>, want: number) => {
 		let placed = 0;
 		let tries = 0;
 		while (placed < want && tries < 200) {
@@ -237,9 +263,11 @@ export function baseTilesOf(index: number): Uint8Array {
 			let y = b.y0 + Math.floor(r() * (b.y1 - b.y0 + 1));
 			if (Math.abs(x - px) + Math.abs(y - py) < 3 || !free(x, y)) continue;
 			const size = 2 + Math.floor(r() * 3);
+			const patch = new Set<number>();
 			for (let i = 0; i < size && placed < want; i++) {
-				if (free(x, y) && oreHasGroundExit(tiles, x, y, STRIDE, MAX_COLS, MAX_ROWS)) {
-					tiles[cellIdx(x, y)] = TILE_ORE;
+				const c = cellIdx(x, y);
+				if (free(x, y) && !doors.has(c) && !nearOtherOre(x, y, patch) && trySet(plot, c, TILE_ORE)) {
+					patch.add(c);
 					placed++;
 				}
 				const d = Math.floor(r() * 4);
@@ -249,16 +277,15 @@ export function baseTilesOf(index: number): Uint8Array {
 			}
 		}
 	};
-	const placeRocks = (b: Bounds, want: number) => {
+	const placeRocks = (plot: number, b: Bounds, doors: Set<number>, want: number) => {
 		let rocks = 0;
 		let tries = 0;
 		while (rocks < want && tries < 120) {
 			tries++;
 			const x = b.x0 + Math.floor(r() * (b.x1 - b.x0 + 1));
 			const y = b.y0 + Math.floor(r() * (b.y1 - b.y0 + 1));
-			if (!free(x, y) || rockSealsOre(tiles, x, y, STRIDE, MAX_COLS, MAX_ROWS)) continue;
-			tiles[cellIdx(x, y)] = TILE_ROCK;
-			rocks++;
+			const c = cellIdx(x, y);
+			if (free(x, y) && !doors.has(c) && trySet(plot, c, TILE_ROCK)) rocks++;
 		}
 	};
 	// One plot next to the start is always rich, so the first purchase pays off.
@@ -291,14 +318,14 @@ export function baseTilesOf(index: number): Uint8Array {
 				rocks = 2 + Math.floor(r() * 3);
 			}
 		}
-		placeOre(b, ore);
-		placeRocks(b, rocks + Math.floor(index / 2));
+		const doors = new Set(plotDoors(plot));
+		placeOre(plot, b, doors, ore);
+		placeRocks(plot, b, doors, rocks + Math.floor(index / 2));
 	}
-	ensureOreAccessible(tiles, px, py);
 	const issues = validatePlanetTiles(tiles, px, py);
 	if (issues.length) {
 		const msg = issues.map((i) => `cell ${i.cell} ${i.reason}`).join(', ');
-		throw new Error(`${def.name}: ore accessibility failed after fix-up (${msg})`);
+		throw new Error(`${def.name}: ore accessibility failed (${msg})`);
 	}
 	tileCache[index] = tiles;
 	return tiles;
@@ -320,6 +347,41 @@ function layoutRefund(pi: number, cells: (Machine | null)[]): number {
 	return Math.ceil(total);
 }
 
+/** Moves a save onto the current maps: machines that no longer fit and blasts on cells that are no longer rock are paid back. */
+function fitToMap(g: Game) {
+	for (let pi = 0; pi < PLANETS.length; pi++) {
+		const tiles = baseTilesOf(pi);
+		const value = PLANETS[pi].value;
+		const kept: number[] = [];
+		g.blasted[pi].forEach((c, n) => {
+			if (tiles[c] === TILE_ROCK) kept.push(c);
+			else g.credits += Math.ceil(BLAST_COST * value * Math.pow(BLAST_GROWTH, n));
+		});
+		g.blasted[pi] = kept;
+		const now = tilesOf(pi, kept);
+		const p = g.planets[pi];
+		const bad = new Set<number>();
+		p.cells.forEach((m, c) => {
+			if (!m || m.t === 'pad') return;
+			if (now[c] === TILE_ROCK || (m.t === 'drill' && now[c] !== TILE_ORE)) bad.add(c);
+		});
+		for (const c of [...bad]) {
+			const link = p.cells[c]?.link;
+			if (link !== undefined) bad.add(link);
+		}
+		const removed: Machine[] = [];
+		for (const c of bad) {
+			const m = p.cells[c];
+			if (!m || m.t === 'pad') continue;
+			removed.push(m);
+			p.cells[c] = null;
+			p.built[m.t] = Math.max(0, (p.built[m.t] ?? 0) - 1);
+		}
+		g.credits += layoutRefund(pi, removed);
+	}
+	g.map = MAP_VERSION;
+}
+
 // ---------- save / load ----------
 
 const KEY = 'idle-orbit-save-v1';
@@ -339,31 +401,108 @@ export function serialize(g: Game): string {
 
 const round = (n: number) => Math.round(n * 1000) / 1000;
 
+// A bad number in a save (NaN, a string, a negative) would spread through the whole sim.
+const amount = (v: unknown, d = 0) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : d);
+const count = (v: unknown, d = 0) => Math.floor(amount(v, d));
+const ints = (v: unknown) => (Array.isArray(v) ? v.filter(Number.isInteger) : []);
+const strings = (v: unknown) => (Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string') : []);
+const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+const isDir = (v: unknown): v is Dir => v === 0 || v === 1 || v === 2 || v === 3;
+
+function cleanItems(v: unknown): BeltItem[] {
+	if (!Array.isArray(v)) return [];
+	return v.filter(isObj).map((i) => ({ k: count(i.k), p: Math.min(1, amount(i.p)), e: isDir(i.e) ? i.e : 0 }));
+}
+
+function cleanMachine(v: unknown): Machine | null {
+	if (!isObj(v) || typeof v.t !== 'string' || !Object.hasOwn(MACHINES, v.t)) return null;
+	const t = v.t as MachineType;
+	const m = makeMachine(t, isDir(v.d) ? v.d : 0);
+	m.lv = Math.min(MACHINES[t].maxLv, Math.max(1, count(v.lv, 1)));
+	m.inb = ints(v.inb);
+	m.out = ints(v.out);
+	m.prog = Math.min(1, amount(v.prog));
+	m.job = v.job === true;
+	m.items = cleanItems(v.items);
+	if (Number.isInteger(v.kind)) m.kind = v.kind as number;
+	if (Array.isArray(v.thru)) m.thru = cleanItems(v.thru);
+	if (Number.isInteger(v.link)) m.link = v.link as number;
+	if (v.end === true) m.end = true;
+	return m;
+}
+
+function cleanShip(v: unknown): Ship {
+	const s = makeShip();
+	if (!isObj(v)) return s;
+	s.ph = v.ph === 1 || v.ph === 2 ? v.ph : 0;
+	s.t = Math.min(1, amount(v.t));
+	s.cargo = ints(v.cargo);
+	s.wait = amount(v.wait);
+	return s;
+}
+
 export function deserialize(text: string): Game | null {
 	try {
 		const raw = JSON.parse(text);
-		if (!raw || raw.v !== 1 || !Array.isArray(raw.planets)) return null;
+		if (!isObj(raw) || raw.v !== 1 || !Array.isArray(raw.planets)) return null;
+		const rawPlanets: unknown[] = raw.planets;
 		const g = newGame();
-		Object.assign(g, raw);
-		g.settings = { ...defaultSettings(), ...raw.settings };
-		g.crew = { ...raw.crew };
-		g.crewAt = { ...raw.crewAt };
-		g.slots = Number.isInteger(raw.slots) ? raw.slots : 0;
-		g.research = { belt: 0, tap: 0, market: 0, offline: 0, blast: 0, bridges: 0, beacon: 0, ...raw.research };
-		g.blasted = PLANETS.map((_, i) => (Array.isArray(raw.blasted?.[i]) ? raw.blasted[i].filter(Number.isInteger) : []));
+		g.credits = amount(raw.credits);
+		g.runEarned = amount(raw.runEarned);
+		g.stardust = count(raw.stardust);
+		g.peakIncome = amount(raw.peakIncome);
+		g.tutorial = count(raw.tutorial);
+		g.beaconLit = raw.beaconLit === true;
+		g.savedAt = Math.min(Date.now(), amount(raw.savedAt, Date.now()));
+		g.goals = strings(raw.goals);
+		g.unlocks = strings(raw.unlocks);
+		const stats = isObj(raw.stats) ? raw.stats : {};
+		for (const k of Object.keys(g.stats) as (keyof Stats)[]) g.stats[k] = amount(stats[k]);
+		const perks = isObj(raw.perks) ? raw.perks : {};
+		for (const id of Object.keys(PERKS) as PerkId[]) if (perks[id] === true) g.perks[id] = true;
+		const crew = isObj(raw.crew) ? raw.crew : {};
+		const crewAt = isObj(raw.crewAt) ? raw.crewAt : {};
+		for (const id of Object.keys(CREW) as CrewId[]) {
+			const lv = Math.min(CREW_MAX, count(crew[id]));
+			if (lv > 0) g.crew[id] = lv;
+			const at = crewAt[id];
+			if (Number.isInteger(at) && (at as number) >= 0 && (at as number) < PLANETS.length) g.crewAt[id] = at as number;
+		}
+		g.slots = Math.min(SLOT_COSTS.length, count(raw.slots));
+		const research = isObj(raw.research) ? raw.research : {};
+		for (const id of Object.keys(g.research) as ResearchId[]) g.research[id] = Math.min(RESEARCH[id].max, count(research[id]));
+		const settings = isObj(raw.settings) ? raw.settings : {};
+		const def = defaultSettings();
+		g.settings = {
+			sfx: Math.min(1, amount(settings.sfx, def.sfx)),
+			music: Math.min(1, amount(settings.music, def.music)),
+			vibrate: typeof settings.vibrate === 'boolean' ? settings.vibrate : def.vibrate,
+			reduceMotion: typeof settings.reduceMotion === 'boolean' ? settings.reduceMotion : def.reduceMotion,
+		};
+		const blasted = Array.isArray(raw.blasted) ? raw.blasted : [];
+		g.blasted = PLANETS.map((_, i) => ints(blasted[i]));
 		g.planets = PLANETS.map((_, i) => {
 			const base = makePlanet(i, i === 0, 0);
-			const src = raw.planets[i];
-			if (!src) return base;
-			const { expand: _e, revealed: _r, survey: _s, ...kept } = src;
+			const src = rawPlanets[i];
+			if (!isObj(src) || !Array.isArray(src.cells)) return base;
+			const up = isObj(src.up) ? src.up : {};
+			const built = isObj(src.built) ? src.built : {};
 			const planet: PlanetState = {
 				...base,
-				...kept,
-				up: { ...base.up, ...src.up },
-				cells: (src.cells as (Machine | null)[]).map((m) => (m ? { ...makeMachine(m.t, m.d), ...m, items: m.items || [] } : null)),
+				unlocked: i === 0 || src.unlocked === true,
+				pad: ints(src.pad),
+				ships: Array.isArray(src.ships) && src.ships.length ? src.ships.map(cleanShip) : base.ships,
+				up: { ships: count(up.ships), speed: count(up.speed), cargo: count(up.cargo) },
+				built: {},
+				cells: src.cells.map(cleanMachine),
 			};
+			for (const t of Object.keys(MACHINES) as MachineType[]) if (count(built[t]) > 0) planet.built[t] = count(built[t]);
 			if (Array.isArray(src.plots) && src.cells.length === MAX_CELLS) {
-				planet.plots = src.plots.filter(Number.isInteger);
+				planet.plots = ints(src.plots);
+				if (!planet.plots.includes(CENTER_PLOT)) planet.plots.unshift(CENTER_PLOT);
+				const [px, py] = PLANETS[i].pad;
+				const padCell = cellIdx(px, py);
+				if (planet.cells[padCell]?.t !== 'pad') planet.cells[padCell] = makeMachine('pad', 0);
 				return planet;
 			}
 			// Saves from before land plots: the old map does not fit, so clear it and pay the machines back.
@@ -371,6 +510,7 @@ export function deserialize(text: string): Game | null {
 			g.blasted[i] = [];
 			return { ...planet, cells: base.cells, built: {}, plots: base.plots };
 		});
+		if (raw.map !== MAP_VERSION) fitToMap(g);
 		return g;
 	} catch {
 		return null;
@@ -407,6 +547,37 @@ export function clearSave() {
 /** Short text to copy out a save. */
 export function exportSave(g: Game): string {
 	return btoa(unescape(encodeURIComponent(serialize(g))));
+}
+
+/** A save code for what is on disk now, which is the last good state if the game broke since. */
+export function exportStoredSave(): string | null {
+	try {
+		const text = localStorage.getItem(KEY) ?? localStorage.getItem(OLD_KEY);
+		return text ? btoa(unescape(encodeURIComponent(text))) : null;
+	} catch {
+		return null;
+	}
+}
+
+const ERROR_KEY = 'idle-orbit-errors';
+
+/** Keeps the last few errors on the device, so a tester can copy them into a bug report. */
+export function logError(text: string): string[] {
+	let list: string[] = [];
+	try {
+		const old = JSON.parse(localStorage.getItem(ERROR_KEY) || '[]');
+		if (Array.isArray(old)) list = old.filter((s) => typeof s === 'string');
+	} catch {
+		// A bad log is replaced.
+	}
+	list.push(`${new Date().toISOString()} ${text}`);
+	list = list.slice(-10);
+	try {
+		localStorage.setItem(ERROR_KEY, JSON.stringify(list));
+	} catch {
+		// Storage is full or blocked.
+	}
+	return list;
 }
 
 export function importSave(code: string): Game | null {

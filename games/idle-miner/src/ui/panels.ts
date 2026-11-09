@@ -4,7 +4,7 @@ import { CREW, CREW_MAX, CREW_ORDER, PERKS, PLANETS, crewText, RESEARCH, SHIP_UP
 import type { CrewId, PerkId, ResearchId, ShipUpgrade } from '../core/data.ts';
 import { fmt, fmtTime } from '../core/format.ts';
 import * as sim from '../core/sim.ts';
-import { exportSave, importSave } from '../core/state.ts';
+import { NOVA_KIT, exportSave, exportStoredSave, importSave } from '../core/state.ts';
 import type { Game } from '../core/state.ts';
 import { closePanel, openPanel } from './modal.ts';
 
@@ -205,7 +205,7 @@ export function openNova() {
 			if (!g.planets[PRESTIGE_PLANET].unlocked && g.stats.resets === 0) {
 				top = `<p>Unlock <b>${PLANETS[PRESTIGE_PLANET].name}</b> to use the Nova Reset.</p>`;
 			} else {
-				top += `<p>A Nova Reset starts a new run: planets, machines, ships, credits and research go back to zero. You get stardust for what you earned this run. Each stardust adds <b>+${DUST_BONUS * 100}%</b> to all sales, forever.</p>`;
+				top += `<p>A Nova Reset starts a new run: planets, machines, ships, credits and research go back to zero. You get stardust for what you earned this run. Each stardust adds <b>+${DUST_BONUS * 100}%</b> to all sales, forever, and <b>${fmt(NOVA_KIT)}</b> starting credits to each new run.</p>`;
 				top += `<button class="btn btn--gold" style="width:100%" data-act="reset" ${ready ? '' : 'disabled'}>${ready ? `Reset for ✦ ${gain} stardust` : `Earn more first (✦ 1 at ${fmt(2e6)} this run)`}</button>`;
 			}
 			const perks = (Object.keys(PERKS) as PerkId[])
@@ -236,7 +236,7 @@ function confirmNova() {
 	openPanel({
 		id: 'nova-confirm',
 		title: 'Go nova?',
-		render: () => `<p>Your run resets. You keep stardust, perks and stats.</p><p>You get <b>✦ ${gain}</b>. All sales will be <b>+${Math.round((g.stardust + gain) * DUST_BONUS * 100)}%</b>.</p><div class="card__row"><button class="btn btn--ghost" data-act="no">Not yet</button><button class="btn btn--gold" data-act="yes">Go nova</button></div>`,
+		render: () => `<p>Your run resets. You keep stardust, perks and stats.</p><p>You get <b>✦ ${gain}</b>. All sales will be <b>+${Math.round((g.stardust + gain) * DUST_BONUS * 100)}%</b>, and the next run starts with <b>${fmt((g.stardust + gain) * NOVA_KIT + (g.perks.start ? 1000 : 0))}</b> credits.</p><div class="card__row"><button class="btn btn--ghost" data-act="no">Not yet</button><button class="btn btn--gold" data-act="yes">Go nova</button></div>`,
 		act: (name) => {
 			if (name === 'no') openNova();
 			if (name === 'yes') {
@@ -429,6 +429,43 @@ export function openEnding() {
 			<button class="btn" style="width:100%" data-act="ok">Keep playing</button></div>`;
 		},
 		act: (name) => name === 'ok' && closePanel(),
+	});
+}
+
+// ---------- crash ----------
+
+const escapeHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+
+/** The game hit an error and stopped. It no longer saves, so the last good save stays on disk. */
+export function openCrash(errors: string[]) {
+	const report = errors.join('\n');
+	openPanel({
+		id: 'crash',
+		title: 'Something broke',
+		locked: true,
+		still: true,
+		render: () => `<p>The game hit an error and stopped so it would not save a broken game. Your last save is safe.</p>
+			<p>Copy your save code to keep a backup, then reload. If you are testing, please send the error below with your bug report.</p>
+			<textarea class="save-code" id="crash-log" readonly aria-label="Error details">${escapeHtml(report)}</textarea>
+			<div class="menu-list">
+				<button class="btn btn--ghost" data-act="save">Copy save code</button>
+				<button class="btn btn--ghost" data-act="log">Copy error</button>
+				<button class="btn btn--gold" data-act="reload">Reload</button>
+			</div>`,
+		act: (name) => {
+			const copy = (text: string, done: string) =>
+				navigator.clipboard?.writeText(text).then(
+					() => host.toast(done),
+					() => host.toast('Could not copy. Select the text and copy it', 'warn'),
+				);
+			if (name === 'save') {
+				const code = exportStoredSave();
+				if (code) copy(code, 'Save code copied');
+				else host.toast('No save found on this device', 'warn');
+			}
+			if (name === 'log') copy(report, 'Error copied');
+			if (name === 'reload') location.reload();
+		},
 	});
 }
 

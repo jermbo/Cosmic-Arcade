@@ -1,13 +1,85 @@
-// Ore placement rules and post-generation fixes for planet maps.
+// Ore placement rules for planet maps.
 //
 // 1. Every ore tile has ≥1 orthogonal ground neighbor (drill output).
 // 2. At least one of those ground cells is reachable from the pad on ground only.
-// 3. Generation constrains random ore/rock placement; ensureOreAccessible fixes stragglers.
+// 3. Each plot keeps its edge doors open and its ground in one piece, so any owned land can be crossed.
 
-import { DX, DY, TILE_GROUND, TILE_ORE, TILE_ROCK } from './data.ts';
-import { MAX_CELLS, MAX_COLS, MAX_ROWS, STRIDE, cellIdx } from './grid.ts';
+import { DX, DY, TILE_GROUND, TILE_ORE } from './data.ts';
+import { MAX_CELLS, MAX_COLS, MAX_ROWS, PLOT, STRIDE, cellIdx, plotBounds, plotCells } from './grid.ts';
 
 export type OreAccessIssue = { cell: number; reason: 'no-exit' | 'no-path' };
+export type PlotIssue = { plot: number; cell: number; reason: 'door' | 'pocket' | 'no-exit' };
+
+/** Ground cells in the middle of each plot edge. Neighbor plots line up on them, so owned land always joins. */
+export function plotDoors(plot: number): number[] {
+	const b = plotBounds(plot);
+	const out: number[] = [];
+	for (const o of [PLOT / 2 - 1, PLOT / 2]) {
+		out.push(cellIdx(b.x0 + o, b.y0), cellIdx(b.x0 + o, b.y1), cellIdx(b.x0, b.y0 + o), cellIdx(b.x1, b.y0 + o));
+	}
+	return out;
+}
+
+/** Plot rules: the doors are ground, all ground in the plot is one piece, and every ore borders that ground. */
+export function plotIssues(tiles: Uint8Array, plot: number): PlotIssue[] {
+	const b = plotBounds(plot);
+	const inside = (c: number) => {
+		const x = c % STRIDE;
+		const y = (c / STRIDE) | 0;
+		return x >= b.x0 && y >= b.y0 && x <= b.x1 && y <= b.y1;
+	};
+	const issues: PlotIssue[] = [];
+	const doors = plotDoors(plot);
+	for (const d of doors) if (tiles[d] !== TILE_GROUND) issues.push({ plot, cell: d, reason: 'door' });
+	const seen = new Set<number>();
+	const start = doors.find((d) => tiles[d] === TILE_GROUND);
+	if (start !== undefined) {
+		const q = [start];
+		seen.add(start);
+		for (let i = 0; i < q.length; i++) {
+			for (const n of cellNeighbors(q[i]!)) {
+				if (seen.has(n) || !inside(n) || tiles[n] !== TILE_GROUND) continue;
+				seen.add(n);
+				q.push(n);
+			}
+		}
+	}
+	for (const c of plotCells(plot)) {
+		if (tiles[c] === TILE_GROUND && !seen.has(c)) issues.push({ plot, cell: c, reason: 'pocket' });
+		else if (tiles[c] === TILE_ORE && !cellNeighbors(c).some((n) => inside(n) && tiles[n] === TILE_GROUND)) {
+			issues.push({ plot, cell: c, reason: 'no-exit' });
+		}
+	}
+	return issues;
+}
+
+/** Sizes of ore patches, counting diagonal touches as one patch. */
+export function oreClusterSizes(tiles: Uint8Array): number[] {
+	const seen = new Uint8Array(MAX_CELLS);
+	const sizes: number[] = [];
+	for (let c = 0; c < MAX_CELLS; c++) {
+		if (tiles[c] !== TILE_ORE || seen[c]) continue;
+		const q = [c];
+		seen[c] = 1;
+		for (let i = 0; i < q.length; i++) {
+			const x = q[i]! % STRIDE;
+			const y = (q[i]! / STRIDE) | 0;
+			for (let dy = -1; dy <= 1; dy++) {
+				for (let dx = -1; dx <= 1; dx++) {
+					const nx = x + dx;
+					const ny = y + dy;
+					if (nx < 0 || ny < 0 || nx >= MAX_COLS || ny >= MAX_ROWS) continue;
+					const n = cellIdx(nx, ny);
+					if (tiles[n] !== TILE_ORE || seen[n]) continue;
+					seen[n] = 1;
+					q.push(n);
+				}
+			}
+		}
+		sizes.push(q.length);
+	}
+	return sizes;
+}
 
 function cellNeighbors(c: number): number[] {
 	const x = c % STRIDE;
@@ -58,118 +130,4 @@ export function validatePlanetTiles(tiles: Uint8Array, px: number, py: number): 
 		else if (!exits.some((n) => reach.has(n))) issues.push({ cell: c, reason: 'no-path' });
 	}
 	return issues;
-}
-
-function openOreExit(tiles: Uint8Array, c: number): void {
-	if (oreGroundExits(tiles, c).length) return;
-	const rocks = cellNeighbors(c).filter((n) => tiles[n] === TILE_ROCK);
-	if (rocks.length) {
-		tiles[rocks[0]!] = TILE_GROUND;
-		return;
-	}
-	const ores = cellNeighbors(c).filter((n) => tiles[n] === TILE_ORE);
-	if (ores.length) tiles[ores[0]!] = TILE_GROUND;
-}
-
-function connectOreToPad(tiles: Uint8Array, oreC: number, reach: Set<number>): void {
-	const targets = new Set(oreGroundExits(tiles, oreC));
-	if ([...targets].some((n) => reach.has(n))) return;
-	const parent = new Map<number, number>();
-	const q: number[] = [];
-	for (const s of reach) {
-		q.push(s);
-		parent.set(s, -2);
-	}
-	const seen = new Set(reach);
-	while (q.length) {
-		const c = q.shift()!;
-		if (targets.has(c)) {
-			let cur: number | -2 = c;
-			while (cur !== -2) {
-				if (tiles[cur] === TILE_ROCK) tiles[cur] = TILE_GROUND;
-				cur = parent.get(cur)!;
-			}
-			return;
-		}
-		for (const n of cellNeighbors(c)) {
-			if (seen.has(n)) continue;
-			const t = tiles[n];
-			if (t !== TILE_GROUND && t !== TILE_ROCK) continue;
-			seen.add(n);
-			parent.set(n, c);
-			q.push(n);
-		}
-	}
-}
-
-function pokeOpenCorridor(tiles: Uint8Array, oreC: number, reach: Set<number>): boolean {
-	for (const g of oreGroundExits(tiles, oreC)) {
-		if (reach.has(g)) continue;
-		for (const n of cellNeighbors(g)) {
-			if (tiles[n] === TILE_ROCK) {
-				tiles[n] = TILE_GROUND;
-				return true;
-			}
-		}
-		for (const n of cellNeighbors(g)) {
-			if (tiles[n] === TILE_ORE) {
-				tiles[n] = TILE_GROUND;
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
-/** Step 3 — post-process a generated map. */
-export function ensureOreAccessible(tiles: Uint8Array, px: number, py: number): void {
-	for (let c = 0; c < MAX_CELLS; c++) if (tiles[c] === TILE_ORE) openOreExit(tiles, c);
-	for (let pass = 0; pass < 64; pass++) {
-		const reach = reachableGroundFromPad(tiles, px, py);
-		let stuck = -1;
-		for (let c = 0; c < MAX_CELLS; c++) {
-			if (tiles[c] !== TILE_ORE) continue;
-			if (oreGroundExits(tiles, c).some((n) => reach.has(n))) continue;
-			stuck = c;
-			connectOreToPad(tiles, c, reach);
-			if (oreGroundExits(tiles, c).some((n) => reachableGroundFromPad(tiles, px, py).has(n))) break;
-			if (!pokeOpenCorridor(tiles, c, reach)) openOreExit(tiles, c);
-			break;
-		}
-		if (stuck < 0) return;
-	}
-}
-
-/** Step 2 — only place new ore on cells that border ground. */
-export function oreHasGroundExit(
-	tiles: Uint8Array,
-	x: number,
-	y: number,
-	_stride = STRIDE,
-	_w = MAX_COLS,
-	_h = MAX_ROWS,
-): boolean {
-	void _stride;
-	void _w;
-	void _h;
-	for (const n of cellNeighbors(cellIdx(x, y))) if (tiles[n] === TILE_GROUND) return true;
-	return false;
-}
-
-/** Step 2 — skip rocks that would remove an ore's last ground exit. */
-export function rockSealsOre(tiles: Uint8Array, x: number, y: number, _stride = STRIDE, _w = MAX_COLS, _h = MAX_ROWS): boolean {
-	void _stride;
-	void _w;
-	void _h;
-	const c = cellIdx(x, y);
-	for (const n of cellNeighbors(c)) {
-		if (tiles[n] !== TILE_ORE) continue;
-		let exits = 0;
-		for (const g of cellNeighbors(n)) {
-			if (g === c) continue;
-			if (tiles[g] === TILE_GROUND) exits++;
-		}
-		if (exits === 0) return true;
-	}
-	return false;
 }

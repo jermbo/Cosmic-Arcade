@@ -1,7 +1,7 @@
 {
-	"name": "idle-miner",
+	"name": "idle-orbit",
 	"private": true,
-	"version": "1.0.0",
+	"version": "0.9.0-beta",
 	"type": "module",
 	"scripts": {
 		"dev": "vite --open --port 4004",

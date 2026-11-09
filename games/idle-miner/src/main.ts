@@ -12,10 +12,10 @@ import type { MachineType } from './core/data.ts';
 import { fmt } from './core/format.ts';
 import { GOALS, checkProgress, currentGoal } from './core/goals.ts';
 import * as sim from './core/sim.ts';
-import { clearSave, loadGame, newGame, saveGame, tilesOf } from './core/state.ts';
+import { clearSave, loadGame, logError, newGame, saveGame, tilesOf } from './core/state.ts';
 import type { Game } from './core/state.ts';
 import { closePanel, isLocked, panelOpen, refreshPanel } from './ui/modal.ts';
-import { initPanels, openAway, openConfirmNew, openCrew, openNova, openPause, openResearch, openSettings, openShips } from './ui/panels.ts';
+import { initPanels, openAway, openConfirmNew, openCrash, openCrew, openNova, openPause, openResearch, openSettings, openShips } from './ui/panels.ts';
 import { setupPwa } from './ui/pwa.ts';
 import { machineIcon } from './view/draw.ts';
 import { burst, clearFx, drawFx, popup, ring, setReducedMotion, stepFx } from './view/fx.ts';
@@ -79,6 +79,8 @@ let problemWhere: { planet: number; cell: number; kind: sim.Problem['kind'] } | 
 let toolbarKey = '';
 let flash = 0;
 let devSpeed = 1;
+/** Set after an uncaught error: the sim and saving stop, so a broken state never overwrites the save. */
+let crashed = false;
 /** A fake game that runs behind the title screen. */
 let demo: Game | null = null;
 
@@ -101,6 +103,13 @@ const pv = new PlanetView({
 	},
 });
 
+/** A new game that keeps the player's sound and motion settings. */
+function freshGame(): Game {
+	const fresh = newGame();
+	fresh.settings = { ...g.settings };
+	return fresh;
+}
+
 const isPaused = () => ['pause', 'how', 'settings', 'reset', 'new'].some((id) => panelOpen(id));
 
 initPanels({
@@ -114,7 +123,7 @@ initPanels({
 	save: () => saveGame(g),
 	resetAll: () => {
 		clearSave();
-		g = newGame();
+		g = freshGame();
 		hadSave = false;
 		started = false;
 		afterLoad();
@@ -245,6 +254,7 @@ function runAway(seconds: number) {
 	const r = sim.catchUp(g, seconds);
 	sim.events.length = 0;
 	shownCredits = g.credits;
+	saveGame(g);
 	if (seconds > 60 && r.earned > 0) openAway(r, sim.offlineCapHours(g));
 }
 
@@ -264,7 +274,7 @@ ui.play.addEventListener('click', startGame);
 ui.newGame.addEventListener('click', () =>
 	openConfirmNew(() => {
 		clearSave();
-		g = newGame();
+		g = freshGame();
 		hadSave = false;
 		afterLoad();
 		startGame();
@@ -1179,7 +1189,7 @@ function frame(now: number) {
 	requestAnimationFrame(frame);
 	let dt = (now - last) / 1000;
 	last = now;
-	if (dt > 3 && started && !isPaused()) {
+	if (dt > 3 && started && !crashed && !isPaused()) {
 		// The tab slept: run the time away like an offline return.
 		runAway(dt);
 		dt = 0;
@@ -1187,7 +1197,9 @@ function frame(now: number) {
 	dt = Math.min(dt, 0.1);
 	time += dt;
 
-	if (started && !isPaused()) {
+	if (crashed) {
+		// Nothing runs; the last state is still drawn under the crash panel.
+	} else if (started && !isPaused()) {
 		let left = dt * devSpeed;
 		while (left > 1e-6) {
 			const step = Math.min(left, 1 / 30);
@@ -1217,7 +1229,7 @@ function frame(now: number) {
 	if (Math.abs(g.credits - shownCredits) < 0.5) shownCredits = g.credits;
 
 	uiTimer += dt;
-	if (uiTimer > 0.2 && started) {
+	if (uiTimer > 0.2 && started && !crashed) {
 		uiTimer = 0;
 		updateHud();
 		updateGoal();
@@ -1256,22 +1268,47 @@ function render(dt: number) {
 	}
 }
 
+// ---------- errors ----------
+
+function crash(text: string) {
+	if (crashed) return;
+	crashed = true;
+	const errors = logError(text);
+	try {
+		openCrash(errors.slice(-3));
+	} catch {
+		// The panel itself failed; the sim is stopped either way.
+	}
+}
+
+window.addEventListener('error', (e) => {
+	// Errors with no error object come from other scripts (extensions) or the browser, like ResizeObserver notes.
+	if (!(e.error instanceof Error)) return;
+	crash(e.error.stack || String(e.error));
+});
+window.addEventListener('unhandledrejection', (e) => {
+	// A failed promise (audio, clipboard, storage) does not touch the game state, so just log it.
+	const r = e.reason;
+	logError(`unhandled rejection: ${r instanceof Error ? r.stack || r.message : String(r)}`);
+});
+
 // ---------- page life ----------
 
 document.addEventListener('visibilitychange', () => {
 	if (document.hidden) {
-		if (started) saveGame(g);
+		if (started && !crashed) saveGame(g);
 		suspendAudio(true);
 	} else {
 		suspendAudio(false);
 		last = performance.now();
-		if (started && !isPaused()) {
+		// Time away counts even if a menu was open when the player left.
+		if (started && !crashed) {
 			const away = (Date.now() - g.savedAt) / 1000;
 			if (away > 3) runAway(away);
 		}
 	}
 });
-window.addEventListener('pagehide', () => started && saveGame(g));
+window.addEventListener('pagehide', () => started && !crashed && saveGame(g));
 window.addEventListener('resize', resize);
 window.visualViewport?.addEventListener('resize', resize);
 
@@ -1283,6 +1320,5 @@ showTitle();
 applySettings();
 requestAnimationFrame(frame);
 
-// For quick checks in the console: window.__game(), and in dev, window.__speed(n) to run faster.
-(window as unknown as { __game: () => Game }).__game = () => g;
-if (import.meta.env.DEV) Object.assign(window, { __speed: (n: number) => (devSpeed = n), __sim: sim, __open: (i: number) => toPlanet(i), __pv: pv });
+// Dev only, for quick checks in the console: window.__game(), window.__speed(n) to run faster.
+if (import.meta.env.DEV) Object.assign(window, { __game: () => g, __speed: (n: number) => (devSpeed = n), __sim: sim, __open: (i: number) => toPlanet(i), __pv: pv });

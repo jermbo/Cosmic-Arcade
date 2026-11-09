@@ -3,7 +3,7 @@ title: Idle Orbit
 tagline: Idle space factory. Mine six planets, lay belts and fly the cargo home.
 status: playable
 kind: video
-build: "idle-miner"
+build: "idle-orbit"
 platforms: [desktop, mobile]
 inputs: [mouse, keyboard, touch]
 tags: [idle, factory, pwa]
