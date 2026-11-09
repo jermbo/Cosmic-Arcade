@@ -410,6 +410,113 @@ export function drawBelt(ctx: Ctx, d: number, bend: number, x: number, y: number
 	ctx.restore();
 }
 
+/** The raised top deck of a crossing, going way d. Draw it over the lower belt. */
+export function drawCrossDeck(ctx: Ctx, d: number, x: number, y: number, s: number, offset: number, alpha = 1) {
+	const cx = x + s / 2;
+	const cy = y + s / 2;
+	const w = s * 0.58;
+	ctx.save();
+	ctx.globalAlpha *= alpha;
+	ctx.translate(cx, cy);
+	ctx.rotate(DIR_ANGLE[d]);
+	// shadow on the belt below
+	ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+	ctx.fillRect(-s * 0.5, -w / 2 - s * 0.06, s, w + s * 0.12);
+	ctx.restore();
+	drawBelt(ctx, d, -1, x, y, s, offset, alpha);
+	ctx.save();
+	ctx.globalAlpha *= alpha;
+	ctx.translate(cx, cy);
+	ctx.rotate(DIR_ANGLE[d]);
+	// bright rails, so the deck reads as on top
+	ctx.strokeStyle = '#9fb4ff';
+	ctx.lineWidth = s * 0.045;
+	ctx.beginPath();
+	ctx.moveTo(-s * 0.5, -w / 2);
+	ctx.lineTo(s * 0.5, -w / 2);
+	ctx.moveTo(-s * 0.5, w / 2);
+	ctx.lineTo(s * 0.5, w / 2);
+	ctx.stroke();
+	ctx.restore();
+}
+
+/** One end of a bridge, going way d: a belt half and a ramp. `end` is the end items come out of. */
+export function drawBridgeEnd(ctx: Ctx, d: number, end: boolean, x: number, y: number, s: number, offset: number, alpha = 1) {
+	const cx = x + s / 2;
+	const cy = y + s / 2;
+	const w = s * 0.58;
+	ctx.save();
+	ctx.globalAlpha *= alpha;
+	ctx.translate(cx, cy);
+	ctx.rotate(DIR_ANGLE[d]);
+	// The ground side is a belt; the other side is the ramp.
+	const g0 = end ? 0 : -s * 0.5;
+	ctx.fillStyle = '#1a2036';
+	ctx.fillRect(g0, -w / 2, s * 0.5, w);
+	ctx.strokeStyle = '#3d4a78';
+	ctx.lineWidth = s * 0.035;
+	ctx.beginPath();
+	ctx.moveTo(g0, -w / 2);
+	ctx.lineTo(g0 + s * 0.5, -w / 2);
+	ctx.moveTo(g0, w / 2);
+	ctx.lineTo(g0 + s * 0.5, w / 2);
+	ctx.stroke();
+	chevron(ctx, g0 + s * (0.1 + 0.3 * offset), 0, s, 0.15 + 0.35 * Math.sin(offset * Math.PI));
+	// ramp
+	const r0 = end ? -s * 0.46 : -s * 0.04;
+	const r1 = end ? s * 0.04 : s * 0.46;
+	const lo = end ? r1 : r0;
+	const hi = end ? r0 : r1;
+	ctx.beginPath();
+	ctx.moveTo(lo, -w / 2);
+	ctx.lineTo(hi, -w * 0.62);
+	ctx.lineTo(hi, w * 0.62);
+	ctx.lineTo(lo, w / 2);
+	ctx.closePath();
+	ctx.fillStyle = '#2a3462';
+	ctx.fill();
+	ctx.strokeStyle = '#9fb4ff';
+	ctx.lineWidth = s * 0.045;
+	ctx.stroke();
+	// pillars
+	ctx.fillStyle = '#9fb4ff';
+	for (const sy of [-1, 1]) {
+		ctx.beginPath();
+		ctx.arc(hi, sy * w * 0.62, s * 0.05, 0, Math.PI * 2);
+		ctx.fill();
+	}
+	ctx.restore();
+}
+
+/** The deck between bridge ends, from (ax, ay) to (bx, by). */
+export function drawBridgeDeck(ctx: Ctx, ax: number, ay: number, bx: number, by: number, s: number, offset: number, alpha = 1) {
+	const len = Math.hypot(bx - ax, by - ay);
+	const w = s * 0.5;
+	ctx.save();
+	ctx.globalAlpha *= alpha;
+	ctx.translate(ax, ay);
+	ctx.rotate(Math.atan2(by - ay, bx - ax));
+	// shadow on what it passes over
+	ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+	ctx.fillRect(0, -w / 2 + s * 0.1, len, w);
+	ctx.fillStyle = 'rgba(26, 32, 54, 0.62)';
+	ctx.fillRect(0, -w / 2, len, w);
+	ctx.strokeStyle = '#9fb4ff';
+	ctx.lineWidth = s * 0.045;
+	ctx.beginPath();
+	ctx.moveTo(0, -w / 2);
+	ctx.lineTo(len, -w / 2);
+	ctx.moveTo(0, w / 2);
+	ctx.lineTo(len, w / 2);
+	ctx.stroke();
+	const n = Math.max(1, Math.round(len / s));
+	for (let k = 0; k < n * 2; k++) {
+		const p = (offset + k * 0.5) / n;
+		if (p < 1) chevron(ctx, p * len, 0, s, 0.15 + 0.3 * Math.sin(p * Math.PI));
+	}
+	ctx.restore();
+}
+
 function chevron(ctx: Ctx, x: number, y: number, s: number, a: number) {
 	ctx.strokeStyle = withAlpha('#7f8cff', a);
 	ctx.lineWidth = s * 0.06;
@@ -572,6 +679,14 @@ export function machineIcon(t: MachineType, size: number): HTMLCanvasElement {
 	const g = c.getContext('2d')!;
 	g.scale(dpr, dpr);
 	if (t === 'belt') drawBelt(g, 0, -1, 0, 0, size, 0.3);
-	else drawMachine(g, { t, d: 0, lv: 1, glow: 0.6, prog: 0 }, 0, 0, size, 0.6);
+	else if (t === 'bridge') {
+		const s = size * 0.5;
+		drawBridgeEnd(g, 0, false, 0, size * 0.25, s, 0.3);
+		drawBridgeEnd(g, 0, true, size * 0.5, size * 0.25, s, 0.3);
+		drawBridgeDeck(g, s * 0.5, size * 0.5, size - s * 0.5, size * 0.5, s, 0.3);
+	} else if (t === 'cross') {
+		drawBelt(g, 0, -1, 0, 0, size, 0.3);
+		drawCrossDeck(g, 1, 0, 0, size, 0.3);
+	} else drawMachine(g, { t, d: 0, lv: 1, glow: 0.6, prog: 0 }, 0, 0, size, 0.6);
 	return c;
 }

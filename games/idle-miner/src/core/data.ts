@@ -56,7 +56,7 @@ export const PLANETS: PlanetDef[] = [
 	{ name: 'Halcyon', ore: 'Helionite', color: '#ff5fae', light: '#ffc2e2', dark: '#7a1450', value: 32768, unlock: 600e6, travel: 10, newMachine: 'forge', pad: [10, 1], seed: 67, rings: true },
 ];
 
-export type MachineType = 'pad' | 'drill' | 'belt' | 'smelter' | 'crusher' | 'polisher' | 'pylon' | 'compactor' | 'forge';
+export type MachineType = 'pad' | 'drill' | 'belt' | 'cross' | 'bridge' | 'smelter' | 'crusher' | 'polisher' | 'pylon' | 'compactor' | 'forge';
 
 export interface MachineDef {
 	name: string;
@@ -79,6 +79,8 @@ export const MACHINES: Record<MachineType, MachineDef> = {
 	pad: { name: 'Launch Pad', short: 'Pad', desc: 'Ships load cargo here and fly it home.', cost: 0, growth: 1, time: 0, inputs: [], need: 0, outForm: 0, outCount: 0, maxLv: 1, color: '#9fb4ff' },
 	drill: { name: 'Drill', short: 'Drill', desc: 'Digs ore. Place it on an ore tile.', cost: 10, growth: 1.22, time: 2, inputs: [], need: 0, outForm: FORM_ORE, outCount: 1, maxLv: 12, color: '#ffb347' },
 	belt: { name: 'Belt', short: 'Belt', desc: 'Moves items. Drag to lay a line.', cost: 1, growth: 1, time: 0, inputs: [], need: 0, outForm: 0, outCount: 0, maxLv: 1, color: '#7f8cff' },
+	cross: { name: 'Crossing', short: 'Crossing', desc: 'Two belt lines pass through each other here. Drag a belt line straight across a belt to make one.', cost: 20, growth: 1, time: 0, inputs: [], need: 0, outForm: 0, outCount: 0, maxLv: 1, color: '#7f8cff' },
+	bridge: { name: 'Bridge', short: 'Bridge', desc: 'Items hop from this end to the other, over rocks, belts or machines.', cost: 150, growth: 1, time: 0, inputs: [], need: 0, outForm: 0, outCount: 0, maxLv: 1, color: '#9fb4ff' },
 	smelter: { name: 'Smelter', short: 'Smelter', desc: 'Melts ore or dust into bars. Bars sell for 4x.', cost: 60, growth: 1.3, time: 1, inputs: [FORM_ORE, FORM_DUST], need: 1, outForm: FORM_BAR, outCount: 1, maxLv: 12, color: '#ff6a3d' },
 	crusher: { name: 'Crusher', short: 'Crusher', desc: 'Breaks 1 ore into 2 dust. Smelt dust for twice the bars.', cost: 150, growth: 1.35, time: 1, inputs: [FORM_ORE], need: 1, outForm: FORM_DUST, outCount: 2, maxLv: 12, color: '#6fe3ff' },
 	polisher: { name: 'Polisher', short: 'Polisher', desc: 'Cuts a bar into a gem. Gems sell for 3.5x a bar.', cost: 800, growth: 1.35, time: 1, inputs: [FORM_BAR], need: 1, outForm: FORM_GEM, outCount: 1, maxLv: 12, color: '#5dff8f' },
@@ -87,7 +89,7 @@ export const MACHINES: Record<MachineType, MachineDef> = {
 	forge: { name: 'Fusion Forge', short: 'Forge', desc: 'Fuses 3 gems into a star core worth 60x ore.', cost: 100e3, growth: 1.45, time: 1.5, inputs: [FORM_GEM], need: 3, outForm: FORM_CORE, outCount: 1, maxLv: 12, color: '#ff5fae' },
 };
 
-export const BUILD_ORDER: MachineType[] = ['drill', 'belt', 'smelter', 'crusher', 'polisher', 'pylon', 'compactor', 'forge'];
+export const BUILD_ORDER: MachineType[] = ['drill', 'belt', 'bridge', 'smelter', 'crusher', 'polisher', 'pylon', 'compactor', 'forge'];
 
 /** Speed factor of a machine at a level. */
 export const levelSpeed = (lv: number) => 1 + 0.5 * (lv - 1);
@@ -97,6 +99,8 @@ export const pylonBoost = (lv: number) => 0.5 + 0.15 * (lv - 1);
 export const BUF_IN = 6;
 export const BUF_OUT = 4;
 export const BELT_SPACING = 0.5;
+/** Most tiles from one bridge end to the other (so up to 3 tiles in between). */
+export const BRIDGE_SPAN = 4;
 
 export interface UpgradeDef {
 	name: string;
@@ -115,13 +119,14 @@ export const SHIP_UPS: Record<ShipUpgrade, UpgradeDef> = {
 export const shipCargo = (lv: number) => 8 + 5 * lv;
 export const shipSpeed = (lv: number) => 1 + 0.25 * lv;
 
-export type ResearchId = 'belt' | 'tap' | 'market' | 'offline' | 'blast' | 'beacon';
+export type ResearchId = 'belt' | 'tap' | 'market' | 'offline' | 'blast' | 'bridges' | 'beacon';
 export const RESEARCH: Record<ResearchId, UpgradeDef> = {
 	belt: { name: 'Mag Belts', desc: 'All belts move 30% faster.', cost: 120, growth: 4, max: 10 },
 	tap: { name: 'Power Gloves', desc: 'Each tap mines 2x more.', cost: 80, growth: 6, max: 12 },
 	market: { name: 'Trade Deals', desc: 'All cargo sells for 20% more.', cost: 2000, growth: 4.5, max: 20 },
 	offline: { name: 'Night Shift', desc: 'Work 1 more hour while you are away.', cost: 25e3, growth: 12, max: 6 },
 	blast: { name: 'Blast Charges', desc: 'Clear rocks: tap one with the Remove tool. Cleared rocks stay gone, even after a nova.', cost: 1000, growth: 1, max: 1 },
+	bridges: { name: 'Belt Bridges', desc: 'Drag a belt line straight across a belt to make a crossing. Unlocks the Bridge: drag from one end to the other to hop items over up to 3 tiles.', cost: 5000, growth: 1, max: 1 },
 	beacon: { name: 'Star Beacon', desc: 'Light a beacon at the edge of the system. The final project.', cost: 25e9, growth: 1, max: 1 },
 };
 export const beltSpeed = (lv: number, fastPerk: boolean) => (1.5 + 0.4 * lv) * (fastPerk ? 1.5 : 1);

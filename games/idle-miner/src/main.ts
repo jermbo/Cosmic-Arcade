@@ -456,9 +456,10 @@ window.addEventListener('keydown', (e) => {
 	const n = Number(e.key);
 	if (n >= 1 && n <= 9) {
 		const tools = availableTools();
-		const t = n === 9 ? 'remove' : tools[n - 1];
+		const t = tools[n - 1];
 		if (t) setTool(pv.tool === t ? null : t);
 	}
+	if (e.key === '0') setTool(pv.tool === 'remove' ? null : 'remove');
 	if (e.key === 'r' || e.key === 'R') {
 		if (pv.selected !== null) {
 			sim.rotateAt(g, pv.pi, pv.selected % COLS, Math.floor(pv.selected / COLS));
@@ -500,7 +501,7 @@ function updateToolbar() {
 		r.type = 'button';
 		r.className = 'tool tool--remove';
 		r.dataset.tool = 'remove';
-		r.title = 'Remove (9)';
+		r.title = 'Remove (0)';
 		r.innerHTML = `<span class="tool__x"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13" /></svg></span><span class="tool__name">Remove</span><span class="tool__cost">refund</span>`;
 		ui.toolbar.append(r);
 		requestAnimationFrame(relayout);
@@ -568,6 +569,13 @@ function updateInspect() {
 		const sp = beltSpeed(g.research.belt, !!g.perks.belts);
 		stats = `<span>Speed <b>${sp.toFixed(1)}</b> tiles/s</span><span>Carries up to <b>${(sp * 2).toFixed(1)}</b>/s</span>`;
 		desc = 'Tap Turn, or drag a new line over it. Research Mag Belts for speed.';
+	} else if (m.t === 'bridge') {
+		const span = m.link !== undefined ? sim.bridgeSpan(c, m.link) : 0;
+		desc = m.end ? 'Items land here from the other end, then go on.' : 'Items go in here and hop to the other end.';
+		const over = Math.max(0, span - 1);
+		stats = `<span>Hops over <b>${over}</b> tile${over === 1 ? '' : 's'}</span>`;
+	} else if (m.t === 'cross') {
+		stats = '';
 	} else if (m.t === 'pad') {
 		const cap = sim.padCap(p);
 		stats = `<span>Stock <b>${p.pad.length}</b>/${cap}</span><span>Ships <b>${p.ships.length}</b></span>`;
@@ -578,7 +586,7 @@ function updateInspect() {
 		stats = `<span>Makes <b>${(jobs * def.outCount).toFixed(2)}</b>/s</span><span>Holds <b>${m.inb.length}</b> in</span>`;
 	}
 	if (boost > 1 && m.t !== 'pylon') stats += `<span>Pylon <b>+${Math.round((boost - 1) * 100)}%</b></span>`;
-	if (crewMult > 1 && m.t !== 'pylon' && m.t !== 'belt' && m.t !== 'pad') stats += `<span>Crew <b>+${Math.round((crewMult - 1) * 100)}%</b></span>`;
+	if (crewMult > 1 && def.time > 0) stats += `<span>Crew <b>+${Math.round((crewMult - 1) * 100)}%</b></span>`;
 	// Blocked lines: say why, and offer a way out.
 	const blocks = pv.blocks;
 	const dead = blocks.find((b): b is Extract<sim.Block, { kind: 'dead' }> => b.kind === 'dead' && b.cell === c);
@@ -601,7 +609,7 @@ function updateInspect() {
 		inspectGoto = held.cell;
 		fixBtn = '<button class="btn btn--small btn--fix" data-act="goto">Show</button>';
 	}
-	const canUp = m.t !== 'belt' && m.t !== 'pad';
+	const canUp = def.maxLv > 1;
 	const maxed = m.lv >= def.maxLv;
 	const upCost = canUp && !maxed ? sim.machineUpCost(pv.pi, m) : 0;
 	const lvText = canUp ? `<small>Level ${m.lv}${maxed ? ' (max)' : ''}</small>` : '';
@@ -609,7 +617,7 @@ function updateInspect() {
 		m.t === 'pad'
 			? `${fixBtn}<button class="btn btn--small" data-act="ships">Ships</button>`
 			: `${fixBtn}${canUp ? `<button class="btn btn--small" data-act="upgrade" ${!maxed && g.credits >= upCost ? '' : 'disabled'}>${maxed ? 'Max level' : `Upgrade ${fmt(upCost)}`}</button>` : ''}
-				${m.t !== 'pylon' ? '<button class="btn btn--small btn--ghost" data-act="rotate">Turn</button>' : ''}
+				${m.t !== 'pylon' && m.t !== 'cross' && m.t !== 'bridge' ? '<button class="btn btn--small btn--ghost" data-act="rotate">Turn</button>' : ''}
 				<button class="btn btn--small btn--danger" data-act="remove">Remove</button>`;
 	const html = `<div class="inspect__head"><b style="color:${def.color}">${def.name}</b>${lvText}<button class="inspect__close" data-act="close" aria-label="Close">×</button></div><p>${desc}</p>${warn ? `<p class="inspect__warn${dead || held?.kind === 'dead' ? '' : ' is-slow'}">${warn}</p>` : ''}<div class="inspect__stats">${stats}</div><div class="inspect__row">${buttons}</div>`;
 	if (ui.inspect.dataset.html !== html) {
@@ -700,23 +708,16 @@ function updateCard() {
 		const can = g.credits >= def.unlock;
 		const machine = def.newMachine ? MACHINES[def.newMachine].name : '';
 		const pct = Math.min(100, (g.credits / def.unlock) * 100);
-		const eta = sim.incomeRate() > 0 && !can ? ` · about ${etaText((def.unlock - g.credits) / sim.incomeRate())}` : '';
 		html = `<div class="card__head"><span class="card__dot" style="color:${def.color}"></span><span class="card__title">${def.name}</span><span class="card__sub">New ore: ${def.ore}</span></div>
 			<p>Ore here sells for <b>${def.value}x</b> Cinder ore.${machine ? ` Unlocks the <b>${machine}</b>.` : ''}</p>
 			<div class="goal__bar" style="margin-bottom:10px"><i style="width:${pct}%"></i></div>
-			<div class="card__row"><button class="btn ${can ? 'btn--gold' : ''}" data-act="unlock" ${can ? '' : 'disabled'}>Unlock ${fmt(def.unlock)}${can ? '' : eta}</button></div>`;
+			<div class="card__row"><button class="btn ${can ? 'btn--gold' : ''}" data-act="unlock" ${can ? '' : 'disabled'}>Unlock ${fmt(def.unlock)}</button></div>`;
 	}
 	if (ui.card.dataset.html !== html) {
 		ui.card.dataset.html = html;
 		ui.card.innerHTML = html;
 	}
 	ui.card.hidden = false;
-}
-
-function etaText(s: number) {
-	if (s < 60) return `${Math.ceil(s)}s`;
-	if (s < 3600) return `${Math.ceil(s / 60)} min`;
-	return `${(s / 3600).toFixed(1)} h`;
 }
 
 ui.card.addEventListener('click', (e) => {

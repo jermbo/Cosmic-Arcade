@@ -16,8 +16,10 @@ export function fmt(n: number): string {
 		u++;
 	}
 	if (v >= 1000) return (neg ? '-' : '') + n.toExponential(2).replace('+', '');
-	const s = v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2);
-	return (neg ? '-' : '') + s.replace(/\.?0+$/, '') + UNITS[u];
+	let s = v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2);
+	// Strip trailing fractional zeros (1.20 → 1.2), not integer digits (600 → 6).
+	if (s.includes('.')) s = s.replace(/\.?0+$/, '');
+	return (neg ? '-' : '') + s + UNITS[u];
 }
 
 export function fmtTime(seconds: number): string {

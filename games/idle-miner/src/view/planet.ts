@@ -1,11 +1,11 @@
 // The planet view: the factory grid, drawing and touch / mouse building.
 
-import { COLS, DX, DY, MACHINES, PLANETS, ROWS, TILE_ORE, TILE_ROCK, beltSpeed } from '../core/data.ts';
+import { BRIDGE_SPAN, COLS, DX, DY, MACHINES, PLANETS, ROWS, TILE_ORE, TILE_ROCK, beltSpeed } from '../core/data.ts';
 import type { Dir, MachineType } from '../core/data.ts';
 import * as sim from '../core/sim.ts';
 import { baseTilesOf, tilesOf } from '../core/state.ts';
 import type { BeltItem, Game, Machine } from '../core/state.ts';
-import { drawBelt, drawItem, drawMachine, drawShip, glow, mix, roundRect, withAlpha } from './draw.ts';
+import { drawBelt, drawBridgeDeck, drawBridgeEnd, drawCrossDeck, drawItem, drawMachine, drawShip, glow, mix, roundRect, withAlpha } from './draw.ts';
 import { burst, popup, ring, spray } from './fx.ts';
 import { fmt as fmtShort } from '../core/format.ts';
 
@@ -21,7 +21,7 @@ export interface PlanetHooks {
 interface Drag {
 	path: number[];
 	moved: boolean;
-	mode: 'belt' | 'machine' | 'remove' | 'none';
+	mode: 'belt' | 'bridge' | 'machine' | 'remove' | 'none';
 	pointer: number;
 	startX: number;
 	startY: number;
@@ -140,7 +140,7 @@ export class PlanetView {
 			this.hooks.select(null);
 			return;
 		}
-		const mode = this.tool === 'belt' ? 'belt' : this.tool === 'remove' ? 'remove' : this.tool ? 'machine' : 'none';
+		const mode = this.tool === 'belt' ? 'belt' : this.tool === 'bridge' ? 'bridge' : this.tool === 'remove' ? 'remove' : this.tool ? 'machine' : 'none';
 		this.drag = { path: [c], moved: false, mode, pointer: id, startX: sx, startY: sy };
 		if (mode === 'remove') this.removeCell(g, c, true);
 	}
@@ -156,6 +156,12 @@ export class PlanetView {
 			if (d.mode === 'none') d.mode = 'belt';
 		}
 		if (c === null || !d.moved) return;
+		if (d.mode === 'bridge') {
+			const end = straightEnd(d.path[0], c);
+			if (end !== d.path[d.path.length - 1]) this.hooks.sound('click');
+			d.path = end === d.path[0] ? [end] : [d.path[0], end];
+			return;
+		}
 		if (d.mode === 'machine') {
 			d.path = [c];
 			return;
@@ -188,6 +194,12 @@ export class PlanetView {
 		if (d.mode === 'belt') {
 			if (!d.moved && d.path.length === 1) this.tapBelt(g, d.path[0]);
 			else this.commitBelts(g, d.path);
+		} else if (d.mode === 'bridge') {
+			if (d.path.length === 2) this.placeBridge(g, d.path[0], d.path[1]);
+			else {
+				this.hooks.toast(`Drag from where items go in to where they come out. Up to ${BRIDGE_SPAN - 1} tiles between.`);
+				this.hooks.sound('error');
+			}
 		} else if (d.mode === 'machine' && this.tool && this.tool !== 'remove') {
 			const target = d.moved ? (c ?? d.path[0]) : d.path[0];
 			this.placeMachine(g, target, this.tool);
@@ -247,16 +259,41 @@ export class PlanetView {
 		return dirs;
 	}
 
+	/** Path steps where the line goes straight across a straight belt: these become crossings. */
+	private crossings(g: Game, path: number[]): Set<number> {
+		const out = new Set<number>();
+		if (!g.research.bridges) return out;
+		const cells = g.planets[this.pi].cells;
+		for (let i = 1; i < path.length - 1; i++) {
+			const m = cells[path[i]];
+			if (!m || m.t !== 'belt') continue;
+			const din = dirTo(path[i - 1], path[i]);
+			if (din !== dirTo(path[i], path[i + 1]) || din % 2 === m.d % 2) continue;
+			// The line being dragged will feed it from the side; that is the point.
+			if (sim.straightBelt(g, this.pi, path[i], [path[i - 1], path[i + 1]])) out.add(i);
+		}
+		return out;
+	}
+
 	private commitBelts(g: Game, path: number[]) {
 		const p = g.planets[this.pi];
 		const tiles = tilesOf(this.pi, g.blasted[this.pi]);
 		const dirs = this.pathDirs(g, path);
+		const cross = this.crossings(g, path);
 		let placed = 0;
 		let short = false;
 		for (let i = 0; i < path.length; i++) {
 			const c = path[i];
 			const m = p.cells[c];
 			if (tiles[c] === TILE_ROCK) continue;
+			if (cross.has(i)) {
+				if (sim.makeCross(g, this.pi, c, [path[i - 1], path[i + 1]])) {
+					placed++;
+					const s = this.cellCenter(c);
+					burst(s.x, s.y, '#9fb4ff', 6, 70, { size: 2, life: 0.35 });
+				} else short = true;
+				continue;
+			}
 			if (m) {
 				// A drag that ends on a belt joins it, so that belt keeps its way.
 				const joins = i === path.length - 1 && path.length > 1;
@@ -275,6 +312,25 @@ export class PlanetView {
 			this.hooks.toast('Not enough credits for all belts');
 			this.hooks.sound('error');
 		}
+		this.hooks.changed();
+	}
+
+	private placeBridge(g: Game, a: number, b: number) {
+		const check = sim.canBridge(g, this.pi, a, b);
+		if (!check.ok) {
+			this.hooks.toast(check.why);
+			this.hooks.sound('error');
+			return;
+		}
+		sim.placeBridge(g, this.pi, a, b);
+		const col = MACHINES.bridge.color;
+		for (const c of [a, b]) {
+			const s = this.cellCenter(c);
+			burst(s.x, s.y, col, 10, 140, { size: 2.5, life: 0.45 });
+		}
+		const s = this.cellCenter(b);
+		popup(s.x, s.y - this.ts * 0.4, '-' + fmtShort(check.cost), '#ffb3b3', 13);
+		this.hooks.sound('place');
 		this.hooks.changed();
 	}
 
@@ -399,12 +455,26 @@ export class PlanetView {
 		// belts
 		const speed = beltSpeed(g.research.belt, !!g.perks.belts);
 		const offset = (time * speed) % 1;
+		const u = s * 0.15;
 		for (let i = 0; i < p.cells.length; i++) {
 			const m = p.cells[i];
-			if (m && m.t === 'belt') drawBelt(ctx, m.d, m.bend ?? -1, cx(i) * s, cy(i) * s, s, offset);
+			if (!m) continue;
+			if (m.t === 'belt') drawBelt(ctx, m.d, m.bend ?? -1, cx(i) * s, cy(i) * s, s, offset);
+			else if (m.t === 'bridge') drawBridgeEnd(ctx, m.d, !!m.end, cx(i) * s, cy(i) * s, s, offset);
+			else if (m.t === 'cross') {
+				// across runs below, down passes over it on a deck
+				const [h, v] = sim.crossLanes(p, i);
+				drawBelt(ctx, h, -1, cx(i) * s, cy(i) * s, s, offset);
+				for (const it of m.items) if (it.e % 2 === 0) drawMoving(ctx, it, it.e, i, s, u);
+				drawCrossDeck(ctx, v, cx(i) * s, cy(i) * s, s, offset);
+				for (const it of m.items) if (it.e % 2 === 1) drawMoving(ctx, it, it.e, i, s, u);
+			}
 		}
-		// items on belts
-		const u = s * 0.15;
+		// items on belts and coming off bridges
+		for (let i = 0; i < p.cells.length; i++) {
+			const m = p.cells[i];
+			if (m?.t === 'bridge' && m.end) for (const it of m.items) drawMoving(ctx, it, m.d, i, s, u);
+		}
 		for (let i = 0; i < p.cells.length; i++) {
 			const m = p.cells[i];
 			if (!m || m.t !== 'belt') continue;
@@ -417,7 +487,7 @@ export class PlanetView {
 		for (const b of this.blocks) blockOf.set(b.from, b);
 		for (let i = 0; i < p.cells.length; i++) {
 			const m = p.cells[i];
-			if (!m || m.t === 'belt') continue;
+			if (!m || m.t === 'belt' || m.t === 'cross' || m.t === 'bridge') continue;
 			drawMachine(ctx, { t: m.t, d: m.d, lv: m.lv, glow: m.glow || 0, prog: m.job ? m.prog : 0 }, cx(i) * s, cy(i) * s, s, time);
 			if (m.t === 'pad') this.drawPad(ctx, g, i, time, dt);
 			const b = blockOf.get(i);
@@ -432,7 +502,24 @@ export class PlanetView {
 			if (m?.thru?.length) for (const it of m.thru) drawMoving(ctx, it, m.d, i, s, u);
 		}
 
-		this.drawBlockMarks(ctx, g, s, time);
+		// bridge decks pass over everything, with their items on top
+		for (let i = 0; i < p.cells.length; i++) {
+			const m = p.cells[i];
+			if (m?.t !== 'bridge' || m.end || m.link === undefined) continue;
+			const ax = (cx(i) + 0.5) * s;
+			const ay = (cy(i) + 0.5) * s;
+			const bx = (cx(m.link) + 0.5) * s;
+			const by = (cy(m.link) + 0.5) * s;
+			drawBridgeDeck(ctx, ax, ay, bx, by, s, offset);
+			// items ride from this end's back edge to the far end's back edge
+			const hx = DX[m.d] * s * 0.5;
+			const hy = DY[m.d] * s * 0.5;
+			for (const it of m.items) {
+				const lift = 1 + 0.35 * Math.sin(it.p * Math.PI);
+				drawItem(ctx, it.k, ax - hx + (bx - ax) * it.p, ay - hy + (by - ay) * it.p, u * lift);
+			}
+		}
+		this.drawBlockMarks(ctx, s, time);
 		this.drawOverlay(ctx, g, time);
 		ctx.restore();
 	}
@@ -453,7 +540,7 @@ export class PlanetView {
 	}
 
 	/** The cause of each block: an X where a dead end points, a ring on a slow machine. */
-	private drawBlockMarks(ctx: CanvasRenderingContext2D, g: Game, s: number, time: number) {
+	private drawBlockMarks(ctx: CanvasRenderingContext2D, s: number, time: number) {
 		const done = new Set<number>();
 		for (const b of this.blocks) {
 			if (done.has(b.cell)) continue;
@@ -471,7 +558,7 @@ export class PlanetView {
 				x = (cx(b.target) + 0.5) * s;
 				y = (cy(b.target) + 0.5) * s;
 			} else {
-				const d = g.planets[this.pi].cells[b.cell]?.d ?? 0;
+				const d = b.dir;
 				x = (cx(b.cell) + 0.5 + DX[d] * 0.5) * s;
 				y = (cy(b.cell) + 0.5 + DY[d] * 0.5) * s;
 			}
@@ -567,12 +654,21 @@ export class PlanetView {
 		// belt path preview
 		if (d && d.mode === 'belt' && (d.moved || this.tool === 'belt')) {
 			const dirs = this.pathDirs(g, d.path);
+			const cross = this.crossings(g, d.path);
 			let cost = 0;
 			const price = sim.buildCost(g, this.pi, 'belt');
 			const tiles = tilesOf(this.pi, g.blasted[this.pi]);
 			for (let k = 0; k < d.path.length; k++) {
 				const c = d.path[k];
 				const m = p.cells[c];
+				if (cross.has(k)) {
+					cost += sim.buildCost(g, this.pi, 'cross');
+					roundRect(ctx, cx(c) * s + 1, cy(c) * s + 1, s - 2, s - 2, s * 0.15);
+					ctx.fillStyle = withAlpha(g.credits >= cost ? '#5ef2ff' : '#ff5d73', 0.16);
+					ctx.fill();
+					drawCrossDeck(ctx, dirs[k], cx(c) * s, cy(c) * s, s, (time * 1.5) % 1, 0.75);
+					continue;
+				}
 				const bad = tiles[c] === TILE_ROCK;
 				if (m && m.t !== 'belt') continue;
 				if (m && k === d.path.length - 1 && k > 0) continue;
@@ -586,6 +682,39 @@ export class PlanetView {
 			this.previewCost = cost;
 			this.previewAt = d.path[d.path.length - 1];
 		} else this.previewCost = -1;
+		// bridge preview
+		if (d && d.mode === 'bridge') {
+			const a = d.path[0];
+			const b = d.path.length === 2 ? d.path[1] : -1;
+			const check = b >= 0 ? sim.canBridge(g, this.pi, a, b) : null;
+			const col = !check || check.ok ? '#5ef2ff' : '#ff5d73';
+			for (const c of b >= 0 ? [a, b] : [a]) {
+				roundRect(ctx, cx(c) * s + 1, cy(c) * s + 1, s - 2, s - 2, s * 0.15);
+				ctx.fillStyle = withAlpha(col, 0.2);
+				ctx.fill();
+				ctx.strokeStyle = col;
+				ctx.lineWidth = 2;
+				ctx.stroke();
+			}
+			if (b >= 0) {
+				const dd = dirTo(a, b);
+				const t = (time * 1.5) % 1;
+				drawBridgeEnd(ctx, dd, false, cx(a) * s, cy(a) * s, s, t, 0.7);
+				drawBridgeEnd(ctx, dd, true, cx(b) * s, cy(b) * s, s, t, 0.7);
+				drawBridgeDeck(ctx, (cx(a) + 0.5) * s, (cy(a) + 0.5) * s, (cx(b) + 0.5) * s, (cy(b) + 0.5) * s, s, t, 0.7);
+				this.ghost = { cell: b, ok: check!.ok, text: check!.ok ? fmtShort(check!.cost) : check!.why };
+			} else this.ghost = { cell: a, ok: true, text: 'Drag to the far end' };
+			return;
+		}
+		if (!d && this.hover !== null && this.tool === 'bridge') {
+			const c = this.hover;
+			roundRect(ctx, cx(c) * s + 1, cy(c) * s + 1, s - 2, s - 2, s * 0.15);
+			ctx.strokeStyle = withAlpha('#5ef2ff', 0.6);
+			ctx.lineWidth = 1.5;
+			ctx.stroke();
+			this.ghost = { cell: c, ok: true, text: `Bridge ${fmtShort(sim.buildCost(g, this.pi, 'bridge'))}` };
+			return;
+		}
 		// machine ghost
 		const ghostCell = d && d.mode === 'machine' ? d.path[0] : !d ? this.hover : null;
 		if (ghostCell !== null && this.tool && this.tool !== 'remove' && this.tool !== 'belt') {
@@ -743,6 +872,14 @@ export class PlanetView {
 		}
 		return c;
 	}
+}
+
+/** The far end of a bridge dragged from a toward c: straight, and at most BRIDGE_SPAN away. */
+function straightEnd(a: number, c: number): number {
+	const dx = cx(c) - cx(a);
+	const dy = cy(c) - cy(a);
+	if (Math.abs(dx) >= Math.abs(dy)) return idx(cx(a) + Math.sign(dx) * Math.min(Math.abs(dx), BRIDGE_SPAN), cy(a));
+	return idx(cx(a), cy(a) + Math.sign(dy) * Math.min(Math.abs(dy), BRIDGE_SPAN));
 }
 
 function dirTo(a: number, b: number): Dir {

@@ -1,6 +1,7 @@
 // The shape of a game, a fresh game, the planet maps, and save / load.
 
 import { CELLS, COLS, ROWS, PLANETS, TILE_GROUND, TILE_ORE, TILE_ROCK } from './data.ts';
+import { ensureOreAccessible, oreHasGroundExit, rockSealsOre, validatePlanetTiles } from './tile-access.ts';
 import type { CrewId, Dir, MachineType, PerkId, ResearchId, ShipUpgrade } from './data.ts';
 
 export interface BeltItem {
@@ -35,6 +36,10 @@ export interface Machine {
 	thru?: BeltItem[];
 	/** blocked for a while (seconds), for hints */
 	stuck?: number;
+	/** bridge only: the cell of the other end */
+	link?: number;
+	/** bridge only: true for the end items come out of */
+	end?: boolean;
 }
 
 export interface Ship {
@@ -138,7 +143,7 @@ export function newGame(keep?: Game): Game {
 		crew: keep ? { ...keep.crew } : {},
 		crewAt: keep ? crewHome(keep.crewAt) : {},
 		slots: keep ? keep.slots : 0,
-		research: { belt: 0, tap: 0, market: 0, offline: 0, blast: 0, beacon: 0 },
+		research: { belt: 0, tap: 0, market: 0, offline: 0, blast: 0, bridges: 0, beacon: 0 },
 		blasted: keep ? keep.blasted.map((a) => a.slice()) : PLANETS.map(() => []),
 		planets: PLANETS.map((_, i) => makePlanet(i, i === 0, extra)),
 		goals: [],
@@ -178,6 +183,11 @@ const tileCache: Uint8Array[] = [];
 
 const blastCache = new WeakMap<readonly number[], { n: number; tiles: Uint8Array }>();
 
+/** Clears cached base maps (tests and validate-tiles). */
+export function clearPlanetTileCache(): void {
+	tileCache.length = 0;
+}
+
 /** The ground of a planet now: the base map, minus any rocks that were blasted. */
 export function tilesOf(index: number, blasted?: readonly number[]): Uint8Array {
 	const base = baseTilesOf(index);
@@ -210,7 +220,7 @@ export function baseTilesOf(index: number): Uint8Array {
 		if (Math.abs(x - px) + Math.abs(y - py) < 4 || !free(x, y)) continue;
 		const size = 4 + Math.floor(r() * 3);
 		for (let i = 0; i < size && placed < want; i++) {
-			if (free(x, y)) {
+			if (free(x, y) && oreHasGroundExit(tiles, x, y)) {
 				tiles[y * COLS + x] = TILE_ORE;
 				placed++;
 			}
@@ -226,9 +236,15 @@ export function baseTilesOf(index: number): Uint8Array {
 		tries++;
 		const x = Math.floor(r() * COLS);
 		const y = Math.floor(r() * ROWS);
-		if (!free(x, y)) continue;
+		if (!free(x, y) || rockSealsOre(tiles, x, y)) continue;
 		tiles[y * COLS + x] = TILE_ROCK;
 		rocks++;
+	}
+	ensureOreAccessible(tiles, px, py);
+	const issues = validatePlanetTiles(tiles, px, py);
+	if (issues.length) {
+		const msg = issues.map((i) => `cell ${i.cell} ${i.reason}`).join(', ');
+		throw new Error(`${def.name}: ore accessibility failed after fix-up (${msg})`);
 	}
 	tileCache[index] = tiles;
 	return tiles;
@@ -245,7 +261,7 @@ export function serialize(g: Game): string {
 		...g,
 		planets: g.planets.map((p) => ({
 			...p,
-			cells: p.cells.map((m) => (m ? { t: m.t, d: m.d, lv: m.lv, inb: m.inb, out: m.out, prog: round(m.prog), job: m.job, kind: m.kind, items: m.items.map((i) => ({ k: i.k, p: round(i.p), e: i.e })), thru: m.thru?.length ? m.thru.map((i) => ({ k: i.k, p: round(i.p), e: i.e })) : undefined } : null)),
+			cells: p.cells.map((m) => (m ? { t: m.t, d: m.d, lv: m.lv, inb: m.inb, out: m.out, prog: round(m.prog), job: m.job, kind: m.kind, items: m.items.map((i) => ({ k: i.k, p: round(i.p), e: i.e })), thru: m.thru?.length ? m.thru.map((i) => ({ k: i.k, p: round(i.p), e: i.e })) : undefined, link: m.link, end: m.end || undefined } : null)),
 		})),
 	};
 	return JSON.stringify(plain);
@@ -263,7 +279,7 @@ export function deserialize(text: string): Game | null {
 		g.crew = { ...raw.crew };
 		g.crewAt = { ...raw.crewAt };
 		g.slots = Number.isInteger(raw.slots) ? raw.slots : 0;
-		g.research = { belt: 0, tap: 0, market: 0, offline: 0, blast: 0, beacon: 0, ...raw.research };
+		g.research = { belt: 0, tap: 0, market: 0, offline: 0, blast: 0, bridges: 0, beacon: 0, ...raw.research };
 		g.blasted = PLANETS.map((_, i) => (Array.isArray(raw.blasted?.[i]) ? raw.blasted[i].filter(Number.isInteger) : []));
 		g.planets = PLANETS.map((_, i) => {
 			const base = makePlanet(i, i === 0, 0);
