@@ -1,8 +1,10 @@
 // Shape drawing shared by the planet view, the space map and the toolbar icons.
 // Flat vector shapes with soft glows. Glows use cached sprites, so they are cheap.
 
-import { MACHINES, PLANETS, formOfKind, isCrate, planetOfKind } from '../core/data.ts';
-import type { MachineType } from '../core/data.ts';
+import { MACHINES } from '../content/machines.ts';
+import type { MachineType } from '../content/machines.ts';
+import { PLANETS } from '../content/planets.ts';
+import { formOfKind, isCrate, planetOfKind } from '../core/items.ts';
 
 export const INK = '#0b1020';
 export const PANEL = '#151b2e';

@@ -1,9 +1,10 @@
 // The space map: home station, planets, cargo routes and ships.
 
-import { PLANETS } from '../core/data.ts';
+import { PLANETS } from '../content/planets.ts';
 import { fmt } from '../core/format.ts';
-import { SHIP_WAIT, planetBadge } from '../core/sim.ts';
-import type { Game } from '../core/state.ts';
+import { planetBadge } from '../core/blocks.ts';
+import { SHIP } from '../content/ships.ts';
+import type { Game } from '../core/game.ts';
 import { drawPlanet, drawShip, glow, roundRect, withAlpha } from './draw.ts';
 import { burst, popup, ring } from './fx.ts';
 
@@ -241,7 +242,7 @@ export class SpaceView {
 					// waiting ships circle the planet; the loading one sits on top
 					if (first) {
 						first = false;
-						const load = Math.min(1, s.wait / SHIP_WAIT);
+						const load = Math.min(1, s.wait / SHIP.wait);
 						const dk = this.dock(i);
 						if (s.cargo.length) glow(ctx, dk.x, dk.y, sz * 2.4, PLANETS[i].color, 0.3 + 0.4 * load);
 						drawShip(ctx, dk.x, dk.y, dk.a, sz, PLANETS[i].color, 0, time);

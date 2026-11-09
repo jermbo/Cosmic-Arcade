@@ -1,1129 +1,86 @@
-// Idle Orbit: start-up, the main loop, input, HUD, planet card, toolbar, tutorial.
+// Idle Orbit: start-up, the main loop, the events from the game, errors and page life.
 
 import '@fontsource/chakra-petch/latin-500.css';
 import '@fontsource/chakra-petch/latin-700.css';
 import './style.css';
 
-import { initAudio, setVolumes, sfx, suspendAudio } from './audio.ts';
-import { BUILD_ORDER, MACHINES, PLANETS, TILE_ORE, beltSpeed, levelSpeed, pylonBoost } from './core/data.ts';
-import { boughtPlots, cellX, cellY, viewBounds } from './core/grid.ts';
-import { clearPlanetTileCache } from './core/state.ts';
-import type { MachineType } from './core/data.ts';
+import { sfx, suspendAudio } from './audio.ts';
+import { PLANETS } from './content/planets.ts';
 import { fmt } from './core/format.ts';
-import { GOALS, checkProgress, currentGoal } from './core/goals.ts';
-import * as sim from './core/sim.ts';
-import { clearSave, loadGame, logError, newGame, saveGame, tilesOf } from './core/state.ts';
-import type { Game } from './core/state.ts';
-import { closePanel, isLocked, panelOpen, refreshPanel } from './ui/modal.ts';
-import { initPanels, openAway, openConfirmNew, openCrash, openCrew, openNova, openPause, openResearch, openSettings, openShips } from './ui/panels.ts';
+import { checkProgress } from './core/progress.ts';
+import { events, setEvents } from './core/events.ts';
+import { incomeRate } from './core/income.ts';
+import { prestige } from './core/nova.ts';
+import { tick } from './core/tick.ts';
+import { logError } from './core/error-log.ts';
+import { clearSave, saveGame } from './core/save.ts';
+import { panelOpen, refreshPanel } from './ui/modal.ts';
+import { openCrash } from './ui/panels/crash.ts';
+import { initPanels } from './ui/panels/host.ts';
 import { setupPwa } from './ui/pwa.ts';
-import { machineIcon } from './view/draw.ts';
-import { burst, clearFx, drawFx, popup, ring, setReducedMotion, stepFx } from './view/fx.ts';
-import { PlanetView } from './view/planet.ts';
-import type { Tool } from './view/planet.ts';
-import { SpaceView } from './view/space.ts';
+import { drawFx, stepFx } from './view/fx.ts';
+import { session } from './session.ts';
+import { canvas, ui } from './ui/elements.ts';
+import { bumpCredits, initHud, updateGoal, updateHud } from './ui/hud.ts';
+import { initInput } from './ui/input.ts';
+import { initInspect, updateInspect } from './ui/inspect.ts';
+import { initPlanetCard, updateCard } from './ui/planet-card.ts';
+import { afterLoad, applySettings, freshGame, initScreens, resize, runAway, showTitle, toPlanet, toTitle } from './ui/screens.ts';
+import { pushToast, toast, toastUnlock } from './ui/toasts.ts';
+import { initToolbar, markToolbarStale, updateToolbar } from './ui/toolbar.ts';
+import { initTutorial, updateTutorial } from './ui/tutorial.ts';
+import { pv, space } from './views.ts';
 
-const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
-
-const canvas = $<HTMLCanvasElement>('stage');
 const ctx = canvas.getContext('2d')!;
-const ui = {
-	dock: $('dock'),
-	hud: $('hud'),
-	credits: $('credits'),
-	income: $('income'),
-	dust: $('dust'),
-	dustN: $('dust-n'),
-	research: $('btn-research'),
-	nova: $('btn-nova'),
-	goal: $('goal'),
-	goalTag: $('goal-tag'),
-	goalText: $('goal-text'),
-	goalFill: $('goal-fill'),
-	pvTop: $('pv-top'),
-	pvName: $('pv-name'),
-	pvSub: $('pv-sub'),
-	crew: $('btn-crew'),
-	survey: $('btn-survey'),
-	card: $('planet-card'),
-	toolbar: $('toolbar'),
-	inspect: $('inspect'),
-	toasts: $('toasts'),
-	coach: $('coach'),
-	coachText: $('coach-text'),
-	title: $('title'),
-	play: $('btn-play'),
-	newGame: $('btn-new'),
-};
 
 // ---------- state ----------
 
-clearPlanetTileCache();
-let g: Game = loadGame() ?? newGame();
-let hadSave = !!loadGame();
-let started = false;
-let view: 'space' | 'planet' = 'space';
-let W = 0;
-let H = 0;
-let dpr = 1;
-let time = 0;
-let shownCredits = g.credits;
-let tapCombo = 0;
-let lastTapAt = 0;
 let uiTimer = 0;
 let saveTimer = 0;
 let progressTimer = 0;
-/** cell the inspect panel's Show button jumps to */
-let inspectGoto = -1;
-let problemWhere: { planet: number; cell: number; kind: sim.Problem['kind'] } | null = null;
-let toolbarKey = '';
-let flash = 0;
 let devSpeed = 1;
 /** Set after an uncaught error: the sim and saving stop, so a broken state never overwrites the save. */
 let crashed = false;
-/** A fake game that runs behind the title screen. */
-let demo: Game | null = null;
-
-const space = new SpaceView();
-const pv = new PlanetView({
-	sound: (n) => sfx[n](),
-	toast: (t) => toast(t, 'warn'),
-	select: (c) => select(c),
-	changed: () => {
-		updateInspect();
-		updateToolbar();
-		relayout();
-		updatePlanetHeader();
-	},
-	expanded: () => {
-		sfx.unlock();
-		saveGame(g);
-		relayout();
-		updatePlanetHeader();
-	},
-});
-
-/** A new game that keeps the player's sound and motion settings. */
-function freshGame(): Game {
-	const fresh = newGame();
-	fresh.settings = { ...g.settings };
-	return fresh;
-}
 
 const isPaused = () => ['pause', 'how', 'settings', 'reset', 'new'].some((id) => panelOpen(id));
 
 initPanels({
-	game: () => g,
+	game: () => session.g,
 	sound: (n) => sfx[n](),
 	toast,
 	afterBuy: () => {
 		updateHud();
 		updateToolbar();
 	},
-	save: () => saveGame(g),
+	save: () => saveGame(session.g),
 	resetAll: () => {
 		clearSave();
-		g = freshGame();
-		hadSave = false;
-		started = false;
+		session.g = freshGame();
+		session.hadSave = false;
+		session.started = false;
 		afterLoad();
 		showTitle();
 	},
 	loadGame: (loaded) => {
-		g = loaded;
+		session.g = loaded;
 		afterLoad();
-		saveGame(g);
+		saveGame(session.g);
 	},
 	prestige: doPrestige,
 	toTitle,
 	settingsChanged: applySettings,
 });
 
-// ---------- layout ----------
-
-function resize() {
-	dpr = Math.min(2, window.devicePixelRatio || 1);
-	W = window.innerWidth;
-	H = window.innerHeight;
-	canvas.width = Math.round(W * dpr);
-	canvas.height = Math.round(H * dpr);
-	relayout();
-}
-
-/** Landscape phones: the dock is a left rail and the toolbar a right rail (see style.css). */
-const railQuery = window.matchMedia('(orientation: landscape) and (max-height: 540px)');
-railQuery.addEventListener('change', resize);
-
-/** Finds the free play area around the UI panels and fits the view to it. */
-function relayout() {
-	const rail = railQuery.matches;
-	const dock = ui.dock.getBoundingClientRect();
-	const docked = !ui.hud.hidden;
-	let top: number;
-	let left = 0;
-	let right = 0;
-	let bottom: number;
-	if (rail) {
-		top = 8;
-		left = docked ? dock.right + 4 : 0;
-	} else {
-		top = Math.max(dock.bottom + (view === 'space' ? 6 : 4), view === 'space' ? 70 : 0);
-	}
-	if (view === 'space') {
-		bottom = Math.min(150, H * 0.2);
-		space.layout(W, H, top, bottom, left, right);
-	} else {
-		const bar = ui.toolbar.getBoundingClientRect();
-		if (ui.toolbar.hidden) bottom = 8;
-		else if (rail) {
-			bottom = 8;
-			right = W - bar.left + 4;
-		} else bottom = H - bar.top + 6;
-		const pl = g.planets[pv.pi];
-		pv.layout(W, H, top, bottom, viewBounds(pl), left, right);
-	}
-	const root = document.documentElement.style;
-	root.setProperty('--play-t', `${top}px`);
-	root.setProperty('--play-l', `${left}px`);
-	root.setProperty('--play-r', `${right}px`);
-}
-
-// ---------- start / title ----------
-
-function makeDemo(): Game {
-	const d = newGame();
-	d.planets.forEach((p, i) => {
-		p.unlocked = true;
-		p.up.ships = 1;
-		p.ships.push({ ph: 1, t: 0.3 + i * 0.1, cargo: [], wait: 0 });
-		p.ships[0].ph = 2;
-		p.ships[0].t = (i * 0.37) % 1;
-	});
-	return d;
-}
-
-function showTitle() {
-	ui.title.hidden = false;
-	ui.play.textContent = hadSave ? 'Continue' : 'Play';
-	ui.newGame.hidden = !hadSave;
-	ui.hud.hidden = true;
-	ui.goal.hidden = true;
-	ui.card.hidden = true;
-	ui.pvTop.hidden = true;
-	ui.toolbar.hidden = true;
-	ui.inspect.hidden = true;
-	ui.coach.hidden = true;
-	demo = makeDemo();
-	space.showLabels = false;
-	view = 'space';
-	space.selected = -1;
-	space.pointAt = -1;
-	relayout();
-}
-
-function toTitle() {
-	saveGame(g);
-	started = false;
-	hadSave = true;
-	showTitle();
-}
-
-function startGame() {
-	initAudio();
-	applySettings();
-	ui.title.hidden = true;
-	ui.hud.hidden = false;
-	ui.goal.hidden = false;
-	demo = null;
-	space.showLabels = true;
-	started = true;
-	clearFx();
-	sim.resetIncome();
-	sim.setEvents(true);
-	toSpace();
-	// time away since the last save
-	const away = (Date.now() - g.savedAt) / 1000;
-	if (hadSave && away > 30) runAway(away);
-	saveGame(g);
-	hadSave = true;
-	updateHud();
-	sfx.buy();
-}
-
-function runAway(seconds: number) {
-	const r = sim.catchUp(g, seconds);
-	sim.events.length = 0;
-	shownCredits = g.credits;
-	saveGame(g);
-	if (seconds > 60 && r.earned > 0) openAway(r, sim.offlineCapHours(g));
-}
-
-function afterLoad() {
-	shownCredits = g.credits;
-	space.rate.fill(0);
-	pv.tool = null;
-	pv.selected = null;
-	toolbarKey = '';
-	sim.resetIncome();
-	clearFx();
-	applySettings();
-	if (started) toSpace();
-}
-
-ui.play.addEventListener('click', startGame);
-ui.newGame.addEventListener('click', () =>
-	openConfirmNew(() => {
-		clearSave();
-		g = freshGame();
-		hadSave = false;
-		afterLoad();
-		startGame();
-	}),
-);
-$('btn-title-settings').addEventListener('click', () => {
-	initAudio();
-	openSettings(true);
-});
-
-function applySettings() {
-	setVolumes(g.settings.sfx, g.settings.music);
-	setReducedMotion(g.settings.reduceMotion);
-	document.documentElement.classList.toggle('reduce-motion', g.settings.reduceMotion);
-}
-
-// ---------- views ----------
-
-function updatePlanetHeader() {
-	const pi = pv.pi;
-	const p = g.planets[pi];
-	ui.pvSub.textContent = `${boughtPlots(p) + 1} plot${boughtPlots(p) ? 's' : ''} · tap a dashed plot to buy land · drag off-land or two fingers to pan`;
-	ui.survey.hidden = true;
-}
-
-function toSpace() {
-	view = 'space';
-	ui.pvTop.hidden = true;
-	ui.toolbar.hidden = true;
-	ui.inspect.hidden = true;
-	pv.tool = null;
-	select(null);
-	clearFx();
-	updateCard();
-	relayout();
-}
-
-function toPlanet(pi: number) {
-	if (!g.planets[pi].unlocked) return;
-	view = 'planet';
-	space.selected = -1;
-	ui.card.hidden = true;
-	ui.pvTop.hidden = false;
-	ui.toolbar.hidden = false;
-	pv.open(pi);
-	ui.pvName.textContent = PLANETS[pi].name;
-	ui.pvName.style.color = PLANETS[pi].light;
-	updatePlanetHeader();
-	toolbarKey = '';
-	updateToolbar();
-	clearFx();
-	relayout();
-	sfx.click();
-}
-
-$('btn-back').addEventListener('click', () => {
-	sfx.click();
-	toSpace();
-});
-$('btn-ships').addEventListener('click', () => {
-	sfx.click();
-	openShips(pv.pi);
-});
-ui.crew.addEventListener('click', () => {
-	sfx.click();
-	openCrew(pv.pi);
-});
-$('btn-research').addEventListener('click', () => {
-	sfx.click();
-	openResearch();
-});
-$('btn-nova').addEventListener('click', () => {
-	sfx.click();
-	openNova();
-});
-$('btn-menu').addEventListener('click', () => {
-	sfx.click();
-	openPause();
-});
-ui.goal.addEventListener('click', goToGoal);
-
-function goToGoal() {
-	sfx.click();
-	if (problemWhere) {
-		if (view !== 'planet' || pv.pi !== problemWhere.planet) toPlanet(problemWhere.planet);
-		const m = g.planets[problemWhere.planet].cells[problemWhere.cell];
-		if (m?.t === 'pad') openShips(problemWhere.planet);
-		else select(problemWhere.cell);
-		return;
-	}
-	const goal = currentGoal(g);
-	if (!goal) return;
-	const [kind, arg] = goal.where.split(':');
-	const pi = Number(arg);
-	if (kind === 'space') {
-		if (view !== 'space') toSpace();
-		const next = g.planets.findIndex((p) => !p.unlocked);
-		if (goal.id.startsWith('tap') || goal.id === 'ship') space.selected = 0;
-		else if (next > 0 && /^(glacia|verdance|solara|umbra|halcyon)$/.test(goal.id)) space.selected = next;
-		updateCard();
-	} else if (kind === 'planet') {
-		if (g.planets[pi].unlocked) toPlanet(pi);
-	} else if (kind === 'ships') {
-		openShips(g.planets[pi].unlocked ? pi : 0);
-	} else if (kind === 'research') {
-		if (g.unlocks.includes('research')) openResearch();
-	} else if (kind === 'prestige') openNova();
-}
-
-// ---------- input ----------
-
-const pointers = new Map<number, { x: number; y: number }>();
-/** Two-finger gesture: last finger distance and midpoint. */
-let pinch: { dist: number; x: number; y: number } | null = null;
-/** One-finger press on the space map: a tap on release, or a pan once it moves. */
-let spaceDrag: { id: number; x0: number; y0: number; x: number; y: number; moved: boolean; tap: boolean } | null = null;
-
-/** The camera for the current view. */
-function cam() {
-	return view === 'planet' ? pv : space;
-}
-
-function pinchState() {
-	const [a, b] = [...pointers.values()];
-	return { dist: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-}
-
-canvas.addEventListener('pointerdown', (e) => {
-	initAudio();
-	if (!started) return;
-	canvas.setPointerCapture?.(e.pointerId);
-	pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-	if (pointers.size === 2) {
-		spaceDrag = null;
-		// A second finger turns any drag into pinch + pan.
-		pv.pointerCancel();
-		pinch = pinchState();
-		return;
-	}
-	if (pointers.size > 2) return;
-	if (view === 'space') {
-		spaceDrag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, moved: false, tap: e.button === 0 };
-		return;
-	}
-	if (e.button === 1 || e.button === 2) pv.startPan(e.clientX, e.clientY, e.pointerId);
-	else pv.pointerDown(g, e.clientX, e.clientY, e.pointerId);
-});
-canvas.addEventListener('pointermove', (e) => {
-	if (!started) return;
-	if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-	if (pinch && pointers.size >= 2) {
-		const now = pinchState();
-		if (pinch.dist > 0) cam().zoomAt(now.dist / pinch.dist, now.x, now.y);
-		cam().panBy(now.x - pinch.x, now.y - pinch.y);
-		pinch = now;
-		return;
-	}
-	if (view === 'space' && spaceDrag?.id === e.pointerId) {
-		if (!spaceDrag.moved && Math.hypot(e.clientX - spaceDrag.x0, e.clientY - spaceDrag.y0) > 8) spaceDrag.moved = true;
-		if (spaceDrag.moved) space.panBy(e.clientX - spaceDrag.x, e.clientY - spaceDrag.y);
-		spaceDrag.x = e.clientX;
-		spaceDrag.y = e.clientY;
-		canvas.style.cursor = spaceDrag.moved ? 'grabbing' : canvas.style.cursor;
-		return;
-	}
-	if (view === 'planet') {
-		pv.pointerMove(g, e.clientX, e.clientY, e.pointerId);
-		if (e.pointerType !== 'mouse' && !pointers.has(e.pointerId)) pv.hover = null;
-	} else canvas.style.cursor = space.hit(g, e.clientX, e.clientY) !== -1 ? 'pointer' : 'default';
-});
-const up = (e: PointerEvent) => {
-	pointers.delete(e.pointerId);
-	if (pointers.size < 2) pinch = null;
-	if (!started) return;
-	if (view === 'space' && spaceDrag?.id === e.pointerId) {
-		const d = spaceDrag;
-		spaceDrag = null;
-		canvas.style.cursor = 'default';
-		if (!d.moved && d.tap) spaceTap(e.clientX, e.clientY);
-		return;
-	}
-	if (view === 'planet') {
-		pv.pointerUp(g, e.clientX, e.clientY, e.pointerId);
-		if (e.pointerType !== 'mouse') pv.hover = null;
-	}
-};
-canvas.addEventListener('pointerup', up);
-canvas.addEventListener('pointercancel', (e) => {
-	pointers.delete(e.pointerId);
-	if (pointers.size < 2) pinch = null;
-	spaceDrag = null;
-	pv.pointerCancel();
-});
-canvas.addEventListener('pointerleave', () => (pv.hover = null));
-canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-
-/** A mouse wheel moves in big notches; a trackpad sends many small, smooth deltas. */
-function isWheelNotch(e: WheelEvent) {
-	if (e.deltaMode !== 0) return true;
-	return e.deltaX === 0 && Math.abs(e.deltaY) >= 50 && Number.isInteger(e.deltaY);
-}
-
-canvas.addEventListener(
-	'wheel',
-	(e) => {
-		if (!started) return;
-		e.preventDefault();
-		if (e.ctrlKey) {
-			// Trackpad pinch (browsers send it as ctrl + wheel).
-			cam().zoomAt(Math.exp(-e.deltaY * 0.008), e.clientX, e.clientY);
-		} else if (isWheelNotch(e)) {
-			const step = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
-			cam().zoomAt(Math.exp(-Math.max(-120, Math.min(120, step)) * 0.0012), e.clientX, e.clientY);
-		} else {
-			// Two-finger trackpad scroll pans.
-			cam().panBy(-e.deltaX, -e.deltaY);
-			return;
-		}
-		if (view === 'planet') relayout();
-	},
-	{ passive: false },
-);
-
-// Safari sends trackpad pinch as gesture events instead of ctrl + wheel.
-let gestureScale = 1;
-canvas.addEventListener('gesturestart', (e) => {
-	e.preventDefault();
-	gestureScale = 1;
-});
-canvas.addEventListener('gesturechange', (e) => {
-	if (!started) return;
-	e.preventDefault();
-	const ge = e as unknown as { scale: number; clientX: number; clientY: number };
-	cam().zoomAt(ge.scale / gestureScale, ge.clientX, ge.clientY);
-	gestureScale = ge.scale;
-	if (view === 'planet') relayout();
-});
-
-function spaceTap(x: number, y: number) {
-	const hit = space.hit(g, x, y);
-	if (hit >= 0) {
-		const p = g.planets[hit];
-		if (p.unlocked) {
-			const v = sim.tap(g, hit);
-			const now = performance.now();
-			tapCombo = now - lastTapAt < 500 ? tapCombo + 1 : 0;
-			lastTapAt = now;
-			space.tapPlanet(hit, v, PLANETS[hit].color);
-			sfx.tap(tapCombo);
-			buzz(8);
-			bumpCredits();
-		} else sfx.click();
-		if (space.selected !== hit) {
-			space.selected = hit;
-			updateCard();
-		}
-	} else if (hit === -2) {
-		toast(`Home station. Cargo sells here. Income: ${fmt(sim.incomeRate())}/s`);
-	} else {
-		space.selected = -1;
-		updateCard();
-	}
-}
-
-function buzz(ms: number) {
-	if (g.settings.vibrate) navigator.vibrate?.(ms);
-}
-
-window.addEventListener('keydown', (e) => {
-	if (!started) {
-		if (e.key === 'Enter' && ui.title.hidden === false && !panelOpen()) startGame();
-		return;
-	}
-	if (panelOpen()) {
-		if (e.key === 'Escape' && !isLocked()) closePanel();
-		return;
-	}
-	const target = e.target as HTMLElement;
-	if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
-	if (e.key === 'Escape') {
-		if (view === 'planet') {
-			if (pv.tool) setTool(null);
-			else if (pv.selected !== null) select(null);
-			else toSpace();
-		} else openPause();
-		return;
-	}
-	if (e.key === 'Tab') {
-		e.preventDefault();
-		if (view === 'planet') toSpace();
-		else toPlanet(space.selected >= 0 && g.planets[space.selected].unlocked ? space.selected : 0);
-		return;
-	}
-	if (view !== 'planet') {
-		if (e.key === 'f' || e.key === 'F') space.resetCamera();
-		if (e.key === ' ' && space.selected >= 0 && g.planets[space.selected].unlocked) {
-			e.preventDefault();
-			const p = space.screenPos(space.selected);
-			spaceTap(p.x, p.y);
-		}
-		return;
-	}
-	const n = Number(e.key);
-	if (n >= 1 && n <= 9) {
-		const tools = availableTools();
-		const t = tools[n - 1];
-		if (t) setTool(pv.tool === t ? null : t);
-	}
-	if (e.key === '0') setTool(pv.tool === 'remove' ? null : 'remove');
-	if (e.key === 'r' || e.key === 'R') {
-		if (pv.selected !== null) {
-			sim.rotateAt(g, pv.pi, cellX(pv.selected), cellY(pv.selected));
-			sfx.click();
-		}
-	}
-	if ((e.key === 'Delete' || e.key === 'Backspace') && pv.selected !== null) inspectAct('remove');
-	if (e.key === 'u' || e.key === 'U') inspectAct('upgrade');
-	if (e.key === 'f' || e.key === 'F') {
-		pv.resetCamera();
-		relayout();
-	}
-});
-
-// ---------- toolbar ----------
-
-function availableTools(): MachineType[] {
-	const pi = pv.pi;
-	return BUILD_ORDER.filter((t) => sim.toolOnPlanet(g, pi, t));
-}
-
-const seenTools = new Set<string>(['drill', 'belt']);
-
-function updateToolbar() {
-	if (view !== 'planet') return;
-	const tools = availableTools();
-	const key = tools.join(',') + '|' + pv.pi;
-	if (key !== toolbarKey) {
-		toolbarKey = key;
-		ui.toolbar.innerHTML = '';
-		tools.forEach((t, i) => {
-			const b = document.createElement('button');
-			b.type = 'button';
-			b.className = 'tool';
-			b.dataset.tool = t;
-			b.title = `${MACHINES[t].name} (${i + 1})`;
-			b.setAttribute('aria-label', MACHINES[t].name);
-			b.append(machineIcon(t, 34));
-			b.insertAdjacentHTML('beforeend', `<span class="tool__name">${MACHINES[t].short}</span><span class="tool__cost"></span>`);
-			if (!seenTools.has(t) && g.stats.playTime > 5) b.classList.add('is-new');
-			ui.toolbar.append(b);
-		});
-		const r = document.createElement('button');
-		r.type = 'button';
-		r.className = 'tool tool--remove';
-		r.dataset.tool = 'remove';
-		r.title = 'Remove (0)';
-		r.innerHTML = `<span class="tool__x"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13" /></svg></span><span class="tool__name">Remove</span><span class="tool__cost">refund</span>`;
-		ui.toolbar.append(r);
-		requestAnimationFrame(relayout);
-	}
-	for (const b of ui.toolbar.querySelectorAll<HTMLElement>('.tool')) {
-		const t = b.dataset.tool as MachineType | 'remove';
-		b.classList.toggle('is-active', pv.tool === t);
-		b.setAttribute('aria-pressed', String(pv.tool === t));
-		if (t === 'remove') continue;
-		const cost = sim.buildCost(g, pv.pi, t);
-		const el = b.querySelector('.tool__cost')!;
-		const txt = fmt(cost);
-		if (el.textContent !== txt) el.textContent = txt;
-		b.classList.toggle('is-poor', g.credits < cost);
-	}
-}
-
-ui.toolbar.addEventListener('click', (e) => {
-	const b = (e.target as HTMLElement).closest<HTMLElement>('.tool');
-	if (!b) return;
-	const t = b.dataset.tool as Tool;
-	b.classList.remove('is-new');
-	if (t) seenTools.add(t);
-	setTool(pv.tool === t ? null : t);
-});
-
-function setTool(t: Tool) {
-	pv.tool = t;
-	if (t) select(null);
-	sfx.click();
-	updateToolbar();
-}
-
-// ---------- inspect card ----------
-
-function select(c: number | null) {
-	pv.selected = c;
-	if (c !== null) pv.tool = null;
-	updateToolbar();
-	updateInspect();
-}
-
-function updateInspect() {
-	const c = pv.selected;
-	const m = c !== null && view === 'planet' ? g.planets[pv.pi].cells[c] : null;
-	if (!m || c === null) {
-		ui.inspect.hidden = true;
-		ui.toolbar.classList.remove('is-under');
-		if (c !== null) pv.selected = null;
-		return;
-	}
-	ui.toolbar.classList.add('is-under');
-	const def = MACHINES[m.t];
-	const p = g.planets[pv.pi];
-	const boost = sim.boostAt(p, c, pv.pi);
-	const crew = sim.crewOf(p);
-	const crewMult = m.t === 'drill' ? crew.drill : crew.machine;
-	let stats = '';
-	let desc = def.desc;
-	if (m.t === 'drill') {
-		const ore = tilesOf(pv.pi, g.blasted[pv.pi])[c] === TILE_ORE;
-		stats = `<span>Digs <b>${((levelSpeed(m.lv) * boost * crewMult) / def.time).toFixed(2)}</b>/s</span>`;
-		if (!ore) desc = 'This drill is not on ore.';
-	} else if (m.t === 'belt') {
-		const sp = beltSpeed(g.research.belt, !!g.perks.belts);
-		stats = `<span>Speed <b>${sp.toFixed(1)}</b> tiles/s</span><span>Carries up to <b>${(sp * 2).toFixed(1)}</b>/s</span>`;
-		desc = 'Tap Turn, or drag a new line over it. Research Mag Belts for speed.';
-	} else if (m.t === 'bridge') {
-		const span = m.link !== undefined ? sim.bridgeSpan(c, m.link) : 0;
-		desc = m.end ? 'Items land here from the other end, then go on.' : 'Items go in here and hop to the other end.';
-		const over = Math.max(0, span - 1);
-		stats = `<span>Hops over <b>${over}</b> tile${over === 1 ? '' : 's'}</span>`;
-	} else if (m.t === 'cross') {
-		stats = '';
-	} else if (m.t === 'pad') {
-		const cap = sim.padCap(p);
-		stats = `<span>Stock <b>${p.pad.length}</b>/${cap}</span><span>Ships <b>${p.ships.length}</b></span>`;
-	} else if (m.t === 'pylon') {
-		stats = `<span>Boost <b>+${Math.round(pylonBoost(m.lv) * 100)}%</b> to the 8 tiles around</span>`;
-	} else {
-		const jobs = (levelSpeed(m.lv) * boost * crewMult) / def.time;
-		stats = `<span>Makes <b>${(jobs * def.outCount).toFixed(2)}</b>/s</span><span>Holds <b>${m.inb.length}</b> in</span>`;
-	}
-	if (boost > 1 && m.t !== 'pylon') stats += `<span>Pylon <b>+${Math.round((boost - 1) * 100)}%</b></span>`;
-	if (crewMult > 1 && def.time > 0) stats += `<span>Crew <b>+${Math.round((crewMult - 1) * 100)}%</b></span>`;
-	// Blocked lines: say why, and offer a way out.
-	const blocks = pv.blocks;
-	const dead = blocks.find((b): b is Extract<sim.Block, { kind: 'dead' }> => b.kind === 'dead' && b.cell === c);
-	const slowHere = blocks.some((b) => b.kind === 'slow' && b.cell === c);
-	const held = blocks.find((b) => b.from === c && b.cell !== c);
-	let warn = '';
-	let fixBtn = '';
-	inspectGoto = -1;
-	if (dead) {
-		if (sim.fixDir(g, pv.pi, c) !== null) {
-			warn = `Blocked: it ${dead.why}.`;
-			fixBtn = '<button class="btn btn--small btn--fix" data-act="fix">Fix</button>';
-		} else warn = `Blocked: it ${dead.why}, and no side is open. Lay a belt next to it.`;
-	} else if (slowHere && m.t === 'pad') {
-		if (p.pad.length >= sim.padCap(p)) warn = 'Pad is full. Buy ships or cargo space.';
-	} else if (slowHere) warn = 'Backed up: items come in faster than it works. Upgrade it or build another.';
-	else if (held) {
-		const what = g.planets[pv.pi].cells[held.cell]!;
-		warn = held.kind === 'dead' ? 'Blocked: the line ends in a dead end.' : `Waiting: the ${MACHINES[what.t].short.toLowerCase()} down the line can't keep up.`;
-		inspectGoto = held.cell;
-		fixBtn = '<button class="btn btn--small btn--fix" data-act="goto">Show</button>';
-	}
-	const canUp = def.maxLv > 1;
-	const maxed = m.lv >= def.maxLv;
-	const upCost = canUp && !maxed ? sim.machineUpCost(pv.pi, m) : 0;
-	const lvText = canUp ? `<small>Level ${m.lv}${maxed ? ' (max)' : ''}</small>` : '';
-	const buttons =
-		m.t === 'pad'
-			? `${fixBtn}<button class="btn btn--small" data-act="ships">Ships</button>`
-			: `${fixBtn}${canUp ? `<button class="btn btn--small" data-act="upgrade" ${!maxed && g.credits >= upCost ? '' : 'disabled'}>${maxed ? 'Max level' : `Upgrade ${fmt(upCost)}`}</button>` : ''}
-				${m.t !== 'pylon' && m.t !== 'cross' && m.t !== 'bridge' ? '<button class="btn btn--small btn--ghost" data-act="rotate">Turn</button>' : ''}
-				<button class="btn btn--small btn--danger" data-act="remove">Remove</button>`;
-	const html = `<div class="inspect__head"><b style="color:${def.color}">${def.name}</b>${lvText}<button class="inspect__close" data-act="close" aria-label="Close">×</button></div><p>${desc}</p>${warn ? `<p class="inspect__warn${dead || held?.kind === 'dead' ? '' : ' is-slow'}">${warn}</p>` : ''}<div class="inspect__stats">${stats}</div><div class="inspect__row">${buttons}</div>`;
-	if (ui.inspect.dataset.html !== html) {
-		ui.inspect.dataset.html = html;
-		ui.inspect.innerHTML = html;
-	}
-	ui.inspect.hidden = false;
-}
-
-ui.inspect.addEventListener('click', (e) => {
-	const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-act]');
-	if (!b || b.disabled) return;
-	inspectAct(b.dataset.act!);
-});
-
-function inspectAct(act: string) {
-	const c = pv.selected;
-	if (c === null) return;
-	const x = cellX(c);
-	const y = cellY(c);
-	if (act === 'upgrade') {
-		if (sim.upgradeMachine(g, pv.pi, x, y)) {
-			sfx.upgrade();
-			buzz(12);
-			const s = pv.cellCenter(c);
-			const m = g.planets[pv.pi].cells[c]!;
-			burstUpgrade(s.x, s.y, MACHINES[m.t].color);
-		} else sfx.error();
-	} else if (act === 'rotate') {
-		sim.rotateAt(g, pv.pi, x, y);
-		sfx.click();
-	} else if (act === 'fix') {
-		if (sim.fixAt(g, pv.pi, c)) {
-			sfx.place();
-			const s = pv.cellCenter(c);
-			popupAt(s.x, s.y, 'Fixed', '#9dffb0');
-		} else sfx.error();
-	} else if (act === 'goto') {
-		if (inspectGoto >= 0) {
-			sfx.click();
-			select(inspectGoto);
-		}
-		return;
-	} else if (act === 'remove') {
-		const refund = sim.removeAt(g, pv.pi, x, y);
-		if (refund > 0 || g.planets[pv.pi].cells[c] === null) {
-			sfx.remove();
-			const s = pv.cellCenter(c);
-			popupAt(s.x, s.y, '+' + fmt(refund), '#9dffb0');
-			select(null);
-		}
-	} else if (act === 'ships') openShips(pv.pi);
-	else if (act === 'close') select(null);
-	updateInspect();
-	updateToolbar();
-}
-
-function burstUpgrade(x: number, y: number, color: string) {
-	ring(x, y, color, 8, 140, 0.5);
-	burst(x, y, color, 18, 220, { size: 3, life: 0.6 });
-	burst(x, y, '#ffffff', 6, 120, { size: 2, life: 0.4 });
-	popup(x, y - 26, 'LEVEL UP', '#ffffff', 14);
-}
-function popupAt(x: number, y: number, text: string, color: string) {
-	popup(x, y, text, color, 13);
-}
-
-// ---------- planet card (space view) ----------
-
-function updateCard() {
-	const i = space.selected;
-	if (view !== 'space' || i < 0 || !started) {
-		ui.card.hidden = true;
-		return;
-	}
-	const def = PLANETS[i];
-	const p = g.planets[i];
-	let html: string;
-	if (p.unlocked) {
-		const drills = sim.countOf(g, i, 'drill');
-		const rate = space.rate[i] / 12;
-		const sub = rate > 0.05 ? `${fmt(rate)}/s` : drills ? 'Starting up' : 'No factory yet';
-		const badge = sim.planetBadge(g, i);
-		const flag =
-			badge === 'warn' ? ' ⚠ Stalled' : badge === 'full' ? ' 📦 Pad full' : badge === 'survey' ? ' 🗺 Land for sale' : '';
-		const tip = drills === 0 ? 'Tap the planet to mine by hand. Open it to build drills.' : `${drills} drill${drills > 1 ? 's' : ''}, ${p.ships.length} ship${p.ships.length > 1 ? 's' : ''}. Each tap mines ${fmt(sim.tapValue(g, i))}.${flag}`;
-		html = `<div class="card__head"><span class="card__dot" style="color:${def.color}"></span><span class="card__title">${def.name}</span><span class="card__sub">${def.ore}<br>${sub}</span></div>
-			<p>${tip}</p>
-			<div class="card__row"><button class="btn" data-act="open" id="card-open">Open factory</button>${g.unlocks.includes('ships') ? `<button class="btn btn--ghost" data-act="ships">Ships</button>` : ''}${g.unlocks.includes('crew') ? `<button class="btn btn--ghost" data-act="crew">Crew</button>` : ''}</div>`;
-	} else {
-		const can = g.credits >= def.unlock;
-		const machine = def.newMachine ? MACHINES[def.newMachine].name : '';
-		const pct = Math.min(100, (g.credits / def.unlock) * 100);
-		html = `<div class="card__head"><span class="card__dot" style="color:${def.color}"></span><span class="card__title">${def.name}</span><span class="card__sub">New ore: ${def.ore}</span></div>
-			<p>Ore here sells for <b>${def.value}x</b> Cinder ore.${machine ? ` Unlocks the <b>${machine}</b>.` : ''}</p>
-			<div class="goal__bar" style="margin-bottom:10px"><i style="width:${pct}%"></i></div>
-			<div class="card__row"><button class="btn ${can ? 'btn--gold' : ''}" data-act="unlock" ${can ? '' : 'disabled'}>Unlock ${fmt(def.unlock)}</button></div>`;
-	}
-	if (ui.card.dataset.html !== html) {
-		ui.card.dataset.html = html;
-		ui.card.innerHTML = html;
-	}
-	ui.card.hidden = false;
-}
-
-ui.card.addEventListener('click', (e) => {
-	const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-act]');
-	if (!b || b.disabled) return;
-	const i = space.selected;
-	if (b.dataset.act === 'open') toPlanet(i);
-	if (b.dataset.act === 'ships') openShips(i);
-	if (b.dataset.act === 'crew') openCrew(i);
-	if (b.dataset.act === 'unlock') {
-		if (sim.unlockPlanet(g, i)) {
-			sfx.unlock();
-			buzz(30);
-			const p = space.screenPos(i);
-			ring(p.x, p.y, PLANETS[i].color, p.r, 300, 1);
-			ring(p.x, p.y, '#ffffff', p.r * 0.6, 200, 0.7);
-			burst(p.x, p.y, PLANETS[i].color, 40, 300, { size: 4, life: 1 });
-			flash = 0.6;
-			toastUnlock(`${PLANETS[i].name} unlocked`, `New ore: ${PLANETS[i].ore}. Open it to build.`);
-			checkProgress(g);
-			saveGame(g);
-			updateCard();
-		} else sfx.error();
-	}
-});
-
-// ---------- HUD and goal bar ----------
-
-function bumpCredits() {
-	ui.credits.classList.add('is-bump');
-	setTimeout(() => ui.credits.classList.remove('is-bump'), 120);
-}
-
-function updateHud() {
-	const txt = fmt(shownCredits);
-	if (ui.credits.textContent !== txt) ui.credits.textContent = txt;
-	const inc = `${fmt(sim.incomeRate())} / s`;
-	if (ui.income.textContent !== inc) ui.income.textContent = inc;
-	ui.dust.hidden = g.stardust <= 0;
-	ui.dustN.textContent = String(g.stardust);
-	ui.research.hidden = !g.unlocks.includes('research');
-	ui.nova.hidden = !g.unlocks.includes('prestige');
-	ui.crew.hidden = !g.unlocks.includes('crew');
-	ui.nova.classList.toggle('is-ready', sim.canPrestige(g) && sim.prestigeGain(g) >= Math.max(1, g.stardust));
-	if (view === 'planet' && started) updatePlanetHeader();
-}
-
-function updateGoal() {
-	const goal = currentGoal(g);
-	const prob = g.tutorial >= 99 ? sim.findProblem(g) : null;
-	problemWhere = prob ? { planet: prob.planet, cell: prob.cell, kind: prob.kind } : null;
-	if (prob) {
-		ui.goal.classList.add('is-warn');
-		ui.goal.classList.toggle('is-slow', prob.kind === 'slow');
-		ui.goalTag.textContent = prob.kind === 'slow' ? 'Slow' : 'Fix';
-		const hint = prob.kind === 'pad' ? 'Tap to open ships' : 'Tap to jump there';
-		const text = `${prob.text} · ${hint}`;
-		if (ui.goalText.textContent !== text) ui.goalText.textContent = text;
-		ui.goalFill.style.width = '0%';
-		return;
-	}
-	ui.goal.classList.remove('is-warn', 'is-slow');
-	if (!goal) {
-		ui.goalTag.textContent = 'Done';
-		ui.goalText.textContent = g.beaconLit ? 'The beacon is lit. Go nova to grow faster.' : 'All goals done!';
-		ui.goalFill.style.width = '100%';
-		return;
-	}
-	const [have, want] = goal.progress(g);
-	let text = goal.text;
-	const planetIdx = PLANETS.findIndex((p) => goal.id === p.name.toLowerCase());
-	if (planetIdx > 0) {
-		const cost = PLANETS[planetIdx].unlock;
-		text = `${goal.text} · ${fmt(Math.min(g.credits, cost))} / ${fmt(cost)}`;
-		ui.goalFill.style.width = `${Math.min(100, (g.credits / cost) * 100)}%`;
-	} else {
-		if (want > 1) {
-			text += ` (${fmt(have)}/${fmt(want)})`;
-			if (have < want && goal.where.startsWith('planet') && g.credits < sim.buildCost(g, Number(goal.where.split(':')[1]) || 0, 'drill')) {
-				const pi = Number(goal.where.split(':')[1] || 0);
-				text += ` · need ${fmt(sim.buildCost(g, pi, 'drill'))} for next drill`;
-			}
-		}
-		ui.goalFill.style.width = `${(have / want) * 100}%`;
-	}
-	ui.goalTag.textContent = `Next ${g.goals.length + 1}/${GOALS.length}`;
-	if (ui.goalText.textContent !== text) ui.goalText.textContent = text;
-}
-
-// ---------- toasts ----------
-
-function toast(text: string, kind = '') {
-	const el = document.createElement('div');
-	el.className = `toast ${kind ? 'toast--' + kind : ''}`;
-	el.textContent = text;
-	pushToast(el, 2.2);
-}
-
-function toastUnlock(title: string, text: string) {
-	const el = document.createElement('div');
-	el.className = 'toast toast--unlock';
-	el.innerHTML = `<strong></strong><span></span>`;
-	el.querySelector('strong')!.textContent = title;
-	el.querySelector('span')!.textContent = text;
-	pushToast(el, 3.6);
-}
-
-function pushToast(el: HTMLElement, life: number) {
-	el.style.setProperty('--life', `${life}s`);
-	ui.toasts.append(el);
-	while (ui.toasts.children.length > 3) ui.toasts.firstElementChild!.remove();
-	setTimeout(() => el.remove(), (life + 0.5) * 1000);
-}
-
-// ---------- tutorial ----------
-
-function coach(text: string | null, target?: HTMLElement | { x: number; y: number; h?: number } | null, anchor?: HTMLElement) {
-	document.querySelectorAll('.is-coach').forEach((el) => el.classList.remove('is-coach'));
-	if (!text) {
-		ui.coach.hidden = true;
-		return;
-	}
-	if (ui.coachText.textContent !== text) {
-		ui.coachText.textContent = text;
-		ui.coach.hidden = true;
-	}
-	ui.coach.hidden = false;
-	let tx = W / 2;
-	let ty = H / 2;
-	let th = 0;
-	if (target instanceof HTMLElement) {
-		target.classList.add('is-coach');
-		const r = (anchor ?? target).getBoundingClientRect();
-		tx = r.left + r.width / 2;
-		ty = r.top;
-		th = r.height;
-	} else if (target) {
-		tx = target.x;
-		ty = target.y;
-		th = target.h ?? 0;
-	}
-	const bw = ui.coach.offsetWidth;
-	const bh = ui.coach.offsetHeight;
-	const left = Math.max(10, Math.min(W - bw - 10, tx - bw / 2));
-	const below = ty + th / 2 < H * 0.5;
-	const top = below ? ty + th + 14 : ty - bh - 14;
-	ui.coach.style.left = `${left}px`;
-	ui.coach.style.top = `${Math.max(10, Math.min(H - bh - 10, top))}px`;
-}
-
-$('coach-skip').addEventListener('click', () => {
-	g.tutorial = 99;
-	coach(null);
-	pv.highlight = [];
-	space.pointAt = -1;
-	sfx.click();
-});
-
-function updateTutorial() {
-	pv.highlight = [];
-	space.pointAt = -1;
-	if (g.tutorial >= 99 || panelOpen()) {
-		coach(null);
-		return;
-	}
-	const p0 = g.planets[0];
-	const drills = sim.countOf(g, 0, 'drill');
-	const step = g.tutorial;
-	const advance = (n: number) => {
-		g.tutorial = n;
-	};
-	if (step === 0) {
-		if (g.stats.taps >= 8 && g.credits >= sim.buildCost(g, 0, 'drill')) advance(1);
-		else if (view === 'space') {
-			space.pointAt = 0;
-			const p = space.screenPos(0);
-			coach(g.stats.taps === 0 ? 'Tap Cinder to mine ore. Each tap earns credits.' : `Keep tapping! A drill costs ${fmt(sim.buildCost(g, 0, 'drill'))}.`, { x: p.x, y: p.y - p.r, h: p.r * 2 + 36 });
-		} else coach(null);
-		return;
-	}
-	if (step === 1) {
-		if (view === 'planet' && pv.pi === 0) return advance(2);
-		if (view === 'space') {
-			if (space.selected !== 0) {
-				space.selected = 0;
-				updateCard();
-			}
-			const btn = document.getElementById('card-open');
-			if (btn) coach('You can afford a drill. Open Cinder to build your first factory.', btn, ui.card);
-		}
-		return;
-	}
-	if (view !== 'planet' || pv.pi !== 0) {
-		if (step <= 4 && drills === 0) return advance(1);
-		if (step <= 4) {
-			coach('Open Cinder to keep building.', null);
-			return;
-		}
-	}
-	if (step === 2) {
-		if (drills > 0) return advance(4);
-		if (pv.tool === 'drill') return advance(3);
-		coach('Pick the Drill.', ui.toolbar.querySelector<HTMLElement>('[data-tool="drill"]'), ui.pvTop);
-		return;
-	}
-	if (step === 3) {
-		if (drills > 0) return advance(4);
-		if (pv.tool !== 'drill') return advance(2);
-		const tiles = tilesOf(0);
-		const pad = p0.cells.findIndex((m) => m?.t === 'pad');
-		const ores = [...tiles.keys()].filter((i) => tiles[i] === TILE_ORE && !p0.cells[i]);
-		ores.sort((a, b) => dist(a, pad) - dist(b, pad));
-		pv.highlight = ores.slice(0, 3);
-		const c = pv.cellCenter(ores[0]);
-		coach('Tap a glowing ore tile to place the drill.', { x: c.x, y: c.y - pv.ts * 0.5, h: pv.ts });
-		return;
-	}
-	if (step === 4) {
-		if (pv.tool && pv.tool !== 'belt' && sim.countOf(g, 0, 'belt') === 0) {
-			coach('Pick the Belt. Then drag from the drill to the launch pad.', ui.toolbar.querySelector<HTMLElement>('[data-tool="belt"]'), ui.pvTop);
-			return;
-		}
-		const flowing = p0.pad.length > 0 || g.stats.flights > 0 || p0.ships.some((s) => s.cargo.length > 0 || s.ph !== 0);
-		if (flowing) return advance(5);
-		const drill = p0.cells.findIndex((m) => m?.t === 'drill');
-		const pad = p0.cells.findIndex((m) => m?.t === 'pad');
-		pv.highlight = [drill, pad];
-		const c = pv.cellCenter(pad);
-		const dc = pv.cellCenter(drill);
-		const belts = sim.countOf(g, 0, 'belt');
-		coach(belts === 0 ? 'Now drag from the drill to the launch pad. Belts follow your finger.' : 'Connect the belts to the launch pad (the round pad). Arrows show the way items move.', { x: (c.x + dc.x) / 2, y: Math.min(c.y, dc.y) - pv.ts * 0.5, h: Math.abs(c.y - dc.y) + pv.ts });
-		return;
-	}
-	if (step === 5) {
-		if (view === 'space') return advance(6);
-		if (g.stats.flights > 0) return advance(6);
-		coach('Ore is on its way! Ships fly it home to sell. Go back to watch.', $('btn-back'));
-		return;
-	}
-	if (step === 6) {
-		if (g.stats.flights > 0 || g.goals.includes('ship')) {
-			advance(7);
-			tutorialEndAt = time + 7;
-			return;
-		}
-		if (view === 'space') {
-			{
-				const h = space.screenHome();
-				coach('Your ship is flying home. Each landing sells the cargo.', { x: h.x, y: h.y - h.r, h: h.r * 3 });
-			}
-		} else coach(null);
-		return;
-	}
-	if (step === 7) {
-		coach('Nice! Tap the NEXT bar at the top any time to see what to do.', { x: W / 2, y: H * 0.62, h: 0 });
-		if (time > tutorialEndAt) advance(99);
-	}
-}
-let tutorialEndAt = 0;
-
-function dist(a: number, b: number) {
-	return Math.abs(cellX(a) - cellX(b)) + Math.abs(cellY(a) - cellY(b));
-}
-
 // ---------- prestige ----------
 
 function doPrestige() {
 	sfx.warp();
-	flash = 1.4;
+	session.flash = 1.4;
 	setTimeout(() => {
-		g = sim.prestige(g);
+		session.g = prestige(session.g);
 		afterLoad();
-		saveGame(g);
-		toastUnlock('Nova Reset', `You now have ✦ ${g.stardust} stardust. Spend it on perks in the Nova panel.`);
+		saveGame(session.g);
+		toastUnlock('Nova Reset', `You now have ✦ ${session.g.stardust} stardust. Spend it on perks in the Nova panel.`);
 		updateHud();
 	}, 700);
 }
@@ -1131,12 +88,12 @@ function doPrestige() {
 // ---------- events from the game ----------
 
 function handleEvents() {
-	for (const e of sim.events) {
+	for (const e of events) {
 		switch (e.type) {
 			case 'sold':
-				if (view === 'space') {
+				if (session.view === 'space') {
 					space.onSold(e.planet, e.amount);
-					sfx.land(e.amount > sim.incomeRate() * 5);
+					sfx.land(e.amount > incomeRate() * 5);
 				} else {
 					space.rate[e.planet] += e.amount;
 					sfx.coin();
@@ -1144,22 +101,22 @@ function handleEvents() {
 				bumpCredits();
 				break;
 			case 'made':
-				if (view === 'planet' && e.planet === pv.pi) pv.onMade(e.cell, e.t);
+				if (session.view === 'planet' && e.planet === pv.pi) pv.onMade(e.cell, e.t);
 				break;
 			case 'depart':
-				if (view === 'space') space.onDepart(e.planet);
+				if (session.view === 'space') space.onDepart(e.planet);
 				else if (e.planet === pv.pi) {
 					pv.onShip('up');
 					sfx.depart();
 				}
 				break;
 			case 'dock':
-				if (view === 'planet' && e.planet === pv.pi) pv.onShip('down');
+				if (session.view === 'planet' && e.planet === pv.pi) pv.onShip('down');
 				break;
 			case 'unlock':
 				toastUnlock(e.title, e.text);
 				sfx.unlock();
-				toolbarKey = '';
+				markToolbarStale();
 				updateToolbar();
 				updateHud();
 				break;
@@ -1178,7 +135,7 @@ function handleEvents() {
 			}
 		}
 	}
-	sim.events.length = 0;
+	events.length = 0;
 }
 
 // ---------- main loop ----------
@@ -1189,47 +146,47 @@ function frame(now: number) {
 	requestAnimationFrame(frame);
 	let dt = (now - last) / 1000;
 	last = now;
-	if (dt > 3 && started && !crashed && !isPaused()) {
+	if (dt > 3 && session.started && !crashed && !isPaused()) {
 		// The tab slept: run the time away like an offline return.
 		runAway(dt);
 		dt = 0;
 	}
 	dt = Math.min(dt, 0.1);
-	time += dt;
+	session.time += dt;
 
 	if (crashed) {
 		// Nothing runs; the last state is still drawn under the crash panel.
-	} else if (started && !isPaused()) {
+	} else if (session.started && !isPaused()) {
 		let left = dt * devSpeed;
 		while (left > 1e-6) {
 			const step = Math.min(left, 1 / 30);
-			sim.tick(g, step);
+			tick(session.g, step);
 			left -= step;
 		}
 		progressTimer += dt;
 		if (progressTimer > 0.25) {
 			progressTimer = 0;
-			checkProgress(g);
+			checkProgress(session.g);
 		}
 		handleEvents();
 		saveTimer += dt;
 		if (saveTimer > 10) {
 			saveTimer = 0;
-			saveGame(g);
+			saveGame(session.g);
 		}
-	} else if (demo) {
-		for (const p of demo.planets) while (p.pad.length < 30) p.pad.push(0);
-		sim.setEvents(false);
-		sim.tick(demo, dt);
+	} else if (session.demo) {
+		for (const p of session.demo.planets) while (p.pad.length < 30) p.pad.push(0);
+		setEvents(false);
+		tick(session.demo, dt);
 	}
 
 	// credits count up smoothly, and drop at once when spent
-	if (g.credits < shownCredits) shownCredits = g.credits;
-	else shownCredits += (g.credits - shownCredits) * Math.min(1, dt * 12);
-	if (Math.abs(g.credits - shownCredits) < 0.5) shownCredits = g.credits;
+	if (session.g.credits < session.shownCredits) session.shownCredits = session.g.credits;
+	else session.shownCredits += (session.g.credits - session.shownCredits) * Math.min(1, dt * 12);
+	if (Math.abs(session.g.credits - session.shownCredits) < 0.5) session.shownCredits = session.g.credits;
 
 	uiTimer += dt;
-	if (uiTimer > 0.2 && started && !crashed) {
+	if (uiTimer > 0.2 && session.started && !crashed) {
 		uiTimer = 0;
 		updateHud();
 		updateGoal();
@@ -1246,25 +203,25 @@ function frame(now: number) {
 }
 
 function render(dt: number) {
-	ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+	ctx.setTransform(session.dpr, 0, 0, session.dpr, 0, 0);
 	ctx.fillStyle = '#070a14';
-	ctx.fillRect(0, 0, W, H);
+	ctx.fillRect(0, 0, session.W, session.H);
 	stepFx(dt);
-	const game = demo ?? g;
-	if (view === 'space' || !started) {
-		space.draw(ctx, game, time, dt);
+	const game = session.demo ?? session.g;
+	if (session.view === 'space' || !session.started) {
+		space.draw(ctx, game, session.time, dt);
 	} else {
-		space.draw(ctx, demo ?? g, time, 0);
+		space.draw(ctx, session.demo ?? session.g, session.time, 0);
 		ctx.fillStyle = 'rgba(5,7,15,0.72)';
-		ctx.fillRect(0, 0, W, H);
-		pv.draw(ctx, g, time, dt);
-		pv.drawLabels(ctx, g);
+		ctx.fillRect(0, 0, session.W, session.H);
+		pv.draw(ctx, session.g, session.time, dt);
+		pv.drawLabels(ctx, session.g);
 	}
 	drawFx(ctx);
-	if (flash > 0) {
-		ctx.fillStyle = `rgba(255,255,255,${Math.min(0.9, flash * 0.6)})`;
-		ctx.fillRect(0, 0, W, H);
-		flash = Math.max(0, flash - dt * 1.6);
+	if (session.flash > 0) {
+		ctx.fillStyle = `rgba(255,255,255,${Math.min(0.9, session.flash * 0.6)})`;
+		ctx.fillRect(0, 0, session.W, session.H);
+		session.flash = Math.max(0, session.flash - dt * 1.6);
 	}
 }
 
@@ -1296,24 +253,31 @@ window.addEventListener('unhandledrejection', (e) => {
 
 document.addEventListener('visibilitychange', () => {
 	if (document.hidden) {
-		if (started && !crashed) saveGame(g);
+		if (session.started && !crashed) saveGame(session.g);
 		suspendAudio(true);
 	} else {
 		suspendAudio(false);
 		last = performance.now();
 		// Time away counts even if a menu was open when the player left.
-		if (started && !crashed) {
-			const away = (Date.now() - g.savedAt) / 1000;
+		if (session.started && !crashed) {
+			const away = (Date.now() - session.g.savedAt) / 1000;
 			if (away > 3) runAway(away);
 		}
 	}
 });
-window.addEventListener('pagehide', () => started && !crashed && saveGame(g));
+window.addEventListener('pagehide', () => session.started && !crashed && saveGame(session.g));
 window.addEventListener('resize', resize);
 window.visualViewport?.addEventListener('resize', resize);
 
 // ---------- boot ----------
 
+initScreens();
+initHud();
+initInput();
+initToolbar();
+initInspect();
+initPlanetCard();
+initTutorial();
 setupPwa();
 resize();
 showTitle();
@@ -1321,4 +285,4 @@ applySettings();
 requestAnimationFrame(frame);
 
 // Dev only, for quick checks in the console: window.__game(), window.__speed(n) to run faster.
-if (import.meta.env.DEV) Object.assign(window, { __game: () => g, __speed: (n: number) => (devSpeed = n), __sim: sim, __open: (i: number) => toPlanet(i), __pv: pv });
+if (import.meta.env.DEV) Object.assign(window, { __game: () => session.g, __speed: (n: number) => (devSpeed = n), __open: (i: number) => toPlanet(i), __pv: pv });

@@ -1,10 +1,11 @@
 // Every planet map must pass the ore access and plot rules.
 // Run: npm run test:tiles
 
-import { PLANETS, TILE_ORE, TILE_ROCK } from '../src/core/data.ts';
+import { PLANETS } from '../src/content/planets.ts';
+import { TILE_ORE, TILE_ROCK } from '../src/core/tiles.ts';
 import { PLOTS } from '../src/core/grid.ts';
 import { oreClusterSizes, plotIssues, validatePlanetTiles } from '../src/core/tile-access.ts';
-import { baseTilesOf, clearPlanetTileCache } from '../src/core/state.ts';
+import { baseTilesOf, clearPlanetTileCache } from '../src/core/planet-map.ts';
 
 clearPlanetTileCache();
 let failed = 0;

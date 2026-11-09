@@ -4,7 +4,8 @@
 // 2. At least one of those ground cells is reachable from the pad on ground only.
 // 3. Each plot keeps its edge doors open and its ground in one piece, so any owned land can be crossed.
 
-import { DX, DY, TILE_GROUND, TILE_ORE } from './data.ts';
+import { DX, DY } from './direction.ts';
+import { TILE_GROUND, TILE_ORE } from './tiles.ts';
 import { MAX_CELLS, MAX_COLS, MAX_ROWS, PLOT, STRIDE, cellIdx, plotBounds, plotCells } from './grid.ts';
 
 export type OreAccessIssue = { cell: number; reason: 'no-exit' | 'no-path' };

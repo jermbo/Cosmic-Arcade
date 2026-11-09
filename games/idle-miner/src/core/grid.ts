@@ -1,8 +1,10 @@
 // Cell indexing and land plots. A planet is a square of 6×6 plots around a center plot;
 // players start with the center and buy plots next to ones they own.
 
-import { PLANETS, TILE_ORE } from './data.ts';
-import type { PlanetState } from './state.ts';
+import { PLOT_PRICE } from '../content/land.ts';
+import { PLANETS } from '../content/planets.ts';
+import { TILE_ORE } from './tiles.ts';
+import type { PlanetState } from './game.ts';
 
 /** Tiles per plot side. */
 export const PLOT = 6;
@@ -90,7 +92,6 @@ export function plotBounds(plot: number): Bounds {
 }
 
 export function ownedPlots(p: PlanetState): number[] {
-	if (!p.plots?.length) p.plots = [CENTER_PLOT];
 	return p.plots;
 }
 
@@ -126,8 +127,8 @@ export function buyablePlots(p: PlanetState): number[] {
 
 export function plotCost(pi: number, bought: number): number {
 	const def = PLANETS[pi];
-	const anchor = Math.max(def.unlock, 400);
-	return Math.ceil(anchor * def.value * 0.55 * Math.pow(1.9, bought));
+	const anchor = Math.max(def.unlock, PLOT_PRICE.minUnlock);
+	return Math.ceil(anchor * def.value * PLOT_PRICE.share * Math.pow(PLOT_PRICE.growth, bought));
 }
 
 /** Price of the next plot on this planet. */

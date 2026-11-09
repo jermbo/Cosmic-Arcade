@@ -2,13 +2,36 @@
 // Run: node tools/bot.ts [minutes] [tapsPerSecond]
 // It prints when each goal and unlock happens, and flags long gaps.
 
-import { BUF_IN, DX, DY, MACHINES, PERKS, PLANETS, TILE_ORE, TILE_ROCK, opposite } from '../src/core/data.ts';
+import { BUF_IN, MACHINES } from '../src/content/machines.ts';
+import type { MachineType } from '../src/content/machines.ts';
+import { PERKS } from '../src/content/perks.ts';
+import type { PerkId } from '../src/content/perks.ts';
+import { PLANETS } from '../src/content/planets.ts';
+import { RESEARCH } from '../src/content/research.ts';
+import type { ResearchId } from '../src/content/research.ts';
+import { SHIP_UPS } from '../src/content/ships.ts';
+import type { ShipUpgrade } from '../src/content/ships.ts';
+import { DX, DY, opposite } from '../src/core/direction.ts';
+import type { Dir } from '../src/core/direction.ts';
+import { TILE_ORE, TILE_ROCK } from '../src/core/tiles.ts';
 import { STRIDE, buyablePlots, countOreInCells, nextPlotCost, ownedBounds, plotCells } from '../src/core/grid.ts';
-import type { Dir, MachineType, PerkId, ResearchId, ShipUpgrade } from '../src/core/data.ts';
-import { GOALS, checkProgress, currentGoal } from '../src/core/goals.ts';
-import * as sim from '../src/core/sim.ts';
-import { newGame, tilesOf } from '../src/core/state.ts';
-import type { Game } from '../src/core/state.ts';
+import { GOALS } from '../src/content/goals.ts';
+import { currentGoal } from '../src/core/goals.ts';
+import { countOf } from '../src/core/machine-count.ts';
+import { machineUnlocked } from '../src/core/machine-unlock.ts';
+import { checkProgress } from '../src/core/progress.ts';
+import { buyPlot, place, removeAt, upgradeMachine } from '../src/core/build.ts';
+import { events, setEvents } from '../src/core/events.ts';
+import { tap } from '../src/core/hand-mining.ts';
+import { incomeRate } from '../src/core/income.ts';
+import { idx, inGrid } from '../src/core/layout.ts';
+import { buyPerk, canPrestige, prestige, prestigeGain } from '../src/core/nova.ts';
+import { buildCost, machineUpCost, researchCost, shipUpCost } from '../src/core/prices.ts';
+import { buyResearch, buyShipUp, unlockPlanet } from '../src/core/shop.ts';
+import { tick } from '../src/core/tick.ts';
+import { tilesOf } from '../src/core/planet-map.ts';
+import { newGame } from '../src/core/state.ts';
+import type { Game } from '../src/core/game.ts';
 
 const minutes = Number(process.argv[2] || 60);
 const tapsPerSec = Number(process.argv[3] ?? 4);
@@ -31,7 +54,6 @@ interface Plan {
 }
 const plans: Plan[] = [];
 
-const idx = sim.idx;
 const xy = (i: number) => [i % STRIDE, Math.floor(i / STRIDE)] as const;
 
 function planFor(pi: number): Plan {
@@ -48,7 +70,7 @@ function planFor(pi: number): Plan {
 			const pl = g.planets[pi];
 			for (let oy = -2; oy <= 2; oy++)
 				for (let ox = -2; ox <= 2; ox++)
-					if (sim.inGrid(g, pi, ex + ox, ey + oy) && tiles[idx(ex + ox, ey + oy)] !== TILE_ROCK) open++;
+					if (inGrid(g, pi, ex + ox, ey + oy) && tiles[idx(ex + ox, ey + oy)] !== TILE_ROCK) open++;
 			score += open * 0.15;
 			if (!best || score > best.score) best = { cells: cells.slice(), dirs: dirs.slice(), score };
 			return;
@@ -57,7 +79,7 @@ function planFor(pi: number): Plan {
 		for (const d of [0, 1, 2, 3] as Dir[]) {
 			const nx = x + DX[d];
 			const ny = y + DY[d];
-			if (!sim.inGrid(g, pi, nx, ny)) continue;
+			if (!inGrid(g, pi, nx, ny)) continue;
 			const n = idx(nx, ny);
 			if (n === pad || cells.includes(n) || tiles[n] === TILE_ROCK) continue;
 			const straight = dirs.length && opposite(dirs[dirs.length - 1]) === d ? 0.2 : 0;
@@ -99,7 +121,7 @@ function pathToNet(pi: number, start: number, dryRun: boolean): number {
 		for (const d of [0, 1, 2, 3] as Dir[]) {
 			const nx = x + DX[d];
 			const ny = y + DY[d];
-			if (!sim.inGrid(g, pi, nx, ny)) continue;
+			if (!inGrid(g, pi, nx, ny)) continue;
 			const n = idx(nx, ny);
 			const m = g.planets[pi].cells[n];
 			if (n === head || n === plan.chain[3] || (plan.net.has(n) && m && m.t === 'belt' && m.d !== opposite(d))) {
@@ -125,7 +147,7 @@ function pathToNet(pi: number, start: number, dryRun: boolean): number {
 		if (c === start) break;
 	}
 	path.reverse(); // start .. goalFrom
-	const cost = path.length * sim.buildCost(g, pi, 'belt');
+	const cost = path.length * buildCost(g, pi, 'belt');
 	if (dryRun) return cost;
 	if (g.credits < cost) return -1;
 	for (let k = 0; k < path.length; k++) {
@@ -133,7 +155,7 @@ function pathToNet(pi: number, start: number, dryRun: boolean): number {
 		const next = k + 1 < path.length ? path[k + 1] : goal;
 		const [nx, ny] = xy(next);
 		const d = ([0, 1, 2, 3] as Dir[]).find((dd) => x + DX[dd] === nx && y + DY[dd] === ny)!;
-		sim.place(g, pi, x, y, 'belt', d);
+		place(g, pi, x, y, 'belt', d);
 		plan.net.add(path[k]);
 	}
 	return cost;
@@ -146,7 +168,7 @@ function ensureChain(pi: number): boolean {
 		const c = plan.chain[k];
 		if (cells[c]) continue;
 		const [x, y] = xy(c);
-		if (!sim.place(g, pi, x, y, 'belt', plan.dirs[k])) return false;
+		if (!place(g, pi, x, y, 'belt', plan.dirs[k])) return false;
 	}
 	return true;
 }
@@ -163,7 +185,7 @@ function nextDrillSpot(pi: number): { ore: number; cost: number; start: number; 
 		for (const d of [0, 1, 2, 3] as Dir[]) {
 			const nx = x + DX[d];
 			const ny = y + DY[d];
-			if (!sim.inGrid(g, pi, nx, ny)) continue;
+			if (!inGrid(g, pi, nx, ny)) continue;
 			const n = idx(nx, ny);
 			const m = cells[n];
 			let cost: number;
@@ -172,9 +194,9 @@ function nextDrillSpot(pi: number): { ore: number; cost: number; start: number; 
 			else if (free(pi, n) && !plan.chain.includes(n) && tiles[n] !== TILE_ORE) {
 				cost = pathToNet(pi, n, true);
 				if (cost < 0) continue;
-				cost += sim.buildCost(g, pi, 'belt');
+				cost += buildCost(g, pi, 'belt');
 			} else continue;
-			cost += sim.buildCost(g, pi, 'drill');
+			cost += buildCost(g, pi, 'drill');
 			if (!best || cost < best.cost) best = { ore: i, cost, start: n, dir: d };
 		}
 	}
@@ -198,7 +220,7 @@ function buildDrill(pi: number): boolean {
 		void plan;
 	}
 	const [x, y] = xy(spot.ore);
-	return sim.place(g, pi, x, y, 'drill', spot.dir);
+	return place(g, pi, x, y, 'drill', spot.dir);
 }
 
 // ---------- decisions ----------
@@ -212,7 +234,7 @@ function upgradeLowest(pi: number, t: MachineType): { cost: number; run: () => b
 	}
 	if (best < 0) return null;
 	const [x, y] = xy(best);
-	return { cost: sim.machineUpCost(pi, cells[best]!), run: () => sim.upgradeMachine(g, pi, x, y) };
+	return { cost: machineUpCost(pi, cells[best]!), run: () => upgradeMachine(g, pi, x, y) };
 }
 
 function setStage(pi: number, k: number, t: MachineType): boolean {
@@ -220,10 +242,10 @@ function setStage(pi: number, k: number, t: MachineType): boolean {
 	const c = plan.chain[k];
 	const m = g.planets[pi].cells[c];
 	if (m && m.t === t) return false;
-	if (g.credits < sim.buildCost(g, pi, t) + 2) return false;
+	if (g.credits < buildCost(g, pi, t) + 2) return false;
 	const [x, y] = xy(c);
-	if (m) sim.removeAt(g, pi, x, y);
-	return sim.place(g, pi, x, y, t, plan.dirs[k]);
+	if (m) removeAt(g, pi, x, y);
+	return place(g, pi, x, y, t, plan.dirs[k]);
 }
 
 interface Option {
@@ -235,13 +257,13 @@ interface Option {
 
 function options(): Option[] {
 	const opts: Option[] = [];
-	const rate = Math.max(1, sim.incomeRate());
+	const rate = Math.max(1, incomeRate());
 	for (let pi = 0; pi < g.planets.length; pi++) {
 		const p = g.planets[pi];
 		if (!p.unlocked) continue;
 		const val = PLANETS[pi].value;
 		const plan = planFor(pi);
-		const drills = sim.countOf(g, pi, 'drill');
+		const drills = countOf(g, pi, 'drill');
 		let blocked = 0;
 		for (const m of p.cells) if (m && m.t === 'drill' && m.out.length >= 4) blocked++;
 		const jam = drills > 0 && blocked / drills > 0.3;
@@ -249,16 +271,16 @@ function options(): Option[] {
 		// processing stages
 		for (let k = 0; k < CHAIN.length; k++) {
 			const t = CHAIN[k]!;
-			if (!sim.machineUnlocked(g, t)) continue;
+			if (!machineUnlocked(g, t)) continue;
 			if (t === 'compactor' && pi < 1) continue;
 			const m = p.cells[plan.chain[k]];
 			if (m && m.t === t) {
 				// upgrade when it is the bottleneck
 				if (m.lv < MACHINES[t].maxLv && (m.inb.length >= BUF_IN - 1 || (t === 'compactor' && m.inb.length >= 8) || (goal === 'smelt3' && t === 'smelter'))) {
-					opts.push({ what: `up ${t} p${pi}`, cost: sim.machineUpCost(pi, m), score: 3, run: () => sim.upgradeMachine(g, pi, ...xy(plan.chain[k])) });
+					opts.push({ what: `up ${t} p${pi}`, cost: machineUpCost(pi, m), score: 3, run: () => upgradeMachine(g, pi, ...xy(plan.chain[k])) });
 				}
 			} else if (drills >= 2 || (goal === 'crusher2' && t === 'crusher')) {
-				opts.push({ what: `build ${t} p${pi}`, cost: sim.buildCost(g, pi, t), score: 4, run: () => setStage(pi, k, t) });
+				opts.push({ what: `build ${t} p${pi}`, cost: buildCost(g, pi, t), score: 4, run: () => setStage(pi, k, t) });
 			}
 		}
 		// drills
@@ -270,55 +292,55 @@ function options(): Option[] {
 		if (forSale.length && (!spot || goal === 'survey')) {
 			const tiles = tilesOf(pi, g.blasted[pi]);
 			const plot = forSale.reduce((a, b) => (countOreInCells(tiles, plotCells(b)) > countOreInCells(tiles, plotCells(a)) ? b : a));
-			opts.push({ what: `land p${pi}`, cost: nextPlotCost(pi, p), score: goal === 'survey' ? 5 : 3, run: () => sim.buyPlot(g, pi, plot).ok });
+			opts.push({ what: `land p${pi}`, cost: nextPlotCost(pi, p), score: goal === 'survey' ? 5 : 3, run: () => buyPlot(g, pi, plot).ok });
 		}
 		const up = upgradeLowest(pi, 'drill');
 		if (up && (drills >= 3 || goal === 'upgrade')) opts.push({ what: `up drill p${pi}`, cost: up.cost, score: goal === 'upgrade' ? 5 : jam ? 0.2 : 1.6, run: up.run });
-		if (jam && g.unlocks.includes('research') && g.research.belt < sim.RESEARCH.belt.max) opts.push({ what: 'research belt', cost: sim.researchCost(g, 'belt'), score: 3, run: () => sim.buyResearch(g, 'belt') });
+		if (jam && g.unlocks.includes('research') && g.research.belt < RESEARCH.belt.max) opts.push({ what: 'research belt', cost: researchCost(g, 'belt'), score: 3, run: () => buyResearch(g, 'belt') });
 		// pylon next to the chain
-		if (sim.machineUnlocked(g, 'pylon') && sim.countOf(g, pi, 'pylon') < 2) {
+		if (machineUnlocked(g, 'pylon') && countOf(g, pi, 'pylon') < 2) {
 			const near = [plan.chain[2], plan.chain[3]].flatMap((c) => {
 				const [x, y] = xy(c);
 				return [0, 1, 2, 3]
 					.map((d) => [x + DX[d], y + DY[d]] as const)
-					.filter(([a, b]) => sim.inGrid(g, pi, a, b) && free(pi, idx(a, b)) && !plan.net.has(idx(a, b)));
+					.filter(([a, b]) => inGrid(g, pi, a, b) && free(pi, idx(a, b)) && !plan.net.has(idx(a, b)));
 			});
-			if (near.length) opts.push({ what: `pylon p${pi}`, cost: sim.buildCost(g, pi, 'pylon'), score: 2.5, run: () => sim.place(g, pi, near[0][0], near[0][1], 'pylon', 0) });
+			if (near.length) opts.push({ what: `pylon p${pi}`, cost: buildCost(g, pi, 'pylon'), score: 2.5, run: () => place(g, pi, near[0][0], near[0][1], 'pylon', 0) });
 		}
 		const pyl = upgradeLowest(pi, 'pylon');
 		if (pyl) opts.push({ what: `up pylon p${pi}`, cost: pyl.cost, score: 1.2, run: pyl.run });
 		// ships when the pad backs up
 		const padFull = p.pad.length > 20;
-		if (goal === 'market' && g.unlocks.includes('research')) opts.push({ what: 'research market', cost: sim.researchCost(g, 'market'), score: 5, run: () => sim.buyResearch(g, 'market') });
-		if (goal === 'glaciaShip' && pi === 1) opts.push({ what: 'ships p1', cost: sim.shipUpCost(g, 1, 'ships'), score: 5, run: () => sim.buyShipUp(g, 1, 'ships') });
-		if ((goal === 'belts' || goal === 'belts3') && g.unlocks.includes('research')) opts.push({ what: 'research belt', cost: sim.researchCost(g, 'belt'), score: 5, run: () => sim.buyResearch(g, 'belt') });
-		if (goal === 'research' && g.unlocks.includes('research')) opts.push({ what: 'research tap', cost: sim.researchCost(g, 'tap'), score: 5, run: () => sim.buyResearch(g, 'tap') });
+		if (goal === 'market' && g.unlocks.includes('research')) opts.push({ what: 'research market', cost: researchCost(g, 'market'), score: 5, run: () => buyResearch(g, 'market') });
+		if (goal === 'glaciaShip' && pi === 1) opts.push({ what: 'ships p1', cost: shipUpCost(g, 1, 'ships'), score: 5, run: () => buyShipUp(g, 1, 'ships') });
+		if ((goal === 'belts' || goal === 'belts3') && g.unlocks.includes('research')) opts.push({ what: 'research belt', cost: researchCost(g, 'belt'), score: 5, run: () => buyResearch(g, 'belt') });
+		if (goal === 'research' && g.unlocks.includes('research')) opts.push({ what: 'research tap', cost: researchCost(g, 'tap'), score: 5, run: () => buyResearch(g, 'tap') });
 		const shipGoal = pi === 0 && ['ship2', 'cargo', 'ships3'].includes(goal);
 		for (const u of ['cargo', 'speed', 'ships'] as ShipUpgrade[]) {
-			if (p.up[u] >= sim.SHIP_UPS[u].max) continue;
-			opts.push({ what: `${u} p${pi}`, cost: sim.shipUpCost(g, pi, u), score: padFull || shipGoal ? 4 : 0.8, run: () => sim.buyShipUp(g, pi, u) });
+			if (p.up[u] >= SHIP_UPS[u].max) continue;
+			opts.push({ what: `${u} p${pi}`, cost: shipUpCost(g, pi, u), score: padFull || shipGoal ? 4 : 0.8, run: () => buyShipUp(g, pi, u) });
 		}
 		void val;
 	}
 	if (g.unlocks.includes('research')) {
 		for (const r of ['belt', 'tap', 'market', 'offline'] as ResearchId[]) {
-			if (g.research[r] >= sim.RESEARCH[r].max) continue;
+			if (g.research[r] >= RESEARCH[r].max) continue;
 			const s = r === 'market' ? 2.2 : r === 'belt' ? 1.4 : r === 'tap' ? (tapsPerSec > 0 ? 1.5 : 0) : 0.2;
-			opts.push({ what: `research ${r}`, cost: sim.researchCost(g, r), score: s, run: () => sim.buyResearch(g, r) });
+			opts.push({ what: `research ${r}`, cost: researchCost(g, r), score: s, run: () => buyResearch(g, r) });
 		}
-		if (g.planets[5].unlocked && !g.beaconLit) opts.push({ what: 'beacon', cost: sim.researchCost(g, 'beacon'), score: 5, run: () => sim.buyResearch(g, 'beacon') });
+		if (g.planets[5].unlocked && !g.beaconLit) opts.push({ what: 'beacon', cost: researchCost(g, 'beacon'), score: 5, run: () => buyResearch(g, 'beacon') });
 	}
 	const next = g.planets.findIndex((p) => !p.unlocked);
 	if (next > 0) {
 		const cost = PLANETS[next].unlock;
-		opts.push({ what: `unlock ${PLANETS[next].name}`, cost, score: 6, run: () => sim.unlockPlanet(g, next) });
+		opts.push({ what: `unlock ${PLANETS[next].name}`, cost, score: 6, run: () => unlockPlanet(g, next) });
 		void rate;
 	}
 	return opts;
 }
 
 function decide() {
-	const rate = Math.max(0.5, sim.incomeRate());
+	const rate = Math.max(0.5, incomeRate());
 	const opts = options();
 	// Value: score, but prefer cheap things. Ignore anything that would take > 3 min to afford.
 	let best: Option | null = null;
@@ -349,7 +371,7 @@ function decide() {
 		}
 		if (ok) {
 			buys[best.what.split(' ')[0]] = (buys[best.what.split(' ')[0]] || 0) + 1;
-			if (best.what.startsWith('unlock') || best.what.startsWith('build') || best.what === 'beacon') note(`${best.what}  (income ${fmt(sim.incomeRate())}/s)`);
+			if (best.what.startsWith('unlock') || best.what.startsWith('build') || best.what === 'beacon') note(`${best.what}  (income ${fmt(incomeRate())}/s)`);
 		}
 	}
 }
@@ -363,40 +385,40 @@ const banned = new Map<string, number>();
 let tapAcc = 0;
 let decideAcc = 0;
 let prestiged = 0;
-sim.setEvents(true);
+setEvents(true);
 while (t < minutes * 60) {
-	sim.tick(g, DT);
+	tick(g, DT);
 	t += DT;
 	const tr = t < 180 ? Math.max(tapsPerSec, tapsPerSec ? 5 : 0) : tapsPerSec * 0.3;
 	tapAcc += tr * DT;
 	while (tapAcc >= 1) {
 		tapAcc -= 1;
 		const top = g.planets.reduce((a, p, i) => (p.unlocked ? i : a), 0);
-		sim.tap(g, top);
+		tap(g, top);
 	}
 	decideAcc += DT;
 	if (decideAcc >= 0.5) {
 		decideAcc = 0;
 		decide();
 		checkProgress(g);
-		for (const e of sim.events) {
+		for (const e of events) {
 			if (e.type === 'goal') note('GOAL ' + e.text);
 			if (e.type === 'unlock') note('UNLOCK ' + e.title);
 		}
-		sim.events.length = 0;
+		events.length = 0;
 		// Reset when it doubles our stardust, after Solara.
-		if (sim.canPrestige(g) && sim.prestigeGain(g) >= Math.max(6, g.stardust * 1.5) && g.planets[4].unlocked && !g.planets[5].unlocked) {
-			note(`PRESTIGE +${sim.prestigeGain(g)} stardust (run earned ${fmt(g.runEarned)})`);
-			g = sim.prestige(g);
+		if (canPrestige(g) && prestigeGain(g) >= Math.max(6, g.stardust * 1.5) && g.planets[4].unlocked && !g.planets[5].unlocked) {
+			note(`PRESTIGE +${prestigeGain(g)} stardust (run earned ${fmt(g.runEarned)})`);
+			g = prestige(g);
 			plans.length = 0;
 			prestiged++;
-			for (const id of Object.keys(PERKS) as PerkId[]) sim.buyPerk(g, id);
+			for (const id of Object.keys(PERKS) as PerkId[]) buyPerk(g, id);
 			note('perks: ' + Object.keys(g.perks).join(','));
 		}
 	}
 	if (Math.floor(t) % 300 === 0 && Math.abs(t - Math.round(t)) < DT / 2 && !quiet) {
-		const drills = g.planets.map((p, i) => (p.unlocked ? sim.countOf(g, i, 'drill') : '-')).join('/');
-		console.log(`  [${clock(t)}] credits ${fmt(g.credits)}  income ${fmt(sim.incomeRate())}/s  drills ${drills}  planets ${g.planets.filter((p) => p.unlocked).length}`);
+		const drills = g.planets.map((p, i) => (p.unlocked ? countOf(g, i, 'drill') : '-')).join('/');
+		console.log(`  [${clock(t)}] credits ${fmt(g.credits)}  income ${fmt(incomeRate())}/s  drills ${drills}  planets ${g.planets.filter((p) => p.unlocked).length}`);
 	}
 }
 
@@ -448,7 +470,7 @@ if (process.argv.includes('--map')) {
 	});
 }
 if (process.argv.includes('--opts')) {
-	console.log('credits', fmt(g.credits), 'rate', fmt(sim.incomeRate()));
+	console.log('credits', fmt(g.credits), 'rate', fmt(incomeRate()));
 	for (const o of options()) console.log(o.what, fmt(o.cost), o.score);
 	console.log('spot1', JSON.stringify(nextDrillSpot(1)));
 	g.planets[1].cells.forEach((m, i) => m && m.t !== 'belt' && console.log(i, m.t, m.lv, 'in', m.inb.length, 'out', m.out.length));

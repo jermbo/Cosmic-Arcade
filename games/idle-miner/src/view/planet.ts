@@ -1,6 +1,13 @@
-// The planet view: the factory grid, drawing and touch / mouse building.
+// The planet view: the camera on the factory grid, and the drawing of it. planet-build.ts has the building gestures.
 
-import { BRIDGE_SPAN, DX, DY, MACHINES, PLANETS, TILE_ORE, TILE_ROCK, beltSpeed } from '../core/data.ts';
+import { MACHINES } from '../content/machines.ts';
+import type { MachineType } from '../content/machines.ts';
+import { PLANETS } from '../content/planets.ts';
+import { DX, DY } from '../core/direction.ts';
+import type { Dir } from '../core/direction.ts';
+import { beltSpeed } from '../core/levels.ts';
+import { hasPower } from '../core/effects.ts';
+import { TILE_ORE, TILE_ROCK } from '../core/tiles.ts';
 import {
 	MAX_CELLS,
 	MAX_COLS,
@@ -19,12 +26,17 @@ import {
 	plotOf,
 	plotOfCell,
 } from '../core/grid.ts';
-import type { Dir, MachineType } from '../core/data.ts';
-import * as sim from '../core/sim.ts';
-import { baseTilesOf, tilesOf } from '../core/state.ts';
-import type { BeltItem, Game, Machine } from '../core/state.ts';
+import { planetBlocks } from '../core/blocks.ts';
+import type { Block } from '../core/blocks.ts';
+import { autoDir, canBlast, canBridge, canPlace } from '../core/build.ts';
+import { crossLanes } from '../core/layout.ts';
+import { buildCost } from '../core/prices.ts';
+import { padCap, shipCap } from '../core/ships.ts';
+import { baseTilesOf, tilesOf } from '../core/planet-map.ts';
+import type { BeltItem, Game } from '../core/game.ts';
 import { drawBelt, drawBridgeDeck, drawBridgeEnd, drawCrossDeck, drawItem, drawMachine, drawShip, glow, mix, roundRect, withAlpha } from './draw.ts';
-import { burst, popup, ring, spray } from './fx.ts';
+import { burst, spray } from './fx.ts';
+import { PlanetBuilder, dirTo } from './planet-build.ts';
 import { fmt as fmtShort } from '../core/format.ts';
 
 export type Tool = MachineType | 'remove' | null;
@@ -37,21 +49,6 @@ export interface PlanetHooks {
 	expanded?: () => void;
 }
 
-interface Drag {
-	path: number[];
-	moved: boolean;
-	mode: 'belt' | 'bridge' | 'machine' | 'remove' | 'none' | 'pan';
-	pointer: number;
-	startX: number;
-	startY: number;
-	lastX: number;
-	lastY: number;
-	/** pan only: plot for sale under the press, bought if it was a tap */
-	plot?: number | null;
-}
-
-/** Screen pixels a press may move and still count as a tap. */
-const TAP_SLOP = 8;
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 3;
 
@@ -61,8 +58,6 @@ interface Anim {
 }
 
 const idx = cellIdx;
-const cx = cellX;
-const cy = cellY;
 
 const RED = '#ff5d73';
 const AMBER = '#ffb347';
@@ -94,10 +89,9 @@ export class PlanetView {
 	panY = 0;
 	private viewW = 0;
 	private viewH = 0;
-	private drag: Drag | null = null;
 	/** Blocked machines on this planet. Backups are held a moment so the marks do not flicker. */
-	blocks: sim.Block[] = [];
-	private held = new Map<number, { b: sim.Block; t: number; pi: number }>();
+	blocks: Block[] = [];
+	private held = new Map<number, { b: Block; t: number; pi: number }>();
 	private boardCache: HTMLCanvasElement | null = null;
 	private boardKey = '';
 	private lastSpark = new Float32Array(MAX_CELLS);
@@ -105,16 +99,17 @@ export class PlanetView {
 	/** For the tutorial: cells to point at. */
 	highlight: number[] = [];
 
-	private hooks: PlanetHooks;
+	/** The gestures that build on this view. */
+	readonly build: PlanetBuilder;
 
 	constructor(hooks: PlanetHooks) {
-		this.hooks = hooks;
+		this.build = new PlanetBuilder(this, hooks);
 	}
 
 	open(pi: number) {
 		this.pi = pi;
 		this.selected = null;
-		this.drag = null;
+		this.build.drag = null;
 		this.shipAnims = [];
 		this.boardKey = '';
 		this.zoom = 1;
@@ -155,11 +150,6 @@ export class PlanetView {
 		this.panX += dx;
 		this.panY += dy;
 		this.clampPan();
-	}
-
-	/** Start a camera drag (mouse right / middle button). */
-	startPan(sx: number, sy: number, id: number) {
-		this.drag = { path: [], moved: true, mode: 'pan', pointer: id, startX: sx, startY: sy, lastX: sx, lastY: sy, plot: null };
 	}
 
 	/** Keep part of the board on screen. */
@@ -229,20 +219,8 @@ export class PlanetView {
 		return buyablePlots(g.planets[this.pi]).includes(plot) ? plot : null;
 	}
 
-	tryBuyPlot(g: Game, plot: number): boolean {
-		const r = sim.buyPlot(g, this.pi, plot);
-		if (!r.ok) return false;
-		const name = PLANETS[this.pi].name;
-		this.hooks.toast(r.ore > 0 ? `New land on ${name} · ${r.ore} ore tile${r.ore > 1 ? 's' : ''}` : `New land on ${name} — room to build`);
-		this.hooks.sound('place');
-		this.invalidateBoard();
-		this.hooks.changed();
-		this.hooks.expanded?.();
-		return true;
-	}
-
 	/** Screen point to grid cell, or null. */
-	cellAt(sx: number, sy: number, p: import('../core/state.ts').PlanetState): number | null {
+	cellAt(sx: number, sy: number, p: import('../core/game.ts').PlanetState): number | null {
 		const ts = this.tileScale();
 		let gx: number;
 		let gy: number;
@@ -276,279 +254,6 @@ export class PlanetView {
 		const w = (this.rot ? this.gridRows : this.gridCols) * ts;
 		const h = (this.rot ? this.gridCols : this.gridRows) * ts;
 		return { x: this.ox + this.panX, y: this.oy + this.panY, w, h };
-	}
-
-	// ---------- input ----------
-
-	pointerDown(g: Game, sx: number, sy: number, id: number) {
-		const c = this.cellAt(sx, sy, g.planets[this.pi]);
-		if (c === null) {
-			// Off your land: drag to pan, tap a plot for sale to buy it.
-			this.drag = { path: [], moved: false, mode: 'pan', pointer: id, startX: sx, startY: sy, lastX: sx, lastY: sy, plot: this.plotAt(sx, sy, g) };
-			return;
-		}
-		const mode = this.tool === 'belt' ? 'belt' : this.tool === 'bridge' ? 'bridge' : this.tool === 'remove' ? 'remove' : this.tool ? 'machine' : 'none';
-		this.drag = { path: [c], moved: false, mode, pointer: id, startX: sx, startY: sy, lastX: sx, lastY: sy };
-		if (mode === 'remove') this.removeCell(g, c, true);
-	}
-
-	pointerMove(g: Game, sx: number, sy: number, id: number) {
-		const c = this.cellAt(sx, sy, g.planets[this.pi]);
-		this.hover = c;
-		const d = this.drag;
-		if (!d || d.pointer !== id) return;
-		if (d.mode === 'pan') {
-			if (!d.moved && Math.hypot(sx - d.startX, sy - d.startY) > TAP_SLOP) d.moved = true;
-			if (d.moved) this.panBy(sx - d.lastX, sy - d.lastY);
-			d.lastX = sx;
-			d.lastY = sy;
-			return;
-		}
-		if (!d.moved && Math.hypot(sx - d.startX, sy - d.startY) > this.ts * 0.45) {
-			d.moved = true;
-			// Dragging with no tool lays belts.
-			if (d.mode === 'none') d.mode = 'belt';
-		}
-		if (c === null || !d.moved) return;
-		if (d.mode === 'bridge') {
-			const end = straightEnd(d.path[0], c);
-			if (end !== d.path[d.path.length - 1]) this.hooks.sound('click');
-			d.path = end === d.path[0] ? [end] : [d.path[0], end];
-			return;
-		}
-		if (d.mode === 'machine') {
-			d.path = [c];
-			return;
-		}
-		const last = d.path[d.path.length - 1];
-		if (c === last) return;
-		// Step one cell at a time so the path stays connected.
-		let x = cx(last);
-		let y = cy(last);
-		const tx = cx(c);
-		const ty = cy(c);
-		let guard = 0;
-		while ((x !== tx || y !== ty) && guard++ < 40) {
-			if (Math.abs(tx - x) >= Math.abs(ty - y)) x += Math.sign(tx - x);
-			else y += Math.sign(ty - y);
-			const n = idx(x, y);
-			const at = d.path.indexOf(n);
-			if (at >= 0) d.path.length = at + 1;
-			else d.path.push(n);
-			if (d.mode === 'remove') this.removeCell(g, n);
-			else if (d.mode === 'belt') this.hooks.sound('click');
-		}
-	}
-
-	pointerUp(g: Game, sx: number, sy: number, id: number) {
-		const d = this.drag;
-		if (!d || d.pointer !== id) return;
-		this.drag = null;
-		if (d.mode === 'pan') {
-			if (d.moved) return;
-			if (d.plot != null) {
-				if (!this.tryBuyPlot(g, d.plot)) this.hooks.sound('error');
-			} else this.hooks.select(null);
-			return;
-		}
-		const c = this.cellAt(sx, sy, g.planets[this.pi]);
-		if (d.mode === 'belt') {
-			if (!d.moved && d.path.length === 1) this.tapBelt(g, d.path[0]);
-			else this.commitBelts(g, d.path);
-		} else if (d.mode === 'bridge') {
-			if (d.path.length === 2) this.placeBridge(g, d.path[0], d.path[1]);
-			else {
-				this.hooks.toast(`Drag from where items go in to where they come out. Up to ${BRIDGE_SPAN - 1} tiles between.`);
-				this.hooks.sound('error');
-			}
-		} else if (d.mode === 'machine' && this.tool && this.tool !== 'remove') {
-			const target = d.moved ? (c ?? d.path[0]) : d.path[0];
-			this.placeMachine(g, target, this.tool);
-		} else if (d.mode === 'none') {
-			const m = g.planets[this.pi].cells[d.path[0]];
-			this.hooks.select(m ? d.path[0] : null);
-			if (!m && !d.moved && tilesOf(this.pi, g.blasted[this.pi])[d.path[0]] === TILE_ROCK) {
-				this.hooks.toast(g.research.blast ? `Rock. Tap it with Remove to blast it for ${fmtShort(sim.blastCost(g, this.pi))}.` : 'Rock. Research Blast Charges to clear rocks.');
-			}
-		}
-	}
-
-	pointerCancel() {
-		this.drag = null;
-	}
-
-	private tapBelt(g: Game, c: number) {
-		const p = g.planets[this.pi];
-		const m = p.cells[c];
-		if (m && m.t === 'belt') {
-			sim.rotateAt(g, this.pi, cx(c), cy(c));
-			this.hooks.sound('belt');
-			return;
-		}
-		if (m) {
-			this.hooks.select(c);
-			return;
-		}
-		this.commitBelts(g, [c]);
-	}
-
-	/** The direction each path cell's belt should face. */
-	private pathDirs(g: Game, path: number[]): Dir[] {
-		const dirs: Dir[] = [];
-		for (let i = 0; i < path.length; i++) {
-			if (i + 1 < path.length) dirs.push(dirTo(path[i], path[i + 1]));
-			else if (i > 0) dirs.push(dirTo(path[i - 1], path[i]));
-			else dirs.push(sim.autoDir(g, this.pi, cx(path[i]), cy(path[i]), 0));
-		}
-		// The end turns toward a pad or machine next to it, if straight ahead is nothing useful.
-		const end = path.length - 1;
-		const e = path[end];
-		const p = g.planets[this.pi];
-		const takes = (m: Machine | null) => !!m && m.t !== 'drill' && m.t !== 'pylon';
-		const ahead = neighbor(e, dirs[end]);
-		if (!takes(ahead !== null ? p.cells[ahead] : null)) {
-			for (const dd of [0, 1, 2, 3] as Dir[]) {
-				const n = neighbor(e, dd);
-				if (n === null || (end > 0 && n === path[end - 1])) continue;
-				const nm = p.cells[n];
-				if (takes(nm) && nm!.t !== 'belt') {
-					dirs[end] = dd;
-					break;
-				}
-			}
-		}
-		return dirs;
-	}
-
-	/** Path steps where the line goes straight across a straight belt: these become crossings. */
-	private crossings(g: Game, path: number[]): Set<number> {
-		const out = new Set<number>();
-		if (!g.research.bridges) return out;
-		const cells = g.planets[this.pi].cells;
-		for (let i = 1; i < path.length - 1; i++) {
-			const m = cells[path[i]];
-			if (!m || m.t !== 'belt') continue;
-			const din = dirTo(path[i - 1], path[i]);
-			if (din !== dirTo(path[i], path[i + 1]) || din % 2 === m.d % 2) continue;
-			// The line being dragged will feed it from the side; that is the point.
-			if (sim.straightBelt(g, this.pi, path[i], [path[i - 1], path[i + 1]])) out.add(i);
-		}
-		return out;
-	}
-
-	private commitBelts(g: Game, path: number[]) {
-		const p = g.planets[this.pi];
-		const tiles = tilesOf(this.pi, g.blasted[this.pi]);
-		const dirs = this.pathDirs(g, path);
-		const cross = this.crossings(g, path);
-		let placed = 0;
-		let short = false;
-		for (let i = 0; i < path.length; i++) {
-			const c = path[i];
-			const m = p.cells[c];
-			if (tiles[c] === TILE_ROCK) continue;
-			if (cross.has(i)) {
-				if (sim.makeCross(g, this.pi, c, [path[i - 1], path[i + 1]])) {
-					placed++;
-					const s = this.cellCenter(c);
-					burst(s.x, s.y, '#9fb4ff', 6, 70, { size: 2, life: 0.35 });
-				} else short = true;
-				continue;
-			}
-			if (m) {
-				// A drag that ends on a belt joins it, so that belt keeps its way.
-				const joins = i === path.length - 1 && path.length > 1;
-				if (m.t === 'belt' && !joins) sim.rotateAt(g, this.pi, cx(c), cy(c), dirs[i]);
-				else if (i === 0 && path.length > 1 && m.t !== 'pad' && m.t !== 'pylon') sim.rotateAt(g, this.pi, cx(c), cy(c), dirs[0]);
-				continue;
-			}
-			if (sim.place(g, this.pi, cx(c), cy(c), 'belt', dirs[i])) {
-				placed++;
-				const s = this.cellCenter(c);
-				burst(s.x, s.y, '#7f8cff', 3, 50, { size: 2, life: 0.3 });
-			} else short = true;
-		}
-		if (placed) this.hooks.sound('belt');
-		if (short) {
-			this.hooks.toast('Not enough credits for all belts');
-			this.hooks.sound('error');
-		}
-		this.hooks.changed();
-	}
-
-	private placeBridge(g: Game, a: number, b: number) {
-		const check = sim.canBridge(g, this.pi, a, b);
-		if (!check.ok) {
-			this.hooks.toast(check.why);
-			this.hooks.sound('error');
-			return;
-		}
-		sim.placeBridge(g, this.pi, a, b);
-		const col = MACHINES.bridge.color;
-		for (const c of [a, b]) {
-			const s = this.cellCenter(c);
-			burst(s.x, s.y, col, 10, 140, { size: 2.5, life: 0.45 });
-		}
-		const s = this.cellCenter(b);
-		popup(s.x, s.y - this.ts * 0.4, '-' + fmtShort(check.cost), '#ffb3b3', 13);
-		this.hooks.sound('place');
-		this.hooks.changed();
-	}
-
-	placeMachine(g: Game, c: number, t: MachineType) {
-		const x = cx(c);
-		const y = cy(c);
-		const check = sim.canPlace(g, this.pi, x, y, t);
-		if (!check.ok) {
-			const m = g.planets[this.pi].cells[c];
-			if (m && check.why === 'Space is taken') {
-				this.hooks.select(c);
-				return;
-			}
-			this.hooks.toast(check.why);
-			this.hooks.sound('error');
-			return;
-		}
-		const d = sim.autoDir(g, this.pi, x, y, 0);
-		sim.place(g, this.pi, x, y, t, d);
-		const s = this.cellCenter(c);
-		burst(s.x, s.y, MACHINES[t].color, 14, 160, { size: 3, life: 0.5 });
-		ring(s.x, s.y, MACHINES[t].color, this.ts * 0.3, 90, 0.4);
-		popup(s.x, s.y - this.ts * 0.4, '-' + fmtShort(check.cost), '#ffb3b3', 13);
-		this.hooks.sound('place');
-		this.hooks.changed();
-	}
-
-	private removeCell(g: Game, c: number, tap = false) {
-		const m = g.planets[this.pi].cells[c];
-		if (!m && tap) this.blastCell(g, c);
-		if (!m || m.t === 'pad') return;
-		const refund = sim.removeAt(g, this.pi, cx(c), cy(c));
-		const s = this.cellCenter(c);
-		burst(s.x, s.y, '#ff6b8a', 8, 120, { size: 2.5, life: 0.4 });
-		if (refund > 0) popup(s.x, s.y, '+' + fmtShort(refund), '#9dffb0', 12);
-		if (this.selected === c) this.hooks.select(null);
-		this.hooks.sound('remove');
-		this.hooks.changed();
-	}
-
-	private blastCell(g: Game, c: number) {
-		if (tilesOf(this.pi, g.blasted[this.pi])[c] !== TILE_ROCK) return;
-		const check = sim.canBlast(g, this.pi, c);
-		if (!check.ok) {
-			this.hooks.toast(check.why);
-			this.hooks.sound('error');
-			return;
-		}
-		sim.blastRock(g, this.pi, c);
-		const def = PLANETS[this.pi];
-		const s = this.cellCenter(c);
-		burst(s.x, s.y, '#ffd9a8', 16, 260, { size: 2.5, life: 0.45 });
-		burst(s.x, s.y, mix(def.dark, '#8a8fa6', 0.5), 18, 170, { size: 4, life: 0.8, grav: 260, spark: false });
-		ring(s.x, s.y, '#ffb347', this.ts * 0.25, 160, 0.5);
-		popup(s.x, s.y - this.ts * 0.4, '-' + fmtShort(check.cost), '#ffb3b3', 13);
-		this.hooks.sound('blast');
-		this.hooks.changed();
 	}
 
 	// ---------- events from the game ----------
@@ -624,7 +329,7 @@ export class PlanetView {
 		}
 
 		// belts
-		const speed = beltSpeed(g.research.belt, !!g.perks.belts);
+		const speed = beltSpeed(g);
 		const offset = (time * speed) % 1;
 		const u = s * 0.15;
 		for (let i = 0; i < p.cells.length; i++) {
@@ -634,7 +339,7 @@ export class PlanetView {
 			else if (m.t === 'bridge') drawBridgeEnd(ctx, m.d, !!m.end, this.tileX(i) * s, this.tileY(i) * s, s, offset);
 			else if (m.t === 'cross') {
 				// across runs below, down passes over it on a deck
-				const [h, v] = sim.crossLanes(p, i, this.pi);
+				const [h, v] = crossLanes(p, i, this.pi);
 				drawBelt(ctx, h, -1, this.tileX(i) * s, this.tileY(i) * s, s, offset);
 				for (const it of m.items) if (it.e % 2 === 0) drawMoving(ctx, it, it.e, i, s, u, this.offX, this.offY);
 				drawCrossDeck(ctx, v, this.tileX(i) * s, this.tileY(i) * s, s, offset);
@@ -654,7 +359,7 @@ export class PlanetView {
 
 		// machines
 		this.updateBlocks(g, time);
-		const blockOf = new Map<number, sim.Block>();
+		const blockOf = new Map<number, Block>();
 		for (const b of this.blocks) blockOf.set(b.from, b);
 		for (let i = 0; i < p.cells.length; i++) {
 			const m = p.cells[i];
@@ -697,7 +402,7 @@ export class PlanetView {
 
 	private updateBlocks(g: Game, time: number) {
 		const now = new Set<number>();
-		for (const b of sim.planetBlocks(g, this.pi)) {
+		for (const b of planetBlocks(g, this.pi)) {
 			this.held.set(b.from, { b, t: time, pi: this.pi });
 			now.add(b.from);
 		}
@@ -761,7 +466,7 @@ export class PlanetView {
 		const x = (this.tileX(i) + 0.5) * s;
 		const y = (this.tileY(i) + 0.5) * s;
 		// stock ring
-		const cap = sim.padCap(p);
+		const cap = padCap(p);
 		const fill = Math.min(1, p.pad.length / cap);
 		if (fill > 0) {
 			ctx.beginPath();
@@ -793,7 +498,7 @@ export class PlanetView {
 			ctx.globalAlpha = 1;
 		}
 		if (docked && !this.shipAnims.some((a) => a.kind === 'down')) {
-			const load = docked.cargo.length / sim.shipCap(p);
+			const load = docked.cargo.length / shipCap(p);
 			glow(ctx, x, y, s * 0.6, PLANETS[this.pi].color, 0.3 + load * 0.5);
 			drawShip(ctx, x, y + Math.sin(time * 3) * s * 0.02, upAngle, sz, PLANETS[this.pi].color, 0, time);
 		}
@@ -821,19 +526,19 @@ export class PlanetView {
 			ctx.stroke();
 			ctx.setLineDash([]);
 		}
-		const d = this.drag;
+		const d = this.build.drag;
 		// belt path preview
 		if (d && d.mode === 'belt' && (d.moved || this.tool === 'belt')) {
-			const dirs = this.pathDirs(g, d.path);
-			const cross = this.crossings(g, d.path);
+			const dirs = this.build.pathDirs(g, d.path);
+			const cross = this.build.crossings(g, d.path);
 			let cost = 0;
-			const price = sim.buildCost(g, this.pi, 'belt');
+			const price = buildCost(g, this.pi, 'belt');
 			const tiles = tilesOf(this.pi, g.blasted[this.pi]);
 			for (let k = 0; k < d.path.length; k++) {
 				const c = d.path[k];
 				const m = p.cells[c];
 				if (cross.has(k)) {
-					cost += sim.buildCost(g, this.pi, 'cross');
+					cost += buildCost(g, this.pi, 'cross');
 					roundRect(ctx, this.tileX(c) * s + 1, this.tileY(c) * s + 1, s - 2, s - 2, s * 0.15);
 					ctx.fillStyle = withAlpha(g.credits >= cost ? '#5ef2ff' : '#ff5d73', 0.16);
 					ctx.fill();
@@ -857,7 +562,7 @@ export class PlanetView {
 		if (d && d.mode === 'bridge') {
 			const a = d.path[0];
 			const b = d.path.length === 2 ? d.path[1] : -1;
-			const check = b >= 0 ? sim.canBridge(g, this.pi, a, b) : null;
+			const check = b >= 0 ? canBridge(g, this.pi, a, b) : null;
 			const col = !check || check.ok ? '#5ef2ff' : '#ff5d73';
 			for (const c of b >= 0 ? [a, b] : [a]) {
 				roundRect(ctx, this.tileX(c) * s + 1, this.tileY(c) * s + 1, s - 2, s - 2, s * 0.15);
@@ -883,14 +588,14 @@ export class PlanetView {
 			ctx.strokeStyle = withAlpha('#5ef2ff', 0.6);
 			ctx.lineWidth = 1.5;
 			ctx.stroke();
-			this.ghost = { cell: c, ok: true, text: `Bridge ${fmtShort(sim.buildCost(g, this.pi, 'bridge'))}` };
+			this.ghost = { cell: c, ok: true, text: `Bridge ${fmtShort(buildCost(g, this.pi, 'bridge'))}` };
 			return;
 		}
 		// machine ghost
 		const ghostCell = d && d.mode === 'machine' ? d.path[0] : !d ? this.hover : null;
 		if (ghostCell !== null && this.tool && this.tool !== 'remove' && this.tool !== 'belt') {
-			const check = sim.canPlace(g, this.pi, this.tileX(ghostCell), this.tileY(ghostCell), this.tool);
-			const dir = sim.autoDir(g, this.pi, this.tileX(ghostCell), this.tileY(ghostCell), 0);
+			const check = canPlace(g, this.pi, this.tileX(ghostCell), this.tileY(ghostCell), this.tool);
+			const dir = autoDir(g, this.pi, this.tileX(ghostCell), this.tileY(ghostCell), 0);
 			roundRect(ctx, this.tileX(ghostCell) * s + 1, this.tileY(ghostCell) * s + 1, s - 2, s - 2, s * 0.15);
 			ctx.fillStyle = withAlpha(check.ok ? '#5ef2ff' : '#ff5d73', 0.22);
 			ctx.fill();
@@ -912,11 +617,11 @@ export class PlanetView {
 			const rock = !m && tilesOf(this.pi, g.blasted[this.pi])[ghostCell] === TILE_ROCK;
 			roundRect(ctx, this.tileX(ghostCell) * s + 1, this.tileY(ghostCell) * s + 1, s - 2, s - 2, s * 0.15);
 			if (rock) {
-				const check = sim.canBlast(g, this.pi, ghostCell);
+				const check = canBlast(g, this.pi, ghostCell);
 				ctx.strokeStyle = check.ok ? '#ffb347' : withAlpha('#ff5d73', 0.6);
 				ctx.lineWidth = 2;
 				ctx.stroke();
-				this.ghost = { cell: ghostCell, ok: check.ok, text: check.ok ? `Blast ${fmtShort(check.cost)}` : g.research.blast ? `Blast ${fmtShort(check.cost)}` : 'Needs Blast Charges' };
+				this.ghost = { cell: ghostCell, ok: check.ok, text: check.ok ? `Blast ${fmtShort(check.cost)}` : hasPower(g, 'blastRocks') ? `Blast ${fmtShort(check.cost)}` : 'Needs Blast Charges' };
 				return;
 			}
 			ctx.strokeStyle = m && m.t !== 'pad' ? '#ff5d73' : withAlpha('#ff5d73', 0.3);
@@ -1096,29 +801,8 @@ export class PlanetView {
 	}
 }
 
-/** The far end of a bridge dragged from a toward c: straight, and at most BRIDGE_SPAN away. */
-function straightEnd(a: number, c: number): number {
-	const dx = cx(c) - cx(a);
-	const dy = cy(c) - cy(a);
-	if (Math.abs(dx) >= Math.abs(dy)) return idx(cx(a) + Math.sign(dx) * Math.min(Math.abs(dx), BRIDGE_SPAN), cy(a));
-	return idx(cx(a), cy(a) + Math.sign(dy) * Math.min(Math.abs(dy), BRIDGE_SPAN));
-}
 
-function dirTo(a: number, b: number): Dir {
-	const dx = cx(b) - cx(a);
-	const dy = cy(b) - cy(a);
-	if (dx > 0) return 0;
-	if (dy > 0) return 1;
-	if (dx < 0) return 2;
-	return 3;
-}
 
-function neighbor(i: number, d: Dir): number | null {
-	const x = cx(i) + DX[d];
-	const y = cy(i) + DY[d];
-	if (x < 0 || y < 0 || x >= MAX_COLS || y >= MAX_ROWS) return null;
-	return idx(x, y);
-}
 
 function label(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, color: string, size: number) {
 	ctx.font = `700 ${size}px "Chakra Petch", system-ui, sans-serif`;
