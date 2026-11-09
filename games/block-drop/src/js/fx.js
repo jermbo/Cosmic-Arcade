@@ -35,7 +35,7 @@ export class Fx {
 	}
 
 	/** Glass shards and sparks for one cleared block. */
-	shatter(x, y, size, colorIndex, power = 1) {
+	shatter({ x, y, size, colorIndex, power = 1 }) {
 		const color = PALETTE[colorIndex] || PALETTE[0];
 		const shards = Math.round((this.lite ? 4 : 7) * power);
 		for (let i = 0; i < shards; i++) {
@@ -75,11 +75,11 @@ export class Fx {
 		}
 	}
 
-	ring(x, y, radius, color, width = 6, time = 0.5) {
+	ring({ x, y, radius, color, width = 6, time = 0.5 }) {
 		this.rings.push({ x, y, radius, color, width, life: 0, max: time });
 	}
 
-	burst(x, y, count, speed, glow, size) {
+	burst({ x, y, count, speed, glow, size }) {
 		for (let i = 0; i < count; i++) {
 			const a = (i / count) * Math.PI * 2 + Math.random() * 0.3;
 			const sp = speed * (0.6 + Math.random() * 0.6);
@@ -92,7 +92,7 @@ export class Fx {
 		this.flashColor = color;
 	}
 
-	pop(x, y, text, sub, color = GOLD, big = false) {
+	pop({ x, y, text, sub, color = GOLD, big = false }) {
 		this.pops.push({ x, y, text, sub, color, big, life: 0, max: big ? 1.5 : 1.1 });
 	}
 

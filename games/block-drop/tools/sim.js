@@ -1,15 +1,11 @@
 // Plays many games with bots to check balance. Run: node tools/sim.js
-import { Game, rotatePiece, DEFAULT_LAB } from '../src/js/engine.js';
+import { Game, DEFAULT_LAB } from '../src/js/engine.js';
 
 function moves(game) {
 	const out = [];
 	game.pieces.forEach((piece, slot) => {
 		if (!piece) return;
-		let p = piece;
-		for (let r = 0; r < 4; r++) {
-			for (let x = 0; x <= game.cols - p.w; x++) if (game.fits(p, x)) out.push({ slot, piece: p, x });
-			p = rotatePiece(p);
-		}
+		for (let x = 0; x <= game.cols - piece.w; x++) if (game.fits(piece, x)) out.push({ slot, piece, x });
 	});
 	return out;
 }
@@ -76,17 +72,20 @@ function play(botName, lab, mode, seed, maxTurns = 400) {
 	const rng = () => ((r = (r * 1103515245 + 12345) % 2147483648) / 2147483648);
 	const rewards = { prism: 0, blast: 0, remix: 0 };
 	const chains = [];
+	const groups = [];
 	while (game.hasMove() && game.turn < maxTurns) {
 		const m = bots[botName](game, rng);
 		game.place(m.slot, m.x, m.piece);
 		const steps = game.resolveAll();
 		chains.push(steps.length);
-		const won = game.awardChain(steps.length);
-		if (won) rewards[won.kind]++;
+		const biggest = Math.max(0, ...steps.map((st) => st.biggest));
+		if (biggest) groups.push(biggest);
+		const won = game.awardChain(steps.length, biggest);
+		if (won && won.kind) rewards[won.kind]++;
 		game.bag.length = 0;
 		game.refill(m.slot);
 	}
-	game.sim = { rewards, chains };
+	game.sim = { rewards, chains, groups };
 	return game;
 }
 
@@ -96,19 +95,23 @@ function report(label, botName, lab, mode = 'endless', n = 40) {
 	const avg = (f) => (games.reduce((s, g) => s + f(g), 0) / n).toFixed(1);
 	const capped = games.filter((g) => g.turn >= 400).length;
 	const turns = games.reduce((s, g) => s + g.turn, 0);
-	// How many turns on average between rewards (a reward is the highest tier a chain reached).
+	// How many turns on average between power-ups, by kind and in all.
 	const per = (kind) => {
-		const total = games.reduce((s, g) => s + g.sim.rewards[kind], 0);
+		const total = games.reduce((s, g) => s + (kind ? g.sim.rewards[kind] : Object.values(g.sim.rewards).reduce((a, b) => a + b, 0)), 0);
 		return total ? (turns / total).toFixed(0) : '-';
 	};
+	// Biggest group cleared each turn: sizes 3, 4, 5, 6, 7, 8+.
+	const gdist = [0, 0, 0, 0, 0, 0];
+	for (const g of games) for (const n of g.sim.groups) gdist[Math.min(8, n) - 3]++;
 	const dist = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 	for (const g of games) for (const c of g.sim.chains) dist[Math.min(10, c)]++;
 	console.log(
 		`${label.padEnd(18)} ${botName.padEnd(7)} turns ${avg((g) => g.turn).padStart(6)}  score ${avg((g) => g.score).padStart(8)}  ` +
-			`best chain ${avg((g) => g.stats.bestChain)}  capped ${capped}/${n}  ` +
-			`turns per prism/blast/remix ${per('prism')}/${per('blast')}/${per('remix')}`,
+			`best chain ${avg((g) => g.stats.bestChain)}  glints/100 turns ${((games.reduce((t, g) => t + g.glints, 0) / turns) * 100).toFixed(1)}  capped ${capped}/${n}  ` +
+			`turns per power-up ${per()} (prism/blast/remix ${per('prism')}/${per('blast')}/${per('remix')})`,
 	);
 	console.log(`${''.padEnd(18)} chain length counts (0..10+): ${dist.join(' ')}`);
+	console.log(`${''.padEnd(18)} biggest group per turn (3,4,5,6,7,8+): ${gdist.join(' ')}`);
 }
 
 const only = process.argv[2];

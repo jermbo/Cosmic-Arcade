@@ -1,0 +1,104 @@
+/* Buttons. */
+
+.button {
+	position: relative;
+	min-height: 46px;
+	padding: 10px 16px;
+	border-radius: 16px;
+	border: 2px solid rgba(242, 200, 121, 0.5);
+	background: linear-gradient(180deg, var(--ink-3), var(--ink-2));
+	box-shadow: 0 4px 0 var(--lead), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+	font-weight: 700;
+	font-size: 1rem;
+	cursor: pointer;
+	transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.button:active {
+	transform: translateY(3px);
+	box-shadow: 0 1px 0 var(--lead), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.button:focus-visible {
+	outline: 3px solid var(--gold-2);
+	outline-offset: 2px;
+}
+
+.button--big {
+	min-height: 58px;
+	font-size: 1.2rem;
+	font-weight: 800;
+	border-color: var(--gold);
+	background: linear-gradient(180deg, #4a3790, #2b2060);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 1px;
+}
+
+.button--big .button__note {
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--gold-2);
+	opacity: 0.85;
+}
+
+.button--small {
+	min-height: 44px;
+	font-size: 0.9rem;
+	padding: 8px 14px;
+}
+
+.button--danger {
+	border-color: rgba(255, 93, 115, 0.6);
+}
+
+.button--install {
+	border-color: #7ef0a0;
+	background: linear-gradient(180deg, #23604a, #173c30);
+}
+
+.button.button--perk {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 1px;
+	border-color: rgba(69, 176, 255, 0.7);
+}
+
+.button.button--perk .button__note {
+	font-size: 0.78rem;
+	font-weight: 700;
+	color: #9fd8ff;
+}
+
+.button.button--perk[aria-pressed='true'] {
+	background: linear-gradient(180deg, #1d5d9e, #153e72);
+	border-color: #9fd8ff;
+	box-shadow: 0 4px 0 var(--lead), 0 0 16px rgba(69, 176, 255, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.button.button--perk[aria-disabled='true'] {
+	opacity: 0.5;
+}
+
+.button.button--stack {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 1px;
+}
+
+.button.button--stack .button__note {
+	font-size: 0.7rem;
+	font-weight: 600;
+	color: var(--gold-2);
+	opacity: 0.85;
+}
+
+@container page (max-height: 640px) {
+	.button--big {
+		min-height: 50px;
+	}
+}

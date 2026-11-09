@@ -31,10 +31,12 @@ class Audio {
 			try {
 				this.ctx = new AC();
 			} catch {
+				// The browser refuses to make a sound engine: the game stays silent.
 				return;
 			}
 			this.build();
 		}
+		// A browser can refuse to wake the sound before a tap. The next tap tries again.
 		if (this.ctx.state !== 'running') this.ctx.resume().catch(() => {});
 		if (!this.primed) {
 			// A silent buffer wakes iOS Safari.
@@ -100,10 +102,12 @@ class Audio {
 	}
 
 	suspend() {
+		// A refused suspend leaves the sound on, which does no harm.
 		if (this.ctx && this.ctx.state === 'running') this.ctx.suspend().catch(() => {});
 	}
 
 	resume() {
+		// A browser can refuse to wake the sound before a tap. The next tap tries again.
 		if (this.ctx && this.ctx.state !== 'running') this.ctx.resume().catch(() => {});
 	}
 
@@ -176,11 +180,6 @@ class Audio {
 		this.tone({ freq: 1250, type: 'triangle', decay: 0.03, gain: 0.05 });
 	}
 
-	rotate() {
-		this.tone({ freq: 520, type: 'triangle', decay: 0.09, gain: 0.12, slide: 1.6 });
-		this.noise({ decay: 0.08, gain: 0.05, freq: 3000, q: 2 });
-	}
-
 	deny() {
 		this.tone({ freq: 160, type: 'square', decay: 0.14, gain: 0.07, slide: 0.7 });
 	}
@@ -219,6 +218,33 @@ class Audio {
 		[0, 2, 4, 7, 9, 12, 14, 16, 19, 24].forEach((s, i) => this.bell(midi(76 + s), { at: 0.04 * i, gain: 0.1, decay: 0.7 }));
 	}
 
+	/** Remix: a rising whine while the board charges. */
+	remixCharge() {
+		this.tone({ freq: 90, type: 'sawtooth', attack: 0.15, decay: 0.9, gain: 0.16, slide: 9 });
+		this.tone({ freq: 180, type: 'triangle', attack: 0.15, decay: 0.9, gain: 0.14, slide: 9 });
+		this.noise({ decay: 0.95, gain: 0.18, freq: 300, q: 3, sweep: 14 });
+	}
+
+	/** Remix: blocks rattling, a run of short clicks for this many seconds. */
+	remixRattle(seconds) {
+		for (let t = 0; t < seconds; t += 0.04) {
+			this.noise({ at: t, decay: 0.04, gain: 0.16, freq: 1800 + Math.random() * 2600, q: 1.5 });
+			if (Math.random() < 0.3) this.tone({ freq: 700 + Math.random() * 500, type: 'triangle', at: t, decay: 0.03, gain: 0.05 });
+		}
+	}
+
+	/** Remix: the blast when the colors flip. */
+	remixBoom() {
+		this.tone({ freq: 70, decay: 0.8, gain: 0.55, slide: 0.35 });
+		this.noise({ decay: 0.7, gain: 0.45, freq: 4000, q: 0.5, type: 'lowpass', sweep: 0.06 });
+		[0, 4, 7, 12, 16, 19, 24].forEach((s, i) => this.bell(midi(67 + s), { at: i * 0.04, gain: 0.12, decay: 0.9 }));
+	}
+
+	/** Remix: a note as blocks land. The notes climb the scale as more blocks land. */
+	remixTick(n) {
+		this.bell(midi(79 + PENTA[Math.min(n, PENTA.length - 1)]), { gain: 0.09, decay: 0.4 });
+	}
+
 	tick(urgent) {
 		this.tone({ freq: urgent ? 1320 : 990, type: 'square', decay: 0.03, gain: 0.05 });
 	}
@@ -242,12 +268,6 @@ class Audio {
 		if (!this.ctx || this.timer) return;
 		this.nextBeat = this.ctx.currentTime + 0.1;
 		this.timer = setInterval(() => this.schedule(), 90);
-	}
-
-	stopMusic() {
-		this.musicWanted = false;
-		clearInterval(this.timer);
-		this.timer = null;
 	}
 
 	schedule() {

@@ -2,7 +2,7 @@
 
 import { buildSprites, roundRect, PALETTE, GOLD, LEAD } from './sprites.js';
 import { Fx } from './fx.js';
-import { BAG_SIZE } from './engine.js';
+import { REMIX_STYLES } from './remix-styles.js';
 
 const GRAVITY = 70; // cells per second squared, pulling blocks up to the ceiling
 const TRAY_SCALE = 0.62;
@@ -18,21 +18,22 @@ export class View {
 		this.ctx = canvas.getContext('2d');
 		this.fx = new Fx();
 		this.game = null;
-		this.vis = new Map();
+		this.blockVisuals = new Map();
 		this.dying = [];
 		this.holdFalls = false;
 		this.drag = null;
 		this.returning = null;
-		this.kb = null;
+		this.keyCursor = null;
 		this.hint = false;
 		this.power = null; // the power-up being used: { kind, stage, color }
 		this.aim = null; // where a blast would land: { x, y }
 		this.chipPop = [];
 		this.lastBag = 0;
 		this.time = 0;
-		this.onLand = null;
-		this.landCount = 0;
-		this.previewCache = { key: '', cells: null };
+		this.onRemix = null; // (event, value) for sound and haptics
+		this.remixStyle = 'scatter'; // a key of REMIX_STYLES
+		this.remix = null;
+		this.previewCache = { key: '', cells: null, ghost: new Set() };
 		this.appear = [];
 		this.stars = Array.from({ length: 46 }, () => ({ x: Math.random(), y: Math.random(), r: 0.4 + Math.random() * 1.2, p: Math.random() * 6 }));
 		this.floaters = Array.from({ length: 16 }, () => this.newFloater(true));
@@ -134,13 +135,14 @@ export class View {
 		this.boardLayer = { canvas: c, m };
 	}
 
-	setGame(game, intro = true) {
+	setGame(game) {
 		this.game = game;
-		this.vis.clear();
+		this.blockVisuals.clear();
 		this.dying = [];
+		this.remix = null;
 		this.drag = null;
 		this.returning = null;
-		this.kb = null;
+		this.keyCursor = null;
 		this.appear = game.pieces.map(() => 0);
 		this.fx.clear();
 		this.power = null;
@@ -150,9 +152,9 @@ export class View {
 		this.layout();
 		game.grid.forEach((b, i) => {
 			if (!b) return;
-			const x = i % game.cols;
-			const y = Math.floor(i / game.cols);
-			this.vis.set(b.id, this.newVis(x, intro ? y + game.rows + 1 : y, intro ? 0.05 * x + 0.04 * y : 0));
+			const x = game.columnOf(i);
+			const y = game.rowOf(i);
+			this.blockVisuals.set(b.id, this.newVis(x, y + game.rows + 1, 0.05 * x + 0.04 * y));
 		});
 	}
 
@@ -164,7 +166,7 @@ export class View {
 	dropIn(placed, left, top) {
 		for (const p of placed) {
 			const y = Math.max(top + p.dy, p.y);
-			this.vis.set(p.block.id, { ...this.newVis(left + p.dx, y), vy: 4 });
+			this.blockVisuals.set(p.block.id, { ...this.newVis(left + p.dx, y), vy: 4 });
 		}
 	}
 
@@ -177,9 +179,11 @@ export class View {
 		return { x: this.boardX + (x + 0.5) * this.cell, y: this.boardY + (y + 0.5) * this.cell };
 	}
 
+	/** The tray slot under a point, or null when there is none. */
 	hitSlot(px, py) {
-		if (!this.slots) return -1;
-		return this.slots.findIndex((s) => px >= s.x && px < s.x + s.w && py >= s.y - this.cell * 0.3 && py < s.y + s.h + this.cell * 0.4);
+		if (!this.slots) return null;
+		const index = this.slots.findIndex((s) => px >= s.x && px < s.x + s.w && py >= s.y - this.cell * 0.3 && py < s.y + s.h + this.cell * 0.4);
+		return index < 0 ? null : index;
 	}
 
 	slotPiecePos(slot, piece) {
@@ -189,8 +193,9 @@ export class View {
 	}
 
 	/** Where a dragged piece is, and which column it would drop into. */
-	dragGeometry(piece, px, py, touch) {
+	dragGeometry(piece, point, touch) {
 		const { cell, game } = this;
+		const { x: px, y: py } = point;
 		const pw = piece.w * cell;
 		const ph = piece.h * cell;
 		const left = px - pw / 2;
@@ -207,9 +212,9 @@ export class View {
 		for (let i = 0; i < g.grid.length; i++) {
 			const b = g.grid[i];
 			if (!b) continue;
-			const v = this.vis.get(b.id);
+			const v = this.blockVisuals.get(b.id);
 			if (!v) continue;
-			if (v.delay > 0 || v.y !== Math.floor(i / g.cols) || Math.abs(v.x - (i % g.cols)) > 0.01) return false;
+			if (v.delay > 0 || v.y !== g.rowOf(i) || Math.abs(v.x - g.columnOf(i)) > 0.01) return false;
 		}
 		return true;
 	}
@@ -217,25 +222,127 @@ export class View {
 	/** Marks cleared blocks to flash and break apart. */
 	killBlocks(cleared) {
 		for (const c of cleared) {
-			const v = this.vis.get(c.block.id);
+			const v = this.blockVisuals.get(c.block.id);
 			this.dying.push({ block: c.block, x: c.x, y: v ? v.y : c.y, t: 0, delay: c.delay || 0 });
-			this.vis.delete(c.block.id);
+			this.blockVisuals.delete(c.block.id);
 		}
 	}
 
-	/** A soft glow over every block, used when the colors are mixed. */
-	glowAll() {
-		for (const v of this.vis.values()) v.forge = 1;
+	/**
+	 * The Remix show. The engine has already moved the blocks. Here they rattle and glow, then
+	 * every block flies on its own curve from its old cell to its new one.
+	 * `view.remix` is null again when the show is over.
+	 */
+	startRemix(moves, styleName = this.remixStyle) {
+		const g = this.game;
+		const style = REMIX_STYLES[styleName] || REMIX_STYLES.scatter;
+		const mid = { x: (g.cols - 1) / 2, y: (g.rows - 1) / 2 };
+		const items = [];
+		const sorted = moves.slice().sort((a, b) => a.to - b.to);
+		for (const m of moves) {
+			let v = this.blockVisuals.get(m.block.id);
+			if (!v) {
+				v = this.newVis(g.columnOf(m.from), g.rowOf(m.from));
+				this.blockVisuals.set(m.block.id, v);
+			}
+			const from = { x: g.columnOf(m.from), y: g.rowOf(m.from) };
+			const to = { x: g.columnOf(m.to), y: g.rowOf(m.to) };
+			v.x = from.x;
+			v.y = from.y;
+			v.vy = 0;
+			v.delay = 0;
+			v.fly = true;
+			const plan = style.plan({ from, to, mid, cols: g.cols, rows: g.rows, order: sorted.indexOf(m) });
+			items.push({ block: m.block, from, to, ...plan, done: false });
+		}
+		const events = (style.events || []).map((e) => ({ ...e, fired: false }));
+		this.remix = { phase: 'charge', t: 0, items, lands: 0, tickGap: 0, charge: style.charge, rattle: style.rattle, swell: style.swell ?? style.rattle, events };
+		this.onRemix?.('charge', style.charge, style.sound);
+		if (!style.charge) this.launchRemix();
+	}
+
+	updateRemix(dt) {
+		const r = this.remix;
+		const g = this.game;
+		if (!r || !g) return;
+		r.t += dt;
+		if (r.phase === 'charge') this.updateRemixCharge(r);
+		else this.updateRemixFlight(r, dt, g);
+	}
+
+	/** The blocks rattle and swell more and more until the launch. */
+	updateRemixCharge(r) {
+		const k = Math.min(1, r.t / r.charge);
+		for (const item of r.items) {
+			const v = this.blockVisuals.get(item.block.id);
+			if (!v) continue;
+			v.jx = (Math.random() - 0.5) * k * 0.16 * r.rattle;
+			v.jy = (Math.random() - 0.5) * k * 0.16 * r.rattle;
+			v.sx = v.sy = 1 + k * 0.14 * r.swell;
+		}
+		if (r.t >= r.charge) this.launchRemix();
+	}
+
+	/** Flight: every block follows the path its style gave it. */
+	updateRemixFlight(r, dt, g) {
+		r.tickGap -= dt;
+		for (const ev of r.events) {
+			if (!ev.fired && r.t >= ev.at) {
+				ev.fired = true;
+				this.onRemix?.(ev.name, ev.value);
+			}
+		}
+		for (const item of r.items) {
+			if (item.done) continue;
+			const v = this.blockVisuals.get(item.block.id);
+			if (!v) {
+				item.done = true;
+				continue;
+			}
+			const u = Math.min(1, Math.max(0, (r.t - item.delay) / item.dur));
+			if (u <= 0) {
+				v.jx = (Math.random() - 0.5) * 0.1 * r.rattle;
+				v.jy = (Math.random() - 0.5) * 0.1 * r.rattle;
+				continue;
+			}
+			const p = item.at(u);
+			v.jx = v.jy = 0;
+			// Paths stay inside the well.
+			v.x = Math.min(g.cols - 1, Math.max(0, p.x));
+			v.y = Math.min(g.rows - 1, Math.max(0, p.y));
+			v.rot = p.rot;
+			v.sx = v.sy = p.s;
+			if (u >= 1) this.landRemixBlock(item, v, r);
+		}
+		if (r.items.every((item) => item.done)) this.remix = null;
+	}
+
+	/** A block reaches its new cell: it squashes, and the landing ticks (not more than every 0.05 seconds). */
+	landRemixBlock(item, v, r) {
+		item.done = true;
+		v.fly = false;
+		v.x = item.to.x;
+		v.y = item.to.y;
+		v.rot = 0;
+		v.sx = 1.25;
+		v.sy = 0.78;
+		if (r.tickGap <= 0) {
+			r.tickGap = 0.05;
+			this.onRemix?.('tick', r.lands++);
+		}
+	}
+
+	launchRemix() {
+		const r = this.remix;
+		r.phase = 'fly';
+		r.t = 0;
+		this.onRemix?.('boom');
 	}
 
 	update(dt) {
 		this.time += dt;
 		this.fx.update(dt);
-		for (const f of this.floaters) {
-			f.y -= f.speed * dt;
-			f.rot += f.vr * dt;
-			if (f.y < -0.15) Object.assign(f, this.newFloater(false));
-		}
+		this.updateFloaters(dt);
 		this.appear = this.appear.map((a) => Math.min(1, a + dt * 4));
 		if (this.returning) {
 			this.returning.t += dt / 0.18;
@@ -244,54 +351,75 @@ export class View {
 
 		const g = this.game;
 		if (!g) return;
+		this.updateBlocks(dt, g);
+		this.updateRemix(dt);
+		this.updateChips(dt, g);
+		if (this.landCount && this.onLand) this.onLand(this.landCount);
+		this.updateDying(dt);
+	}
+
+	updateFloaters(dt) {
+		for (const f of this.floaters) {
+			f.y -= f.speed * dt;
+			f.rot += f.vr * dt;
+			if (f.y < -0.15) Object.assign(f, this.newFloater(false));
+		}
+	}
+
+	/** Moves every block toward its cell: it rises to the ceiling, squashes when it lands, and settles. */
+	updateBlocks(dt, g) {
 		const alive = new Set();
 		for (let i = 0; i < g.grid.length; i++) {
 			const b = g.grid[i];
 			if (!b) continue;
 			alive.add(b.id);
-			const gx = i % g.cols;
-			const gy = Math.floor(i / g.cols);
-			let v = this.vis.get(b.id);
+			const gx = g.columnOf(i);
+			const gy = g.rowOf(i);
+			let v = this.blockVisuals.get(b.id);
 			if (!v) {
 				v = this.newVis(gx, gy);
-				this.vis.set(b.id, v);
+				this.blockVisuals.set(b.id, v);
 			}
+			if (v.fly) continue; // the Remix show moves this block
 			if (v.delay > 0) {
 				v.delay -= dt;
 				continue;
 			}
 			v.x += (gx - v.x) * Math.min(1, dt * 20);
 			if (Math.abs(gx - v.x) < 0.01) v.x = gx;
-			if (!this.holdFalls) {
-				if (v.y > gy) {
-					v.vy += GRAVITY * dt;
-					v.y -= v.vy * dt;
-					if (v.y <= gy) {
-						v.y = gy;
-						if (v.vy > 4) {
-							v.sy = 0.78;
-							v.sx = 1.14;
-							this.landCount++;
-						}
-						v.vy = 0;
-					}
-				} else if (v.y < gy) {
-					v.y = gy;
-				}
-			}
+			if (!this.holdFalls) this.riseBlock(v, gy, dt);
 			v.sx += (1 - v.sx) * Math.min(1, dt * 16);
 			v.sy += (1 - v.sy) * Math.min(1, dt * 16);
 			v.forge = Math.max(0, v.forge - dt * 1.8);
 		}
-		for (const id of this.vis.keys()) if (!alive.has(id)) this.vis.delete(id);
+		for (const id of this.blockVisuals.keys()) if (!alive.has(id)) this.blockVisuals.delete(id);
+	}
 
+	/** One block rises toward its row, and squashes when it lands hard. */
+	riseBlock(v, row, dt) {
+		if (v.y > row) {
+			v.vy += GRAVITY * dt;
+			v.y -= v.vy * dt;
+			if (v.y <= row) {
+				v.y = row;
+				if (v.vy > 4) {
+					v.sy = 0.78;
+					v.sx = 1.14;
+				}
+				v.vy = 0;
+			}
+		} else if (v.y < row) {
+			v.y = row;
+		}
+	}
+
+	updateChips(dt, g) {
 		if (g.bag.length > this.lastBag) this.chipPop[g.bag.length - 1] = 0;
 		this.lastBag = g.bag.length;
 		this.chipPop = this.chipPop.map((t) => Math.min(1, (t ?? 1) + dt * 3));
+	}
 
-		if (this.landCount && this.onLand) this.onLand(this.landCount);
-		this.landCount = 0;
-
+	updateDying(dt) {
 		for (const d of this.dying) {
 			if (d.delay > 0) {
 				d.delay -= dt;
@@ -301,7 +429,7 @@ export class View {
 			if (d.t >= CLEAR_TIME && !d.done) {
 				d.done = true;
 				const c = this.cellCenter(d.x, d.y);
-				this.fx.shatter(c.x, c.y, this.cell, d.block.color, d.block.kind === 'plain' ? 1 : 1.8);
+				this.fx.shatter({ x: c.x, y: c.y, size: this.cell, colorIndex: d.block.color, power: d.block.kind === 'plain' ? 1 : 1.8 });
 			}
 		}
 		this.dying = this.dying.filter((d) => !d.done);
@@ -378,9 +506,8 @@ export class View {
 		// Columns close to full glow red at the tray end as a warning.
 		const floorY = this.boardY + this.boardH;
 		for (let x = 0; x < game.cols; x++) {
-			const h = game.height(x);
-			const danger = h - (game.rows - 3);
-			if (danger <= 0) continue;
+			const danger = game.dangerOf(x);
+			if (danger === 0) continue;
 			const grad = ctx.createLinearGradient(0, floorY, 0, floorY - cell * 2.5);
 			const a = 0.12 + danger * 0.08 + 0.05 * Math.sin(this.time * 6);
 			grad.addColorStop(0, `rgba(255,80,100,${a})`);
@@ -390,40 +517,60 @@ export class View {
 		}
 	}
 
-	blockImage(block) {
-		return this.sprites[block.kind][block.color];
+	blockImage(block, color = block.color) {
+		return this.sprites[block.kind][color];
 	}
 
-	drawBlock(block, x, y, sx = 1, sy = 1, alpha = 1) {
+	drawBlock(block, x, y, sx = 1, sy = 1, alpha = 1, color = block.color, rot = 0) {
 		const { ctx, cell } = this;
 		const cx = this.boardX + (x + 0.5) * cell;
 		const top = this.boardY + y * cell;
 		const w = cell * sx;
 		const h = cell * sy;
 		ctx.globalAlpha = alpha;
-		ctx.drawImage(this.blockImage(block), cx - w / 2, top, w, h);
+		if (rot) {
+			ctx.save();
+			ctx.translate(cx, top + cell / 2);
+			ctx.rotate(rot);
+			ctx.drawImage(this.blockImage(block, color), -w / 2, -h / 2, w, h);
+			ctx.restore();
+		} else {
+			ctx.drawImage(this.blockImage(block, color), cx - w / 2, top, w, h);
+		}
 		ctx.globalAlpha = 1;
 	}
 
 	drawBlocks() {
-		const { game, ctx, cell } = this;
+		const { game } = this;
 		const preview = this.previewCells();
+		const flying = [];
 		for (let i = 0; i < game.grid.length; i++) {
 			const b = game.grid[i];
 			if (!b) continue;
-			const v = this.vis.get(b.id);
+			const v = this.blockVisuals.get(b.id);
 			if (!v || v.delay > 0) continue;
-			this.drawBlock(b, v.x, v.y, v.sx, v.sy);
-			if (preview && preview.has(i)) this.drawMatchMark(v.x, v.y);
-			if (v.forge > 0) {
-				const c = this.cellCenter(v.x, v.y);
-				const s = cell * (1 + (1 - v.forge) * 1.6);
-				ctx.globalCompositeOperation = 'lighter';
-				ctx.globalAlpha = v.forge;
-				ctx.drawImage(this.sprites.glowWhite, c.x - s / 2, c.y - s / 2, s, s);
-				ctx.globalAlpha = 1;
-				ctx.globalCompositeOperation = 'source-over';
+			if (v.fly) {
+				flying.push([b, v]);
+				continue;
 			}
+			this.drawOneBlock(b, v);
+			if (preview && preview.has(i)) this.drawMatchMark(v.x, v.y);
+		}
+		// Blocks in the air draw on top of the ones that landed.
+		for (const [b, v] of flying) this.drawOneBlock(b, v);
+	}
+
+	drawOneBlock(b, v) {
+		const { ctx, cell } = this;
+		this.drawBlock(b, v.x + (v.jx || 0), v.y + (v.jy || 0), v.sx, v.sy, 1, b.color, v.rot || 0);
+		if (v.forge > 0) {
+			const c = this.cellCenter(v.x, v.y);
+			const s = cell * (1 + (1 - v.forge) * 1.6);
+			ctx.globalCompositeOperation = 'lighter';
+			ctx.globalAlpha = v.forge;
+			ctx.drawImage(this.sprites.glowWhite, c.x - s / 2, c.y - s / 2, s, s);
+			ctx.globalAlpha = 1;
+			ctx.globalCompositeOperation = 'source-over';
 		}
 	}
 
@@ -453,12 +600,12 @@ export class View {
 
 	/** The active piece and column: from a drag, or from the keyboard cursor. */
 	activeTarget() {
-		if (this.drag && this.drag.moved && this.drag.geo && this.drag.geo.over) {
-			return { piece: this.drag.piece, col: this.drag.geo.col, valid: this.drag.geo.valid };
+		if (this.drag && this.drag.moved && this.drag.geometry && this.drag.geometry.over) {
+			return { piece: this.drag.piece, col: this.drag.geometry.col, valid: this.drag.geometry.valid };
 		}
-		if (this.kb && !this.drag && this.game.pieces[this.kb.slot]) {
-			const piece = this.game.pieces[this.kb.slot];
-			const col = Math.min(this.kb.col, this.game.cols - piece.w);
+		if (this.keyCursor && !this.drag && this.game.pieces[this.keyCursor.slot]) {
+			const piece = this.game.pieces[this.keyCursor.slot];
+			const col = Math.min(this.keyCursor.col, this.game.cols - piece.w);
 			return { piece, col, valid: this.game.fits(piece, col) };
 		}
 		return null;
@@ -473,10 +620,13 @@ export class View {
 		const g = this.game.clone();
 		const slot = 0;
 		g.pieces[slot] = t.piece;
-		g.place(slot, t.col, t.piece);
+		const placed = g.place(slot, t.col, t.piece);
 		const cells = new Set();
 		for (const group of g.findGroups()) for (const c of group.cells) cells.add(c);
-		this.previewCache = { key, cells };
+		// Ghost cells show where the rigid piece rests, so note which of them end up in a match.
+		const ghost = new Set();
+		for (const p of placed) if (cells.has(g.grid.indexOf(p.block))) ghost.add(`${p.x},${p.y}`);
+		this.previewCache = { key, cells, ghost };
 		return cells;
 	}
 
@@ -514,7 +664,7 @@ export class View {
 			roundRect(ctx, x + 3, y + 3, cell - 6, cell - 6, cell * 0.18);
 			ctx.stroke();
 			ctx.setLineDash([]);
-			if (preview && preview.has(game.index(l.x, l.y))) this.drawMatchMark(l.x, l.y);
+			if (preview && this.previewCache.ghost.has(`${l.x},${l.y}`)) this.drawMatchMark(l.x, l.y);
 		}
 	}
 
@@ -535,9 +685,10 @@ export class View {
 		const power = this.power;
 		const cancel = { type: 'cancel', x: bar.x + bar.w - cell * 0.9, y: bar.y, w: cell * 0.9, h: bar.h };
 		if (!power) {
-			const w = Math.min(cell * 2.2, (bar.w - gap * (BAG_SIZE - 1)) / BAG_SIZE);
-			const x0 = bar.x + (bar.w - (w * BAG_SIZE + gap * (BAG_SIZE - 1))) / 2;
-			for (let i = 0; i < BAG_SIZE; i++) rects.push({ type: 'chip', index: i, x: x0 + i * (w + gap), y: bar.y, w, h: bar.h });
+			const n = game.bagSize;
+			const w = Math.min(cell * 2.2, (bar.w - gap * (n - 1)) / n);
+			const x0 = bar.x + (bar.w - (w * n + gap * (n - 1))) / 2;
+			for (let i = 0; i < n; i++) rects.push({ type: 'chip', index: i, x: x0 + i * (w + gap), y: bar.y, w, h: bar.h });
 		} else if (power.kind === 'prism' && power.stage === 'color') {
 			const d = bar.h * 0.9;
 			const n = game.colors;
@@ -566,74 +717,90 @@ export class View {
 	}
 
 	drawBar() {
-		const { ctx, cell, game, power, bar } = this;
+		const { ctx, cell, power, bar } = this;
 		ctx.textBaseline = 'middle';
-		const text = (str, x, y, size, color, align = 'left') => {
-			ctx.font = `800 ${size}px ui-rounded, system-ui, sans-serif`;
-			ctx.textAlign = align;
-			ctx.fillStyle = color;
-			ctx.fillText(str, x, y);
-		};
 		for (const r of this.barRects()) {
-			if (r.type === 'chip') {
-				const kind = game.bag[r.index];
-				const pop = kind ? this.chipPop[r.index] ?? 1 : 1;
-				const k = 1 + Math.sin(pop * Math.PI) * 0.18 + (1 - pop) * 0.2;
-				ctx.save();
-				ctx.translate(r.x + r.w / 2, r.y + r.h / 2);
-				ctx.scale(k, k);
-				ctx.translate(-r.w / 2, -r.h / 2);
-				if (!kind) {
-					ctx.setLineDash([cell * 0.12, cell * 0.1]);
-					ctx.strokeStyle = 'rgba(242,200,121,0.22)';
-					ctx.lineWidth = 1.5;
-					roundRect(ctx, 0, 0, r.w, r.h, cell * 0.22);
-					ctx.stroke();
-					ctx.setLineDash([]);
-				} else {
-					const pulse = 0.5 + 0.5 * Math.sin(this.time * 3 + r.index);
-					ctx.fillStyle = 'rgba(242,200,121,0.16)';
-					roundRect(ctx, 0, 0, r.w, r.h, cell * 0.22);
-					ctx.fill();
-					ctx.strokeStyle = GOLD;
-					ctx.globalAlpha = 0.6 + pulse * 0.4;
-					ctx.lineWidth = 2;
-					ctx.stroke();
-					ctx.globalAlpha = 1;
-					this.drawPowerIcon(kind, cell * 0.5, r.h / 2, r.h * 0.62);
-					text(POWER_NAMES[kind], cell * 0.88, r.h / 2 + 1, Math.max(10, Math.round(cell * 0.3)), '#fff6dc');
-				}
-				ctx.restore();
-			} else if (r.type === 'color') {
-				const sprite = this.sprites.plain[r.color];
-				ctx.drawImage(sprite, r.x, r.y, r.w, r.h);
-				ctx.strokeStyle = '#fff6dc';
-				ctx.lineWidth = 2;
-				ctx.globalAlpha = 0.55 + 0.45 * Math.sin(this.time * 7 + r.color);
-				roundRect(ctx, r.x - 2, r.y - 2, r.w + 4, r.h + 4, cell * 0.2);
-				ctx.stroke();
-				ctx.globalAlpha = 1;
-			} else {
-				ctx.strokeStyle = '#b3a8d6';
-				ctx.lineWidth = 2.5;
-				ctx.lineCap = 'round';
-				const cx = r.x + r.w / 2;
-				const cy = r.y + r.h / 2;
-				const d = cell * 0.2;
-				ctx.beginPath();
-				ctx.moveTo(cx - d, cy - d);
-				ctx.lineTo(cx + d, cy + d);
-				ctx.moveTo(cx + d, cy - d);
-				ctx.lineTo(cx - d, cy + d);
-				ctx.stroke();
-				ctx.lineCap = 'butt';
-			}
+			if (r.type === 'chip') this.drawChip(r);
+			else if (r.type === 'color') this.drawColorChoice(r);
+			else this.drawCancel(r);
 		}
 		if (power) {
 			const msg =
 				power.kind === 'prism' ? (power.stage === 'color' ? '' : 'Tap a piece to paint it') : 'Touch the well to aim, let go to blast';
-			if (msg) text(msg, bar.x + cell * 0.1, bar.y + bar.h / 2, Math.max(11, Math.round(cell * 0.3)), '#fff6dc');
+			if (msg) this.drawBarText(msg, { x: bar.x + cell * 0.1, y: bar.y + bar.h / 2, size: Math.max(11, Math.round(cell * 0.3)) });
 		}
+	}
+
+	drawBarText(str, { x, y, size }) {
+		const { ctx } = this;
+		ctx.font = `800 ${size}px ui-rounded, system-ui, sans-serif`;
+		ctx.textAlign = 'left';
+		ctx.fillStyle = '#fff6dc';
+		ctx.fillText(str, x, y);
+	}
+
+	/** A slot of the power-up bag: a dashed outline when empty, or the power-up with its name. */
+	drawChip(r) {
+		const { ctx, cell, game } = this;
+		const kind = game.bag[r.index];
+		const pop = kind ? this.chipPop[r.index] ?? 1 : 1;
+		const k = 1 + Math.sin(pop * Math.PI) * 0.18 + (1 - pop) * 0.2;
+		ctx.save();
+		ctx.translate(r.x + r.w / 2, r.y + r.h / 2);
+		ctx.scale(k, k);
+		ctx.translate(-r.w / 2, -r.h / 2);
+		if (!kind) {
+			ctx.setLineDash([cell * 0.12, cell * 0.1]);
+			ctx.strokeStyle = 'rgba(242,200,121,0.22)';
+			ctx.lineWidth = 1.5;
+			roundRect(ctx, 0, 0, r.w, r.h, cell * 0.22);
+			ctx.stroke();
+			ctx.setLineDash([]);
+		} else {
+			const pulse = 0.5 + 0.5 * Math.sin(this.time * 3 + r.index);
+			ctx.fillStyle = 'rgba(242,200,121,0.16)';
+			roundRect(ctx, 0, 0, r.w, r.h, cell * 0.22);
+			ctx.fill();
+			ctx.strokeStyle = GOLD;
+			ctx.globalAlpha = 0.6 + pulse * 0.4;
+			ctx.lineWidth = 2;
+			ctx.stroke();
+			ctx.globalAlpha = 1;
+			this.drawPowerIcon(kind, cell * 0.5, r.h / 2, r.h * 0.62);
+			this.drawBarText(POWER_NAMES[kind], { x: cell * 0.88, y: r.h / 2 + 1, size: Math.max(10, Math.round(cell * 0.3)) });
+		}
+		ctx.restore();
+	}
+
+	/** A color to pick for the Prism. */
+	drawColorChoice(r) {
+		const { ctx, cell } = this;
+		const sprite = this.sprites.plain[r.color];
+		ctx.drawImage(sprite, r.x, r.y, r.w, r.h);
+		ctx.strokeStyle = '#fff6dc';
+		ctx.lineWidth = 2;
+		ctx.globalAlpha = 0.55 + 0.45 * Math.sin(this.time * 7 + r.color);
+		roundRect(ctx, r.x - 2, r.y - 2, r.w + 4, r.h + 4, cell * 0.2);
+		ctx.stroke();
+		ctx.globalAlpha = 1;
+	}
+
+	/** The cross that cancels the power-up in use. */
+	drawCancel(r) {
+		const { ctx, cell } = this;
+		ctx.strokeStyle = '#b3a8d6';
+		ctx.lineWidth = 2.5;
+		ctx.lineCap = 'round';
+		const cx = r.x + r.w / 2;
+		const cy = r.y + r.h / 2;
+		const d = cell * 0.2;
+		ctx.beginPath();
+		ctx.moveTo(cx - d, cy - d);
+		ctx.lineTo(cx + d, cy + d);
+		ctx.moveTo(cx + d, cy - d);
+		ctx.lineTo(cx - d, cy + d);
+		ctx.stroke();
+		ctx.lineCap = 'butt';
 	}
 
 	/** Small icon for a power-up, centered at (cx, cy) and about `size` wide. */
@@ -641,65 +808,9 @@ export class View {
 		const r = size / 2;
 		ctx.save();
 		ctx.translate(cx, cy);
-		if (kind === 'prism') {
-			// A gem cut into four colored facets.
-			const pts = [[0, -r], [r, 0], [0, r], [-r, 0]];
-			for (let i = 0; i < 4; i++) {
-				ctx.fillStyle = PALETTE[i].base;
-				ctx.beginPath();
-				ctx.moveTo(0, 0);
-				ctx.lineTo(...pts[i]);
-				ctx.lineTo(...pts[(i + 1) % 4]);
-				ctx.closePath();
-				ctx.fill();
-			}
-			ctx.strokeStyle = '#fff6dc';
-			ctx.lineWidth = 1.2;
-			ctx.beginPath();
-			ctx.moveTo(...pts[0]);
-			pts.slice(1).forEach((p) => ctx.lineTo(...p));
-			ctx.closePath();
-			ctx.stroke();
-		} else if (kind === 'blast') {
-			// A burst: a bright core with eight rays.
-			ctx.strokeStyle = '#ffd98a';
-			ctx.lineWidth = Math.max(1.5, r * 0.28);
-			ctx.lineCap = 'round';
-			ctx.beginPath();
-			for (let i = 0; i < 8; i++) {
-				const a = (i / 8) * Math.PI * 2;
-				ctx.moveTo(Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55);
-				ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-			}
-			ctx.stroke();
-			ctx.fillStyle = '#fff6dc';
-			ctx.beginPath();
-			ctx.arc(0, 0, r * 0.4, 0, Math.PI * 2);
-			ctx.fill();
-		} else {
-			// Two arrows chasing each other in a circle.
-			ctx.strokeStyle = '#bfe6ff';
-			ctx.fillStyle = '#bfe6ff';
-			ctx.lineWidth = Math.max(1.5, r * 0.26);
-			ctx.lineCap = 'round';
-			for (let i = 0; i < 2; i++) {
-				ctx.save();
-				ctx.rotate(i * Math.PI);
-				ctx.beginPath();
-				ctx.arc(0, 0, r * 0.72, -Math.PI * 0.85, -Math.PI * 0.1);
-				ctx.stroke();
-				const a = -Math.PI * 0.1;
-				const ax = Math.cos(a) * r * 0.72;
-				const ay = Math.sin(a) * r * 0.72;
-				ctx.beginPath();
-				ctx.moveTo(ax + r * 0.38, ay - r * 0.05);
-				ctx.lineTo(ax - r * 0.12, ay - r * 0.3);
-				ctx.lineTo(ax - r * 0.12, ay + r * 0.3);
-				ctx.closePath();
-				ctx.fill();
-				ctx.restore();
-			}
-		}
+		if (kind === 'prism') drawPrismIcon(ctx, r);
+		else if (kind === 'blast') drawBlastIcon(ctx, r);
+		else drawRemixIcon(ctx, r);
 		ctx.restore();
 	}
 
@@ -719,8 +830,8 @@ export class View {
 		ctx.stroke();
 		ctx.strokeStyle = `rgba(255,120,120,${0.7 + pulse * 0.3})`;
 		for (const i of hit) {
-			const bx = i % game.cols;
-			const by = Math.floor(i / game.cols);
+			const bx = game.columnOf(i);
+			const by = game.rowOf(i);
 			roundRect(ctx, this.boardX + bx * cell + 3, this.boardY + by * cell + 3, cell - 6, cell - 6, cell * 0.2);
 			ctx.stroke();
 		}
@@ -730,7 +841,7 @@ export class View {
 		const { ctx, game } = this;
 		game.pieces.forEach((piece, i) => {
 			const s = this.slots[i];
-			const selected = this.kb && this.kb.slot === i && !this.drag;
+			const selected = this.keyCursor && this.keyCursor.slot === i && !this.drag;
 			const paintable = Boolean(piece) && this.power && this.power.kind === 'prism' && this.power.stage === 'piece';
 			ctx.fillStyle = selected || paintable ? 'rgba(242,200,121,0.14)' : 'rgba(255,255,255,0.035)';
 			roundRect(ctx, s.x + 6, s.y, s.w - 12, s.h, 14);
@@ -746,7 +857,7 @@ export class View {
 			if (this.drag && this.drag.slot === i && this.drag.moved) return;
 			if (this.returning && this.returning.slot === i) return;
 			const pos = this.slotPiecePos(i, piece);
-			const fits = game.canPlaceAny(piece);
+			const fits = game.canPlace(piece);
 			const a = this.appear[i] ?? 1;
 			const pop = a < 1 ? 0.5 + 0.5 * (1 - Math.pow(1 - a, 3)) + Math.sin(a * Math.PI) * 0.12 : 1;
 			const lifted = this.drag && this.drag.slot === i ? 1.08 : 1;
@@ -758,35 +869,13 @@ export class View {
 			ctx.scale(k, k);
 			this.drawPieceAt(piece, -(piece.w * pos.c) / 2, -(piece.h * pos.c) / 2, pos.c, fits ? 1 : 0.3);
 			ctx.restore();
-			// Small turn arrow, so players know a tap turns the piece.
-			this.drawTurnIcon(s.x + s.w - 22, s.y + 16, fits ? 0.55 : 0.25);
 		});
-	}
-
-	drawTurnIcon(x, y, alpha) {
-		const { ctx } = this;
-		ctx.globalAlpha = alpha;
-		ctx.strokeStyle = GOLD;
-		ctx.lineWidth = 2;
-		ctx.beginPath();
-		ctx.arc(x, y, 6, -Math.PI * 0.9, Math.PI * 0.6);
-		ctx.stroke();
-		ctx.fillStyle = GOLD;
-		ctx.beginPath();
-		const ax = x + Math.cos(Math.PI * 0.6) * 6;
-		const ay = y + Math.sin(Math.PI * 0.6) * 6;
-		ctx.moveTo(ax - 4, ay - 1);
-		ctx.lineTo(ax + 3, ay - 3);
-		ctx.lineTo(ax + 1, ay + 4);
-		ctx.closePath();
-		ctx.fill();
-		ctx.globalAlpha = 1;
 	}
 
 	drawDragged() {
 		const { ctx, cell } = this;
-		if (this.drag && this.drag.moved && this.drag.geo) {
-			const { left, top } = this.drag.geo;
+		if (this.drag && this.drag.moved && this.drag.geometry) {
+			const { left, top } = this.drag.geometry;
 			ctx.fillStyle = 'rgba(0,0,0,0.3)';
 			for (const c of this.drag.piece.cells) {
 				roundRect(ctx, left + c.dx * cell + 5, top + c.dy * cell + 9, cell - 6, cell - 6, cell * 0.2);
@@ -831,5 +920,69 @@ export class View {
 		ctx.fill();
 		ctx.stroke();
 		ctx.globalAlpha = 1;
+	}
+}
+
+/** A gem cut into four colored facets. */
+function drawPrismIcon(ctx, r) {
+	const pts = [[0, -r], [r, 0], [0, r], [-r, 0]];
+	for (let i = 0; i < 4; i++) {
+		ctx.fillStyle = PALETTE[i].base;
+		ctx.beginPath();
+		ctx.moveTo(0, 0);
+		ctx.lineTo(...pts[i]);
+		ctx.lineTo(...pts[(i + 1) % 4]);
+		ctx.closePath();
+		ctx.fill();
+	}
+	ctx.strokeStyle = '#fff6dc';
+	ctx.lineWidth = 1.2;
+	ctx.beginPath();
+	ctx.moveTo(...pts[0]);
+	pts.slice(1).forEach((p) => ctx.lineTo(...p));
+	ctx.closePath();
+	ctx.stroke();
+}
+
+/** A burst: a bright core with eight rays. */
+function drawBlastIcon(ctx, r) {
+	ctx.strokeStyle = '#ffd98a';
+	ctx.lineWidth = Math.max(1.5, r * 0.28);
+	ctx.lineCap = 'round';
+	ctx.beginPath();
+	for (let i = 0; i < 8; i++) {
+		const a = (i / 8) * Math.PI * 2;
+		ctx.moveTo(Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55);
+		ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+	}
+	ctx.stroke();
+	ctx.fillStyle = '#fff6dc';
+	ctx.beginPath();
+	ctx.arc(0, 0, r * 0.4, 0, Math.PI * 2);
+	ctx.fill();
+}
+
+/** Two arrows chasing each other in a circle. */
+function drawRemixIcon(ctx, r) {
+	ctx.strokeStyle = '#bfe6ff';
+	ctx.fillStyle = '#bfe6ff';
+	ctx.lineWidth = Math.max(1.5, r * 0.26);
+	ctx.lineCap = 'round';
+	for (let i = 0; i < 2; i++) {
+		ctx.save();
+		ctx.rotate(i * Math.PI);
+		ctx.beginPath();
+		ctx.arc(0, 0, r * 0.72, -Math.PI * 0.85, -Math.PI * 0.1);
+		ctx.stroke();
+		const a = -Math.PI * 0.1;
+		const ax = Math.cos(a) * r * 0.72;
+		const ay = Math.sin(a) * r * 0.72;
+		ctx.beginPath();
+		ctx.moveTo(ax + r * 0.38, ay - r * 0.05);
+		ctx.lineTo(ax - r * 0.12, ay - r * 0.3);
+		ctx.lineTo(ax - r * 0.12, ay + r * 0.3);
+		ctx.closePath();
+		ctx.fill();
+		ctx.restore();
 	}
 }

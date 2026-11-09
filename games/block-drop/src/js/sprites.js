@@ -8,6 +8,11 @@ export const PALETTE = [
 	{ name: 'Dusk', base: '#b285ff', light: '#e6d6ff', dark: '#5a2ab0', glyph: 'moon' },
 ];
 
+/** Paints the shared palette. Rebuild the sprites afterwards (view.sprites = null; view.layout()). */
+export function paintPalette(colors) {
+	colors.forEach((c, i) => Object.assign(PALETTE[i], c));
+}
+
 export const LEAD = '#130f26';
 export const GOLD = '#f2c879';
 

@@ -15,10 +15,18 @@
 		<link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
 		<link rel="icon" href="icons/icon-32.png" sizes="32x32" type="image/png" />
 		<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-		<link rel="stylesheet" href="css/style.css" />
+		<link rel="stylesheet" href="css/base.css" />
+		<link rel="stylesheet" href="css/hud.css" />
+		<link rel="stylesheet" href="css/button.css" />
+		<link rel="stylesheet" href="css/screen.css" />
+		<link rel="stylesheet" href="css/panel.css" />
+		<link rel="stylesheet" href="css/settings.css" />
+		<link rel="stylesheet" href="css/tutorial.css" />
+		<link rel="stylesheet" href="css/shop.css" />
+		<link rel="stylesheet" href="css/notice.css" />
 	</head>
 	<body>
-		<div class="app" id="app" data-screen="title">
+		<main class="app" id="app" data-screen="title">
 			<header class="hud" id="hud">
 				<div class="hud__score">
 					<span class="hud__label">Score</span>
@@ -30,13 +38,17 @@
 						<span class="hud__bar"><span class="hud__bar-fill" id="time-fill"></span></span>
 					</div>
 					<span class="hud__chip" id="lab-chip" hidden>Lab</span>
+					<div class="hud__wallet">
+						<span class="hud__glints" id="hud-glints" title="Glints">✦ <span id="glints">0</span></span>
+						<button class="hud__reroll" id="reroll" type="button" data-action="reroll" aria-label="Swap the tray for new pieces">↻ <span id="reroll-cost">✦10</span></button>
+					</div>
 				</div>
 				<div class="hud__best">
 					<span class="hud__label">Best</span>
 					<span class="hud__value hud__value--small" id="best">0</span>
 				</div>
 				<button class="icon-button" id="pause-button" type="button" aria-label="Pause">
-					<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.5" /><rect x="14" y="5" width="4" height="14" rx="1.5" /></svg>
+					<svg class="icon-button__icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.5" /><rect x="14" y="5" width="4" height="14" rx="1.5" /></svg>
 				</button>
 			</header>
 
@@ -48,13 +60,18 @@
 				</div>
 				<h1 class="logo__name">Glintwell</h1>
 				<p class="logo__tag">Drop glass. Match light. Chain the glow.</p>
+				<p class="wallet" id="wallet-title">✦ <span class="wallet__n">0</span> Glints</p>
 				<div class="menu">
 					<button class="button button--big" type="button" data-action="play-endless">
-						<span>Endless</span><small id="best-endless">Best 0</small>
+						<span>Endless</span><small class="button__note" id="best-endless">Best 0</small>
 					</button>
 					<button class="button button--big" type="button" data-action="play-timed">
-						<span>Timed · 90s</span><small id="best-timed">Best 0</small>
+						<span>Timed · 90s</span><small class="button__note" id="best-timed">Best 0</small>
 					</button>
+					<div class="menu__row">
+						<button class="button button--stack" type="button" data-action="play-daily"><span>Daily</span><small class="button__note" id="daily-sub">Same pieces for everyone</small></button>
+						<button class="button button--stack" type="button" data-action="shop"><span>Shop</span><small class="button__note">Skins · upgrades</small></button>
+					</div>
 					<div class="menu__row">
 						<button class="button" type="button" data-action="tutorial">How to play</button>
 						<button class="button" type="button" data-action="settings">Settings</button>
@@ -62,7 +79,7 @@
 					<button class="button button--install" type="button" id="install-button" hidden>Install the game</button>
 				</div>
 				<div class="ios-hint" id="ios-hint" hidden>
-					<p>
+					<p class="ios-hint__text">
 						To install: tap
 						<svg class="ios-hint__icon" viewBox="0 0 24 24" aria-label="Share"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5" /><path d="M6 11H5v10h14V11h-1" /></svg>
 						<b>Share</b>, then <b>Add to Home Screen</b>.
@@ -71,6 +88,53 @@
 				</div>
 				<a class="arcade-link" id="arcade-link" href="../" hidden>‹ Back to the arcade</a>
 				<p class="version" id="version-title"></p>
+			</section>
+
+			<section class="screen screen--modal" id="screen-start" aria-label="Before you start" hidden>
+				<div class="panel panel--scroll">
+					<h2 class="panel__title">Before you start</h2>
+					<p class="wallet" id="start-wallet"></p>
+					<div class="menu">
+						<button class="button button--perk" type="button" data-action="start-warmup" aria-pressed="false">
+							<span>Warm-up · the game plays 20 rounds</span><small class="button__note" id="cost-warmup"></small>
+						</button>
+						<p class="panel__note">Start with a power-up</p>
+						<div class="menu__row">
+							<button class="button button--perk" type="button" data-action="start-power" data-kind="prism" aria-pressed="false"><span>Prism</span></button>
+							<button class="button button--perk" type="button" data-action="start-power" data-kind="blast" aria-pressed="false"><span>Blast</span></button>
+							<button class="button button--perk" type="button" data-action="start-power" data-kind="remix" aria-pressed="false"><span>Remix</span></button>
+						</div>
+						<p class="panel__note" id="cost-power"></p>
+						<button class="button button--perk" type="button" data-action="start-ban" aria-pressed="false">
+							<span id="ban-label">Ban a shape from this game</span><small class="button__note" id="cost-ban"></small>
+						</button>
+						<button class="button button--big" type="button" data-action="start-go"><span>Start</span><small class="button__note" id="start-total">Free</small></button>
+						<button class="button" type="button" data-action="start-skip">No thanks</button>
+					</div>
+				</div>
+			</section>
+
+			<section class="screen screen--modal" id="screen-ban" aria-label="Ban a shape" hidden>
+				<div class="panel panel--scroll">
+					<h2 class="panel__title">Ban a shape</h2>
+					<p class="panel__note">It will not show up this game.</p>
+					<div class="shapegrid" id="shape-grid"></div>
+					<div class="menu">
+						<button class="button" type="button" data-action="ban-none">No ban</button>
+					</div>
+				</div>
+			</section>
+
+			<section class="screen screen--modal" id="screen-shop" aria-label="Shop" hidden>
+				<div class="panel panel--scroll">
+					<h2 class="panel__title">Shop</h2>
+					<p class="wallet" id="shop-wallet"></p>
+					<div class="shop" id="shop-body"></div>
+					<p class="panel__note">Boosts for one game are offered when you start a game. Rerolls and second winds are bought when you need them.</p>
+					<div class="menu">
+						<button class="button button--big" type="button" data-action="shop-back">Back</button>
+					</div>
+				</div>
 			</section>
 
 			<section class="screen screen--modal" id="screen-pause" aria-label="Paused" hidden>
@@ -92,13 +156,25 @@
 					<p class="final" id="final-score">0</p>
 					<p class="new-best" id="new-best" hidden>New best!</p>
 					<dl class="stats">
-						<div><dt>Best</dt><dd id="over-best">0</dd></div>
-						<div><dt>Longest chain</dt><dd id="over-chain">0</dd></div>
-						<div><dt>Blocks cleared</dt><dd id="over-cleared">0</dd></div>
-						<div><dt>Power-ups earned · used</dt><dd id="over-specials">0 · 0</dd></div>
+						<div class="stats__item"><dt class="stats__label">Best</dt><dd class="stats__value" id="over-best">0</dd></div>
+						<div class="stats__item"><dt class="stats__label">Longest chain</dt><dd class="stats__value" id="over-chain">0</dd></div>
+						<div class="stats__item"><dt class="stats__label">Blocks cleared</dt><dd class="stats__value" id="over-cleared">0</dd></div>
+						<div class="stats__item"><dt class="stats__label">Power-ups earned · used</dt><dd class="stats__value" id="over-specials">0 · 0</dd></div>
+						<div class="stats__item"><dt class="stats__label">Glints earned</dt><dd class="stats__value" id="over-glints">✦ 0</dd></div>
+						<div class="stats__item"><dt class="stats__label">Glints saved</dt><dd class="stats__value" id="over-wallet">✦ 0</dd></div>
 					</dl>
+					<p class="panel__note" id="over-daily" hidden></p>
 					<p class="panel__note" id="over-lab" hidden>Played with Lab rules.</p>
 					<div class="menu">
+						<button class="button button--big button--perk" type="button" id="second-wind" data-action="second-wind" hidden>
+							<span>Keep going · clear the bottom 4 rows</span><small class="button__note" id="second-wind-cost"></small>
+						</button>
+						<button class="button button--perk" type="button" id="reroll-over" data-action="reroll-over" hidden>
+							<span>Reroll the tray</span><small class="button__note" id="reroll-over-cost"></small>
+						</button>
+						<button class="button button--big button--perk" type="button" id="extend-time" data-action="extend-time" hidden>
+							<span>Keep going · +15 seconds</span><small class="button__note" id="extend-time-cost"></small>
+						</button>
 						<button class="button button--big" type="button" data-action="restart">Play again</button>
 						<button class="button" type="button" data-action="quit">Title</button>
 					</div>
@@ -109,25 +185,25 @@
 				<div class="panel panel--scroll">
 					<h2 class="panel__title">Settings</h2>
 					<div class="settings">
-						<label class="toggle"><span>Sound effects</span><input type="checkbox" data-setting="sfx" /></label>
-						<label class="toggle"><span>Music</span><input type="checkbox" data-setting="music" /></label>
-						<label class="toggle" id="vibrate-row"><span>Vibration</span><input type="checkbox" data-setting="vibrate" /></label>
-						<label class="toggle"><span>Screen shake</span><input type="checkbox" data-setting="shake" /></label>
+						<label class="toggle"><span>Sound effects</span><input class="toggle__input" type="checkbox" data-setting="sfx" /></label>
+						<label class="toggle"><span>Music</span><input class="toggle__input" type="checkbox" data-setting="music" /></label>
+						<label class="toggle" id="vibrate-row"><span>Vibration</span><input class="toggle__input" type="checkbox" data-setting="vibrate" /></label>
+						<label class="toggle"><span>Screen shake</span><input class="toggle__input" type="checkbox" data-setting="shake" /></label>
 					</div>
 
 					<h3 class="panel__sub">Lab</h3>
 					<p class="panel__note">Test other sizes. They start with the next game.</p>
 					<div class="lab">
 						<fieldset class="seg">
-							<legend>Grid size</legend>
-							<label><input type="radio" name="grid" value="small" /><span>Small</span></label>
-							<label><input type="radio" name="grid" value="medium" /><span>Medium</span></label>
-							<label><input type="radio" name="grid" value="large" /><span>Large</span></label>
+							<legend class="seg__legend">Grid size</legend>
+							<label class="seg__option"><input class="seg__input" type="radio" name="grid" value="small" /><span class="seg__label">Small</span></label>
+							<label class="seg__option"><input class="seg__input" type="radio" name="grid" value="medium" /><span class="seg__label">Medium</span></label>
+							<label class="seg__option"><input class="seg__input" type="radio" name="grid" value="large" /><span class="seg__label">Large</span></label>
 						</fieldset>
 						<fieldset class="seg">
-							<legend>Pieces per turn</legend>
-							<label><input type="radio" name="pieces" value="2" /><span>2</span></label>
-							<label><input type="radio" name="pieces" value="3" /><span>3</span></label>
+							<legend class="seg__legend">Pieces per turn</legend>
+							<label class="seg__option"><input class="seg__input" type="radio" name="pieces" value="2" /><span class="seg__label">2</span></label>
+							<label class="seg__option"><input class="seg__input" type="radio" name="pieces" value="3" /><span class="seg__label">3</span></label>
 						</fieldset>
 						<button class="button button--small" type="button" data-action="lab-reset">Reset Lab</button>
 					</div>
@@ -156,9 +232,9 @@
 				</div>
 			</section>
 
-			<div class="banner" id="banner" hidden></div>
+			<div class="banner" id="banner" role="status" hidden></div>
 			<button class="toast" id="update-toast" type="button" hidden>Update ready, tap to reload</button>
-		</div>
+		</main>
 		<script type="module" src="js/main.js"></script>
 	</body>
 </html>

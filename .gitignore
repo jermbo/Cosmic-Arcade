@@ -25,3 +25,4 @@ pnpm-debug.log*
 
 # published game builds (made by scripts/publish-games.js)
 public/games/
+.vercel

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<meta name="robots" content="noindex, nofollow" />
+		<meta name="theme-color" content="#0d0a1f" />
+		<title>Glintwell Shape Lab</title>
+		<link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+		<link rel="stylesheet" href="css/shape-lab.css" />
+	</head>
+	<body>
+		<header>
+			<div>
+				<h1>Shape Lab</h1>
+				<p class="sub">Draw the pieces. Pieces never turn, so each form is its own shape. <a href="index.html">Back to the game</a></p>
+			</div>
+			<div class="bar">
+				<span class="dirty" id="dirty" hidden>Not saved to the game yet</span>
+				<button class="primary" id="save" type="button">Save to game</button>
+				<button id="copy" type="button">Copy code</button>
+				<button id="download" type="button">Download shapes.js</button>
+				<button class="danger" id="reset" type="button">Back to built-in shapes</button>
+			</div>
+		</header>
+
+		<main class="layout">
+			<section class="panel" aria-label="All shapes">
+				<h2>Shapes (<span id="count">0</span>)</h2>
+				<div class="list" id="list"></div>
+				<div class="row">
+					<button id="add" type="button">+ New</button>
+					<button id="dup" type="button">Duplicate</button>
+					<button class="danger" id="del" type="button">Delete</button>
+				</div>
+			</section>
+
+			<section class="panel" aria-label="Edit the selected shape">
+				<h2>Edit</h2>
+				<div class="editor" id="editor" role="group" aria-label="Shape grid. Press a square to add or remove a block."></div>
+				<div class="row">
+					<button id="flipH" type="button" title="Mirror left and right">Flip ↔</button>
+					<button id="flipV" type="button" title="Mirror top and bottom">Flip ↕</button>
+					<button id="turn" type="button" title="Turn this shape a quarter turn">Turn ⟳</button>
+					<button id="clear" type="button">Clear</button>
+				</div>
+				<div class="row">
+					<button id="addTurns" type="button" title="Add this shape turned 90, 180 and 270 degrees as new shapes">Add all turns</button>
+					<button id="addMirror" type="button" title="Add the mirror image as a new shape">Add mirror</button>
+					<button id="colors" type="button">New colors</button>
+				</div>
+				<label class="weight">Weight
+					<input id="weight" type="range" min="1" max="9" step="1" />
+					<b id="weightNum">3</b>
+				</label>
+				<div class="stats" id="stats"></div>
+				<ul class="warn" id="warn"></ul>
+			</section>
+
+			<section class="panel" aria-label="Drop test">
+				<h2>Drop test</h2>
+				<p class="stats stats--intro">The piece rises as one rigid shape, so it only fits if the whole shape fits. Hover a column to see where it rests. Click to drop it.</p>
+				<div class="row row--form">
+					<label>Stack height up to <input id="maxFill" type="number" min="0" max="9" value="6" /></label>
+					<button id="stacks" type="button">New stacks</button>
+					<button id="fullRow" type="button">Nearly full</button>
+				</div>
+				<div class="well" id="well" aria-label="A test well"></div>
+				<p class="hint" id="testHint"></p>
+			</section>
+		</main>
+
+		<section class="panel panel--export" id="exportPanel" hidden>
+			<h2>shapes.js</h2>
+			<p class="stats">Paste this over <b>src/js/shapes.js</b> to make these shapes the built-in ones.</p>
+			<textarea id="code" readonly spellcheck="false"></textarea>
+		</section>
+
+		<div class="toast" id="toast" role="status" hidden></div>
+		<script type="module" src="js/shape-lab.js"></script>
+	</body>
+</html>
