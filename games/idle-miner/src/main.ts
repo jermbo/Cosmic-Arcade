@@ -26,6 +26,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 const canvas = $<HTMLCanvasElement>('stage');
 const ctx = canvas.getContext('2d')!;
 const ui = {
+	dock: $('dock'),
 	hud: $('hud'),
 	credits: $('credits'),
 	income: $('income'),
@@ -68,7 +69,9 @@ let lastTapAt = 0;
 let uiTimer = 0;
 let saveTimer = 0;
 let progressTimer = 0;
-let problemWhere: { planet: number; cell: number } | null = null;
+/** cell the inspect panel's Show button jumps to */
+let inspectGoto = -1;
+let problemWhere: { planet: number; cell: number; kind: sim.Problem['kind'] } | null = null;
 let toolbarKey = '';
 let flash = 0;
 let devSpeed = 1;
@@ -126,17 +129,41 @@ function resize() {
 	relayout();
 }
 
+/** Landscape phones: the dock is a left rail and the toolbar a right rail (see style.css). */
+const railQuery = window.matchMedia('(orientation: landscape) and (max-height: 540px)');
+railQuery.addEventListener('change', resize);
+
+/** Finds the free play area around the UI panels and fits the view to it. */
 function relayout() {
-	const goalRect = ui.goal.hidden ? ui.hud.getBoundingClientRect() : ui.goal.getBoundingClientRect();
-	if (view === 'space') {
-		const top = Math.max(goalRect.bottom + 6, 70);
-		space.layout(W, H, top, Math.min(150, H * 0.2));
+	const rail = railQuery.matches;
+	const dock = ui.dock.getBoundingClientRect();
+	const docked = !ui.hud.hidden;
+	let top: number;
+	let left = 0;
+	let right = 0;
+	let bottom: number;
+	if (rail) {
+		top = 8;
+		left = docked ? dock.right + 4 : 0;
 	} else {
-		const topRect = ui.pvTop.getBoundingClientRect();
-		const bar = ui.toolbar.getBoundingClientRect();
-		const bottom = H - (ui.toolbar.hidden ? H - 8 : bar.top) + 6;
-		pv.layout(W, H, topRect.bottom + 4, bottom);
+		top = Math.max(dock.bottom + (view === 'space' ? 6 : 4), view === 'space' ? 70 : 0);
 	}
+	if (view === 'space') {
+		bottom = Math.min(150, H * 0.2);
+		space.layout(W, H, top, bottom, left, right);
+	} else {
+		const bar = ui.toolbar.getBoundingClientRect();
+		if (ui.toolbar.hidden) bottom = 8;
+		else if (rail) {
+			bottom = 8;
+			right = W - bar.left + 4;
+		} else bottom = H - bar.top + 6;
+		pv.layout(W, H, top, bottom, left, right);
+	}
+	const root = document.documentElement.style;
+	root.setProperty('--play-t', `${top}px`);
+	root.setProperty('--play-l', `${left}px`);
+	root.setProperty('--play-r', `${right}px`);
 }
 
 // ---------- start / title ----------
@@ -552,17 +579,39 @@ function updateInspect() {
 	}
 	if (boost > 1 && m.t !== 'pylon') stats += `<span>Pylon <b>+${Math.round((boost - 1) * 100)}%</b></span>`;
 	if (crewMult > 1 && m.t !== 'pylon' && m.t !== 'belt' && m.t !== 'pad') stats += `<span>Crew <b>+${Math.round((crewMult - 1) * 100)}%</b></span>`;
+	// Blocked lines: say why, and offer a way out.
+	const blocks = pv.blocks;
+	const dead = blocks.find((b): b is Extract<sim.Block, { kind: 'dead' }> => b.kind === 'dead' && b.cell === c);
+	const slowHere = blocks.some((b) => b.kind === 'slow' && b.cell === c);
+	const held = blocks.find((b) => b.from === c && b.cell !== c);
+	let warn = '';
+	let fixBtn = '';
+	inspectGoto = -1;
+	if (dead) {
+		if (sim.fixDir(g, pv.pi, c) !== null) {
+			warn = `Blocked: it ${dead.why}.`;
+			fixBtn = '<button class="btn btn--small btn--fix" data-act="fix">Fix</button>';
+		} else warn = `Blocked: it ${dead.why}, and no side is open. Lay a belt next to it.`;
+	} else if (slowHere && m.t === 'pad') {
+		if (p.pad.length >= sim.padCap(p)) warn = 'Pad is full. Buy ships or cargo space.';
+	} else if (slowHere) warn = 'Backed up: items come in faster than it works. Upgrade it or build another.';
+	else if (held) {
+		const what = g.planets[pv.pi].cells[held.cell]!;
+		warn = held.kind === 'dead' ? 'Blocked: the line ends in a dead end.' : `Waiting: the ${MACHINES[what.t].short.toLowerCase()} down the line can't keep up.`;
+		inspectGoto = held.cell;
+		fixBtn = '<button class="btn btn--small btn--fix" data-act="goto">Show</button>';
+	}
 	const canUp = m.t !== 'belt' && m.t !== 'pad';
 	const maxed = m.lv >= def.maxLv;
 	const upCost = canUp && !maxed ? sim.machineUpCost(pv.pi, m) : 0;
 	const lvText = canUp ? `<small>Level ${m.lv}${maxed ? ' (max)' : ''}</small>` : '';
 	const buttons =
 		m.t === 'pad'
-			? `<button class="btn btn--small" data-act="ships">Ships</button>`
-			: `${canUp ? `<button class="btn btn--small" data-act="upgrade" ${!maxed && g.credits >= upCost ? '' : 'disabled'}>${maxed ? 'Max level' : `Upgrade ${fmt(upCost)}`}</button>` : ''}
+			? `${fixBtn}<button class="btn btn--small" data-act="ships">Ships</button>`
+			: `${fixBtn}${canUp ? `<button class="btn btn--small" data-act="upgrade" ${!maxed && g.credits >= upCost ? '' : 'disabled'}>${maxed ? 'Max level' : `Upgrade ${fmt(upCost)}`}</button>` : ''}
 				${m.t !== 'pylon' ? '<button class="btn btn--small btn--ghost" data-act="rotate">Turn</button>' : ''}
 				<button class="btn btn--small btn--danger" data-act="remove">Remove</button>`;
-	const html = `<div class="inspect__head"><b style="color:${def.color}">${def.name}</b>${lvText}<button class="inspect__close" data-act="close" aria-label="Close">×</button></div><p>${desc}</p><div class="inspect__stats">${stats}</div><div class="inspect__row">${buttons}</div>`;
+	const html = `<div class="inspect__head"><b style="color:${def.color}">${def.name}</b>${lvText}<button class="inspect__close" data-act="close" aria-label="Close">×</button></div><p>${desc}</p>${warn ? `<p class="inspect__warn${dead || held?.kind === 'dead' ? '' : ' is-slow'}">${warn}</p>` : ''}<div class="inspect__stats">${stats}</div><div class="inspect__row">${buttons}</div>`;
 	if (ui.inspect.dataset.html !== html) {
 		ui.inspect.dataset.html = html;
 		ui.inspect.innerHTML = html;
@@ -592,6 +641,18 @@ function inspectAct(act: string) {
 	} else if (act === 'rotate') {
 		sim.rotateAt(g, pv.pi, x, y);
 		sfx.click();
+	} else if (act === 'fix') {
+		if (sim.fixAt(g, pv.pi, c)) {
+			sfx.place();
+			const s = pv.cellCenter(c);
+			popupAt(s.x, s.y, 'Fixed', '#9dffb0');
+		} else sfx.error();
+	} else if (act === 'goto') {
+		if (inspectGoto >= 0) {
+			sfx.click();
+			select(inspectGoto);
+		}
+		return;
 	} else if (act === 'remove') {
 		const refund = sim.removeAt(g, pv.pi, x, y);
 		if (refund > 0 || g.planets[pv.pi].cells[c] === null) {
@@ -705,15 +766,16 @@ function updateHud() {
 function updateGoal() {
 	const goal = currentGoal(g);
 	const prob = g.tutorial >= 99 ? sim.findProblem(g) : null;
-	problemWhere = prob ? { planet: prob.planet, cell: prob.cell } : null;
+	problemWhere = prob ? { planet: prob.planet, cell: prob.cell, kind: prob.kind } : null;
 	if (prob) {
 		ui.goal.classList.add('is-warn');
-		ui.goalTag.textContent = 'Fix';
-		ui.goalText.textContent = prob.text;
+		ui.goal.classList.toggle('is-slow', prob.kind === 'slow');
+		ui.goalTag.textContent = prob.kind === 'slow' ? 'Slow' : 'Fix';
+		if (ui.goalText.textContent !== prob.text) ui.goalText.textContent = prob.text;
 		ui.goalFill.style.width = '0%';
 		return;
 	}
-	ui.goal.classList.remove('is-warn');
+	ui.goal.classList.remove('is-warn', 'is-slow');
 	if (!goal) {
 		ui.goalTag.textContent = 'Done';
 		ui.goalText.textContent = g.beaconLit ? 'The beacon is lit. Go nova to grow faster.' : 'All goals done!';

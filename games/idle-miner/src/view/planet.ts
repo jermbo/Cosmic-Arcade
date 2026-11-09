@@ -36,6 +36,18 @@ const idx = (x: number, y: number) => y * COLS + x;
 const cx = (i: number) => i % COLS;
 const cy = (i: number) => Math.floor(i / COLS);
 
+const RED = '#ff5d73';
+const AMBER = '#ffb347';
+
+/** A pulsing outline around a cell. */
+function blink(ctx: CanvasRenderingContext2D, i: number, s: number, color: string, time: number, width: number) {
+	const a = 0.35 + 0.35 * Math.sin(time * 6);
+	roundRect(ctx, cx(i) * s + 2, cy(i) * s + 2, s - 4, s - 4, s * 0.18);
+	ctx.strokeStyle = withAlpha(color, a);
+	ctx.lineWidth = width;
+	ctx.stroke();
+}
+
 export class PlanetView {
 	pi = 0;
 	tool: Tool = null;
@@ -46,6 +58,9 @@ export class PlanetView {
 	oy = 0;
 	rot = false;
 	private drag: Drag | null = null;
+	/** Blocked machines on this planet. Backups are held a moment so the marks do not flicker. */
+	blocks: sim.Block[] = [];
+	private held = new Map<number, { b: sim.Block; t: number; pi: number }>();
 	private boardCache: HTMLCanvasElement | null = null;
 	private boardKey = '';
 	private lastSpark = new Float32Array(COLS * ROWS);
@@ -68,16 +83,17 @@ export class PlanetView {
 	}
 
 	/** Fits the grid in the free area. Turns it 90 degrees on tall screens. */
-	layout(w: number, h: number, top: number, bottom: number) {
+	layout(w: number, h: number, top: number, bottom: number, left = 0, right = 0) {
+		const availW = w - left - right;
 		const availH = h - top - bottom;
 		const pad = 12;
-		const flat = Math.min((w - pad * 2) / COLS, (availH - pad * 2) / ROWS);
-		const tall = Math.min((w - pad * 2) / ROWS, (availH - pad * 2) / COLS);
+		const flat = Math.min((availW - pad * 2) / COLS, (availH - pad * 2) / ROWS);
+		const tall = Math.min((availW - pad * 2) / ROWS, (availH - pad * 2) / COLS);
 		this.rot = tall > flat * 1.08;
 		this.ts = Math.floor(Math.max(flat, tall));
 		const gw = (this.rot ? ROWS : COLS) * this.ts;
 		const gh = (this.rot ? COLS : ROWS) * this.ts;
-		this.ox = Math.round((w - gw) / 2);
+		this.ox = Math.round(left + (availW - gw) / 2);
 		this.oy = Math.round(top + (availH - gh) / 2);
 		this.boardKey = '';
 	}
@@ -396,19 +412,17 @@ export class PlanetView {
 		}
 
 		// machines
+		this.updateBlocks(g, time);
+		const blockOf = new Map<number, sim.Block>();
+		for (const b of this.blocks) blockOf.set(b.from, b);
 		for (let i = 0; i < p.cells.length; i++) {
 			const m = p.cells[i];
 			if (!m || m.t === 'belt') continue;
 			drawMachine(ctx, { t: m.t, d: m.d, lv: m.lv, glow: m.glow || 0, prog: m.job ? m.prog : 0 }, cx(i) * s, cy(i) * s, s, time);
 			if (m.t === 'pad') this.drawPad(ctx, g, i, time, dt);
-			else if ((m.stuck || 0) > 2) {
-				// blocked: a soft red blink
-				const a = 0.35 + 0.35 * Math.sin(time * 6);
-				roundRect(ctx, cx(i) * s + 2, cy(i) * s + 2, s - 4, s - 4, s * 0.18);
-				ctx.strokeStyle = withAlpha('#ff5d73', a);
-				ctx.lineWidth = 2;
-				ctx.stroke();
-			}
+			const b = blockOf.get(i);
+			// blocked: red blink for a dead end, amber for a backup
+			if (b) blink(ctx, i, s, b.kind === 'dead' ? RED : AMBER, time, 2);
 			// items waiting inside, as small dots
 			if (m.out.length && m.t !== 'pad') drawItem(ctx, m.out[0], cx(i) * s + s * 0.8, cy(i) * s + s * 0.8, s * 0.09);
 		}
@@ -418,8 +432,69 @@ export class PlanetView {
 			if (m?.thru?.length) for (const it of m.thru) drawMoving(ctx, it, m.d, i, s, u);
 		}
 
+		this.drawBlockMarks(ctx, g, s, time);
 		this.drawOverlay(ctx, g, time);
 		ctx.restore();
+	}
+
+	private updateBlocks(g: Game, time: number) {
+		const now = new Set<number>();
+		for (const b of sim.planetBlocks(g, this.pi)) {
+			this.held.set(b.from, { b, t: time, pi: this.pi });
+			now.add(b.from);
+		}
+		this.blocks = [];
+		for (const [k, h] of this.held) {
+			// Dead ends stay stuck until fixed, so drop them at once. Backups come and go.
+			const gone = h.pi !== this.pi || !g.planets[this.pi].cells[k] || (!now.has(k) && (h.b.kind === 'dead' || time - h.t > 1.5));
+			if (gone) this.held.delete(k);
+			else this.blocks.push(h.b);
+		}
+	}
+
+	/** The cause of each block: an X where a dead end points, a ring on a slow machine. */
+	private drawBlockMarks(ctx: CanvasRenderingContext2D, g: Game, s: number, time: number) {
+		const done = new Set<number>();
+		for (const b of this.blocks) {
+			if (done.has(b.cell)) continue;
+			done.add(b.cell);
+			if (b.kind === 'slow') {
+				blink(ctx, b.cell, s, AMBER, time, 3);
+				continue;
+			}
+			// The cell to turn, then an X where it points (or at its edge, if off the map).
+			blink(ctx, b.cell, s, RED, time, 3);
+			const a = 0.8 + 0.2 * Math.sin(time * 6);
+			let x: number;
+			let y: number;
+			if (b.target >= 0) {
+				x = (cx(b.target) + 0.5) * s;
+				y = (cy(b.target) + 0.5) * s;
+			} else {
+				const d = g.planets[this.pi].cells[b.cell]?.d ?? 0;
+				x = (cx(b.cell) + 0.5 + DX[d] * 0.5) * s;
+				y = (cy(b.cell) + 0.5 + DY[d] * 0.5) * s;
+			}
+			const r = s * 0.2;
+			const w = Math.max(4, s * 0.1);
+			ctx.save();
+			ctx.lineCap = 'round';
+			ctx.beginPath();
+			ctx.moveTo(x - r, y - r);
+			ctx.lineTo(x + r, y + r);
+			ctx.moveTo(x + r, y - r);
+			ctx.lineTo(x - r, y + r);
+			// A dark edge first, so the X reads on bright ore too.
+			ctx.lineWidth = w + 4;
+			ctx.strokeStyle = 'rgba(7, 10, 20, 0.85)';
+			ctx.stroke();
+			ctx.lineWidth = w;
+			ctx.strokeStyle = withAlpha(RED, a);
+			ctx.shadowColor = RED;
+			ctx.shadowBlur = 10;
+			ctx.stroke();
+			ctx.restore();
+		}
 	}
 
 	private drawPad(ctx: CanvasRenderingContext2D, g: Game, i: number, time: number, dt: number) {

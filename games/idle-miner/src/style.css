@@ -11,6 +11,7 @@
 	--gold: #ffd23f;
 	--green: #6dff9a;
 	--red: #ff5d73;
+	--amber: #ffb347;
 	--font: 'Chakra Petch', system-ui, -apple-system, 'Segoe UI', sans-serif;
 	--radius: 14px;
 	--safe-t: env(safe-area-inset-top, 0px);
@@ -18,6 +19,10 @@
 	--safe-l: env(safe-area-inset-left, 0px);
 	--safe-r: env(safe-area-inset-right, 0px);
 	--ease-pop: cubic-bezier(0.2, 1.4, 0.4, 1);
+	/* The free play area, set by relayout() in main.ts. */
+	--play-t: 0px;
+	--play-l: 0px;
+	--play-r: 0px;
 	color-scheme: dark;
 }
 
@@ -221,13 +226,30 @@ svg {
 	outline-offset: 2px;
 }
 
-/* ---------- HUD ---------- */
+/* ---------- dock ----------
+   Groups: player (hud), goal, planet (pv-top).
+   Portrait: a stack at the top. Landscape: a rail on the left. */
 
-.hud {
+.dock {
 	position: absolute;
 	top: calc(8px + var(--safe-t));
 	left: calc(8px + var(--safe-l));
 	right: calc(8px + var(--safe-r));
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 6px;
+	pointer-events: none;
+}
+
+.dock > * {
+	pointer-events: auto;
+}
+
+/* ---------- HUD ---------- */
+
+.hud {
+	width: 100%;
 	display: flex;
 	align-items: center;
 	gap: 8px;
@@ -328,11 +350,7 @@ svg {
 /* ---------- goal bar ---------- */
 
 .goal {
-	position: absolute;
-	top: calc(60px + var(--safe-t));
-	left: 50%;
-	transform: translateX(-50%);
-	width: min(560px, calc(100% - 16px));
+	width: min(560px, 100%);
 	display: grid;
 	grid-template-columns: auto 1fr;
 	align-items: center;
@@ -394,6 +412,15 @@ svg {
 	background: var(--red);
 }
 
+.goal.is-warn.is-slow {
+	border-color: rgba(255, 179, 71, 0.55);
+	box-shadow: 0 0 16px rgba(255, 179, 71, 0.2);
+}
+
+.goal.is-warn.is-slow .goal__tag {
+	background: var(--amber);
+}
+
 .goal.is-done {
 	animation: goal-done 0.6s ease;
 }
@@ -408,24 +435,23 @@ svg {
 /* ---------- planet view top ---------- */
 
 .pv-top {
-	position: absolute;
-	top: calc(108px + var(--safe-t));
-	left: 50%;
-	transform: translateX(-50%);
-	width: min(560px, calc(100% - 16px));
+	width: min(560px, 100%);
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
 	gap: 8px;
-	pointer-events: none;
+	padding: 5px;
+	border-radius: var(--radius);
+	background: var(--panel);
+	border: 1px solid var(--line);
 }
 
-.pv-top > * {
-	pointer-events: auto;
+.pv-top .pill {
+	background: rgba(255, 255, 255, 0.04);
 }
 
 .pv-top__name {
-	text-align: center;
+	flex: 1;
+	min-width: 0;
 	line-height: 1.1;
 	pointer-events: none;
 }
@@ -440,13 +466,31 @@ svg {
 	display: block;
 	color: var(--muted);
 	font-size: 12px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+@media (max-width: 520px) {
+	/* Back is icon only, so the planet name gets the room. */
+	#btn-back {
+		width: 38px;
+		padding: 0;
+		justify-content: center;
+	}
+	#btn-back span {
+		display: none;
+	}
+	.pv-top__side .pill {
+		padding: 0 10px;
+	}
 }
 
 /* ---------- planet card (space view) ---------- */
 
 .card {
 	position: absolute;
-	left: 50%;
+	left: calc(50% + (var(--play-l) - var(--play-r)) / 2);
 	bottom: calc(12px + var(--safe-b));
 	transform: translateX(-50%);
 	width: min(440px, calc(100% - 16px));
@@ -677,6 +721,15 @@ svg {
 	line-height: 1.35;
 }
 
+.inspect p.inspect__warn {
+	color: var(--red);
+	font-weight: 600;
+}
+
+.inspect p.inspect__warn.is-slow {
+	color: var(--amber);
+}
+
 .inspect__stats {
 	display: flex;
 	gap: 12px;
@@ -699,12 +752,19 @@ svg {
 	padding: 0 8px;
 }
 
+.inspect__row .btn--fix {
+	border-color: var(--green);
+	background: var(--green);
+	color: var(--ink);
+	font-weight: 700;
+}
+
 /* ---------- toasts ---------- */
 
 .toasts {
 	position: absolute;
-	top: calc(112px + var(--safe-t));
-	left: 50%;
+	top: calc(var(--play-t) + 6px);
+	left: calc(50% + (var(--play-l) - var(--play-r)) / 2);
 	transform: translateX(-50%);
 	width: min(420px, calc(100% - 24px));
 	display: flex;
@@ -845,7 +905,7 @@ svg {
 
 .sheet {
 	width: min(520px, calc(100% - 20px));
-	max-height: calc(100% - 40px - var(--safe-t) - var(--safe-b));
+	max-height: calc(100dvh - 40px - var(--safe-t) - var(--safe-b));
 	display: flex;
 	flex-direction: column;
 	border-radius: 18px;
@@ -1047,6 +1107,105 @@ svg {
 	color: var(--text);
 }
 
+/* ---------- modal on phones ----------
+   Portrait: a bottom sheet, full width, the thumb reaches the buttons.
+   Landscape: a wide, short sheet with a slim header and two columns of rows. */
+
+@keyframes sheet-up {
+	from {
+		transform: translateY(100%);
+	}
+}
+
+@media (max-width: 520px) {
+	.modal {
+		place-items: end stretch;
+	}
+
+	.sheet {
+		width: 100%;
+		max-height: calc(100dvh - 40px - var(--safe-t));
+		border-radius: 18px 18px 0 0;
+		border-bottom: 0;
+		animation: sheet-up 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+	}
+
+	.sheet__head {
+		padding: 10px 10px 8px 16px;
+	}
+
+	.sheet__head h2 {
+		font-size: 17px;
+	}
+
+	.sheet__body {
+		padding: 12px 12px calc(16px + var(--safe-b));
+	}
+
+	.sheet__body p {
+		font-size: 14px;
+	}
+
+	.row {
+		padding: 10px;
+	}
+
+	.row .btn {
+		min-width: 84px;
+	}
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+	.sheet {
+		width: min(760px, calc(100% - 16px - var(--safe-l) - var(--safe-r)));
+		max-height: calc(100dvh - 12px - var(--safe-t) - var(--safe-b));
+	}
+
+	.sheet__head {
+		padding: 6px 8px 6px 16px;
+	}
+
+	.sheet__head h2 {
+		font-size: 16px;
+	}
+
+	.sheet__head .icon-btn {
+		width: 34px;
+		height: 34px;
+	}
+
+	.sheet__body {
+		padding: 10px 14px 14px;
+	}
+
+	.sheet__body p {
+		font-size: 14px;
+		margin-bottom: 10px;
+	}
+
+	.rows {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+	}
+
+	.stats {
+		grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+	}
+
+	.stat {
+		padding: 6px 10px;
+	}
+
+	.menu-list {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+	}
+
+	.menu-list .save-code {
+		grid-column: 1 / -1;
+	}
+}
+
 /* ---------- title ---------- */
 
 .title {
@@ -1196,4 +1355,163 @@ svg {
 
 .crew__slots .stat {
 	flex: 1;
+}
+
+/* ---------- landscape phones ----------
+   Height is the scarce thing. The dock becomes a left rail, the toolbar a
+   right rail, and the board gets the full height between them. */
+
+@keyframes rail-in {
+	from {
+		transform: translateX(16px);
+		opacity: 0;
+	}
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+	.dock {
+		right: auto;
+		bottom: calc(8px + var(--safe-b));
+		width: 188px;
+		align-items: stretch;
+		overflow-y: auto;
+		scrollbar-width: none;
+	}
+
+	.hud {
+		flex-wrap: wrap;
+	}
+
+	.hud__money {
+		flex: 1;
+	}
+
+	.hud__actions {
+		margin-left: 0;
+	}
+
+	.hud .pill span {
+		display: none;
+	}
+
+	.hud .pill {
+		width: 42px;
+		height: 42px;
+		padding: 0;
+		justify-content: center;
+		border-radius: 12px;
+	}
+
+	.goal {
+		grid-template-columns: 1fr;
+	}
+
+	.goal__tag {
+		grid-row: auto;
+		justify-self: start;
+	}
+
+	.goal__text {
+		white-space: normal;
+		font-size: 13px;
+		line-height: 1.25;
+	}
+
+	.pv-top {
+		flex-direction: column;
+		align-items: stretch;
+		padding: 8px;
+	}
+
+	.pv-top__name {
+		order: -1;
+		padding: 0 2px 2px;
+	}
+
+	#btn-back {
+		width: auto;
+		padding: 0 10px;
+		justify-content: center;
+	}
+
+	#btn-back span {
+		display: inline;
+	}
+
+	.pv-top__side .pill {
+		flex: 1;
+		justify-content: center;
+		padding: 0 8px;
+	}
+
+	.toolbar {
+		left: auto;
+		right: calc(8px + var(--safe-r));
+		top: 50%;
+		bottom: auto;
+		transform: translateY(-50%);
+		max-width: none;
+		max-height: calc(100% - 16px - var(--safe-t) - var(--safe-b));
+		display: grid;
+		grid-template-columns: repeat(2, 58px);
+		gap: 4px;
+		padding: 5px;
+		overflow-x: hidden;
+		overflow-y: auto;
+	}
+
+	.tool {
+		width: 58px;
+	}
+
+	/* The inspect card takes the toolbar's place on the right. */
+	.inspect {
+		left: auto;
+		right: calc(8px + var(--safe-r));
+		bottom: calc(8px + var(--safe-b));
+		transform: none;
+		width: min(300px, 40vw);
+		max-height: calc(100% - 16px - var(--safe-t) - var(--safe-b));
+		overflow-y: auto;
+		animation-name: rail-in;
+	}
+
+	.card {
+		width: min(400px, calc(100% - var(--play-l) - var(--play-r) - 16px));
+	}
+}
+
+/* Crew rows: when narrow, the buttons go under the text so the text gets the width. */
+@media (max-width: 520px), (orientation: landscape) and (max-height: 540px) {
+	.row.crew {
+		grid-template-columns: auto 1fr;
+		align-items: start;
+		row-gap: 8px;
+	}
+
+	.crew__badge {
+		grid-row: span 2;
+	}
+
+	.crew__btns {
+		grid-column: 2;
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+
+	.crew__btns .btn {
+		flex: 0 1 auto;
+		min-width: 104px;
+	}
+
+	/* Perk buttons stay compact instead of stretching across the card. */
+	.perk .btn {
+		align-self: flex-start;
+		min-width: 104px;
+	}
+
+	/* Three stats sit in one row, so none is left alone. */
+	.stats:has(> :nth-child(3):last-child) {
+		grid-template-columns: repeat(3, 1fr);
+	}
 }

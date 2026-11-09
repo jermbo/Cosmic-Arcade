@@ -38,17 +38,20 @@ export class SpaceView {
 		for (let i = 0; i < 220; i++) this.stars.push({ x: Math.random(), y: Math.random(), z: Math.random(), s: Math.random(), p: Math.random() * 6.28 });
 	}
 
-	layout(w: number, h: number, top: number, bottom: number) {
+	/** Places the planets in the free area. Left and right are side rails (landscape). */
+	layout(w: number, h: number, top: number, bottom: number, left = 0, right = 0) {
 		this.w = w;
 		this.h = h;
+		const availW = w - left - right;
 		const availH = h - top - bottom;
+		const cxx = left + availW / 2;
 		const cyy = top + availH / 2;
-		const base = Math.min(w, availH);
+		const base = Math.min(availW, availH);
 		const r = Math.max(18, Math.min(46, base * 0.068));
-		this.home = { x: w / 2, y: cyy, r: r * 0.95 };
-		const rx = Math.min(w * 0.37, availH * 0.62);
-		const ry = Math.min(availH * 0.37, w * 0.7);
-		this.pos = PLANETS.map((_, i) => ({ x: w / 2 + Math.cos(ANGLES[i]) * rx * DIST[i], y: cyy + Math.sin(ANGLES[i]) * ry * DIST[i], r: r * (1 + i * 0.04) }));
+		this.home = { x: cxx, y: cyy, r: r * 0.95 };
+		const rx = Math.min(availW * 0.37, availH * 0.62);
+		const ry = Math.min(availH * 0.37, availW * 0.7);
+		this.pos = PLANETS.map((_, i) => ({ x: cxx + Math.cos(ANGLES[i]) * rx * DIST[i], y: cyy + Math.sin(ANGLES[i]) * ry * DIST[i], r: r * (1 + i * 0.04) }));
 		this.nebula = this.renderNebula(w, h);
 	}
 
