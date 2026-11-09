@@ -1,0 +1,241 @@
+.mapscreen {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+	gap: 18px;
+	align-items: start;
+}
+
+.board-head {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	gap: 6px 16px;
+	font-size: 0.75rem;
+	letter-spacing: 0.14em;
+	margin-bottom: 12px;
+}
+
+.board {
+	--node: clamp(46px, 9vw, 64px);
+	position: relative;
+	aspect-ratio: 5 / 4.2;
+	max-height: 62dvh;
+	margin-inline: auto;
+	background:
+		linear-gradient(var(--line) 1px, transparent 1px) 0 0 / 100% 25%,
+		radial-gradient(circle at 50% 100%, rgb(232 115 74 / 0.08), transparent 70%);
+	border-top: 1px dashed var(--line-strong);
+}
+
+.board__edges {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+}
+
+.board__edges line {
+	stroke: var(--line-strong);
+	stroke-width: 1.5;
+	vector-effect: non-scaling-stroke;
+	stroke-dasharray: 3 5;
+}
+
+.board__edges line.is-open {
+	stroke: var(--coral);
+	stroke-dasharray: 6 4;
+	animation: march 0.8s linear infinite;
+}
+
+.board__edges line.is-taken {
+	stroke: var(--gold);
+	stroke-dasharray: none;
+	stroke-width: 2.5;
+}
+
+@keyframes march {
+	to {
+		stroke-dashoffset: -20;
+	}
+}
+
+.node {
+	--c: var(--text);
+	position: absolute;
+	left: var(--x);
+	top: var(--y);
+	translate: -50% -50%;
+	display: grid;
+	place-items: center;
+	align-content: center;
+	gap: 1px;
+	width: var(--node);
+	height: var(--node);
+	padding: 0;
+	border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+	border-radius: var(--radius);
+	background: var(--bg);
+	color: var(--c);
+	cursor: default;
+	transition:
+		transform 0.15s var(--ease-out),
+		opacity 0.2s,
+		box-shadow 0.2s;
+}
+
+.node__glyph {
+	font: 700 0.95rem/1 var(--font-display);
+}
+
+.node__label {
+	font-size: 0.52rem;
+	letter-spacing: 0.1em;
+	opacity: 0.8;
+}
+
+.node--combat {
+	--c: var(--text);
+}
+.node--elite {
+	--c: var(--coral);
+}
+.node--cache {
+	--c: var(--gold);
+}
+.node--unknown {
+	--c: #b9a8d8;
+}
+.node--merchant {
+	--c: var(--green);
+}
+.node--gate,
+.node--boss {
+	--c: var(--coral);
+	--node: clamp(56px, 11vw, 78px);
+	border-width: 2px;
+	background: var(--hatch), var(--bg);
+}
+
+.node--boss .node__glyph {
+	font-size: 1.2rem;
+}
+
+.node[aria-disabled='true'] {
+	opacity: 0.38;
+}
+
+.node.is-visited {
+	opacity: 0.75;
+	background: color-mix(in srgb, var(--c) 14%, var(--bg));
+}
+
+.node.is-here {
+	opacity: 1;
+	box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--gold);
+}
+
+.node.is-here::after {
+	content: 'YOU';
+	position: absolute;
+	top: -18px;
+	font-size: 0.55rem;
+	letter-spacing: 0.2em;
+	color: var(--gold);
+}
+
+.node.is-reachable {
+	cursor: pointer;
+	opacity: 1;
+	border-color: var(--c);
+	animation: node-pulse 1.4s ease-in-out infinite;
+}
+
+.node.is-reachable:hover,
+.node.is-reachable:focus-visible {
+	transform: scale(1.12);
+	background: color-mix(in srgb, var(--c) 18%, var(--bg));
+	animation: none;
+	box-shadow: 0 0 18px color-mix(in srgb, var(--c) 60%, transparent);
+}
+
+.node.is-entering {
+	animation: node-enter 0.38s steps(4) forwards;
+}
+
+@keyframes node-pulse {
+	50% {
+		box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 22%, transparent);
+	}
+}
+
+@keyframes node-enter {
+	50% {
+		transform: scale(1.3);
+		background: var(--c);
+		color: var(--bg);
+	}
+	100% {
+		transform: scale(1.1);
+		background: var(--c);
+		color: var(--bg);
+	}
+}
+
+.board-hint {
+	margin-top: 12px;
+	font-size: 0.75rem;
+	letter-spacing: 0.1em;
+	text-align: center;
+}
+
+.mapscreen__side {
+	display: grid;
+	gap: 14px;
+}
+
+.node-info {
+	min-height: 168px;
+}
+
+.node-info p {
+	margin-bottom: 10px;
+	font-size: 0.85rem;
+}
+
+.node-info__title {
+	font: 700 1rem/1.2 var(--font-display);
+	color: var(--text);
+}
+
+.node-info__title--elite,
+.node-info__title--gate,
+.node-info__title--boss {
+	color: var(--coral);
+}
+.node-info__title--cache {
+	color: var(--gold);
+}
+.node-info__title--merchant {
+	color: var(--green);
+}
+
+.mapscreen__actions {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 10px;
+}
+
+@media (max-width: 820px) {
+	.mapscreen {
+		grid-template-columns: 1fr;
+	}
+
+	.board {
+		max-height: none;
+	}
+
+	.node-info {
+		min-height: 0;
+	}
+}

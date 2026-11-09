@@ -14,7 +14,8 @@
 		"publish-games": "node scripts/publish-games.js"
 	},
 	"dependencies": {
-		"astro": "7.4.5"
+		"astro": "7.4.5",
+		"gsap": "3.15.1"
 	},
 	"devDependencies": {
 		"@astrojs/check": "0.9.12",
