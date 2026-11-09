@@ -5,7 +5,7 @@ import '@fontsource/chakra-petch/latin-700.css';
 import './style.css';
 
 import { initAudio, setVolumes, sfx, suspendAudio } from './audio.ts';
-import { BUILD_ORDER, COLS, MACHINES, PLANETS, TILE_ORE, beltSpeed, levelSpeed, pylonBoost, shipCargo } from './core/data.ts';
+import { BUILD_ORDER, COLS, MACHINES, PLANETS, TILE_ORE, beltSpeed, levelSpeed, pylonBoost } from './core/data.ts';
 import type { MachineType } from './core/data.ts';
 import { fmt } from './core/format.ts';
 import { GOALS, checkProgress, currentGoal } from './core/goals.ts';
@@ -13,7 +13,7 @@ import * as sim from './core/sim.ts';
 import { clearSave, loadGame, newGame, saveGame, tilesOf } from './core/state.ts';
 import type { Game } from './core/state.ts';
 import { closePanel, isLocked, panelOpen, refreshPanel } from './ui/modal.ts';
-import { initPanels, openAway, openConfirmNew, openNova, openPause, openResearch, openSettings, openShips } from './ui/panels.ts';
+import { initPanels, openAway, openConfirmNew, openCrew, openNova, openPause, openResearch, openSettings, openShips } from './ui/panels.ts';
 import { setupPwa } from './ui/pwa.ts';
 import { machineIcon } from './view/draw.ts';
 import { burst, clearFx, drawFx, popup, ring, setReducedMotion, stepFx } from './view/fx.ts';
@@ -40,6 +40,7 @@ const ui = {
 	pvTop: $('pv-top'),
 	pvName: $('pv-name'),
 	pvSub: $('pv-sub'),
+	crew: $('btn-crew'),
 	card: $('planet-card'),
 	toolbar: $('toolbar'),
 	inspect: $('inspect'),
@@ -278,6 +279,10 @@ $('btn-back').addEventListener('click', () => {
 $('btn-ships').addEventListener('click', () => {
 	sfx.click();
 	openShips(pv.pi);
+});
+ui.crew.addEventListener('click', () => {
+	sfx.click();
+	openCrew(pv.pi);
 });
 $('btn-research').addEventListener('click', () => {
 	sfx.click();
@@ -524,26 +529,29 @@ function updateInspect() {
 	const def = MACHINES[m.t];
 	const p = g.planets[pv.pi];
 	const boost = sim.boostAt(p, c);
+	const crew = sim.crewOf(p);
+	const crewMult = m.t === 'drill' ? crew.drill : crew.machine;
 	let stats = '';
 	let desc = def.desc;
 	if (m.t === 'drill') {
 		const ore = tilesOf(pv.pi, g.blasted[pv.pi])[c] === TILE_ORE;
-		stats = `<span>Digs <b>${((levelSpeed(m.lv) * boost) / def.time).toFixed(2)}</b>/s</span>`;
+		stats = `<span>Digs <b>${((levelSpeed(m.lv) * boost * crewMult) / def.time).toFixed(2)}</b>/s</span>`;
 		if (!ore) desc = 'This drill is not on ore.';
 	} else if (m.t === 'belt') {
 		const sp = beltSpeed(g.research.belt, !!g.perks.belts);
 		stats = `<span>Speed <b>${sp.toFixed(1)}</b> tiles/s</span><span>Carries up to <b>${(sp * 2).toFixed(1)}</b>/s</span>`;
 		desc = 'Tap Turn, or drag a new line over it. Research Mag Belts for speed.';
 	} else if (m.t === 'pad') {
-		const cap = 40 + shipCargo(p.up.cargo) * 2;
+		const cap = sim.padCap(p);
 		stats = `<span>Stock <b>${p.pad.length}</b>/${cap}</span><span>Ships <b>${p.ships.length}</b></span>`;
 	} else if (m.t === 'pylon') {
 		stats = `<span>Boost <b>+${Math.round(pylonBoost(m.lv) * 100)}%</b> to the 8 tiles around</span>`;
 	} else {
-		const jobs = (levelSpeed(m.lv) * boost) / def.time;
+		const jobs = (levelSpeed(m.lv) * boost * crewMult) / def.time;
 		stats = `<span>Makes <b>${(jobs * def.outCount).toFixed(2)}</b>/s</span><span>Holds <b>${m.inb.length}</b> in</span>`;
 	}
 	if (boost > 1 && m.t !== 'pylon') stats += `<span>Pylon <b>+${Math.round((boost - 1) * 100)}%</b></span>`;
+	if (crewMult > 1 && m.t !== 'pylon' && m.t !== 'belt' && m.t !== 'pad') stats += `<span>Crew <b>+${Math.round((crewMult - 1) * 100)}%</b></span>`;
 	const canUp = m.t !== 'belt' && m.t !== 'pad';
 	const maxed = m.lv >= def.maxLv;
 	const upCost = canUp && !maxed ? sim.machineUpCost(pv.pi, m) : 0;
@@ -626,7 +634,7 @@ function updateCard() {
 		const tip = drills === 0 ? 'Tap the planet to mine by hand. Open it to build drills.' : `${drills} drill${drills > 1 ? 's' : ''}, ${p.ships.length} ship${p.ships.length > 1 ? 's' : ''}. Each tap mines ${fmt(sim.tapValue(g, i))}.`;
 		html = `<div class="card__head"><span class="card__dot" style="color:${def.color}"></span><span class="card__title">${def.name}</span><span class="card__sub">${def.ore}<br>${sub}</span></div>
 			<p>${tip}</p>
-			<div class="card__row"><button class="btn" data-act="open" id="card-open">Open factory</button>${g.unlocks.includes('ships') ? `<button class="btn btn--ghost" data-act="ships">Ships</button>` : ''}</div>`;
+			<div class="card__row"><button class="btn" data-act="open" id="card-open">Open factory</button>${g.unlocks.includes('ships') ? `<button class="btn btn--ghost" data-act="ships">Ships</button>` : ''}${g.unlocks.includes('crew') ? `<button class="btn btn--ghost" data-act="crew">Crew</button>` : ''}</div>`;
 	} else {
 		const can = g.credits >= def.unlock;
 		const machine = def.newMachine ? MACHINES[def.newMachine].name : '';
@@ -656,6 +664,7 @@ ui.card.addEventListener('click', (e) => {
 	const i = space.selected;
 	if (b.dataset.act === 'open') toPlanet(i);
 	if (b.dataset.act === 'ships') openShips(i);
+	if (b.dataset.act === 'crew') openCrew(i);
 	if (b.dataset.act === 'unlock') {
 		if (sim.unlockPlanet(g, i)) {
 			sfx.unlock();
@@ -689,6 +698,7 @@ function updateHud() {
 	ui.dustN.textContent = String(g.stardust);
 	ui.research.hidden = !g.unlocks.includes('research');
 	ui.nova.hidden = !g.unlocks.includes('prestige');
+	ui.crew.hidden = !g.unlocks.includes('crew');
 	ui.nova.classList.toggle('is-ready', sim.canPrestige(g) && sim.prestigeGain(g) >= Math.max(1, g.stardust));
 }
 

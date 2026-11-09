@@ -25,6 +25,14 @@ import {
 	TILE_ORE,
 	TILE_ROCK,
 	BASE_OFFLINE_HOURS,
+	BASE_SLOTS,
+	CREW,
+	CREW_MAX,
+	CREW_ORDER,
+	NO_BOOST,
+	SLOT_COSTS,
+	addCrew,
+	crewCostAt,
 	beltSpeed,
 	formOfKind,
 	isCrate,
@@ -39,7 +47,7 @@ import {
 	tapPower,
 	upgradeCost,
 } from './data.ts';
-import type { Dir, MachineType, PerkId, ResearchId, ShipUpgrade } from './data.ts';
+import type { CrewBoost, CrewId, Dir, MachineType, PerkId, ResearchId, ShipUpgrade } from './data.ts';
 import { makeMachine, makeShip, newGame, tilesOf } from './state.ts';
 import type { Game, Machine, PlanetState } from './state.ts';
 
@@ -297,6 +305,79 @@ export function buyResearch(g: Game, r: ResearchId): boolean {
 	return true;
 }
 
+// ---------- crew ----------
+
+const crewMap = new WeakMap<PlanetState, CrewBoost>();
+
+/** The boost from all crew working on this planet. Kept fresh by syncCrew. */
+export function crewOf(p: PlanetState): Readonly<CrewBoost> {
+	return crewMap.get(p) ?? NO_BOOST;
+}
+
+/** Works out each planet's crew boost. Cheap; runs every tick and after crew changes. */
+export function syncCrew(g: Game) {
+	const boosts = g.planets.map(() => ({ ...NO_BOOST }));
+	for (const id of CREW_ORDER) {
+		const lv = g.crew[id] || 0;
+		const pi = g.crewAt[id];
+		if (lv && pi !== undefined && g.planets[pi]?.unlocked) addCrew(boosts[pi], id, lv);
+	}
+	g.planets.forEach((p, i) => crewMap.set(p, boosts[i]));
+}
+
+export function slotCount(g: Game) {
+	return BASE_SLOTS + g.slots;
+}
+
+/** How many crew are working now. */
+export function slotsUsed(g: Game) {
+	return CREW_ORDER.filter((id) => g.crew[id] && g.crewAt[id] !== undefined).length;
+}
+
+/** Stardust price of the next slot, or 0 when all are bought. */
+export function slotCost(g: Game) {
+	return SLOT_COSTS[g.slots] ?? 0;
+}
+
+export function buySlot(g: Game): boolean {
+	const cost = slotCost(g);
+	if (!cost || perkPoints(g) < cost) return false;
+	g.slots++;
+	return true;
+}
+
+export function crewCost(g: Game, id: CrewId) {
+	return Math.ceil(crewCostAt(id, g.crew[id] || 0));
+}
+
+/** Hires a crew member, or trains one already hired. */
+export function buyCrew(g: Game, id: CrewId): boolean {
+	const lv = g.crew[id] || 0;
+	if (!CREW[id] || lv >= CREW_MAX) return false;
+	const cost = crewCost(g, id);
+	if (g.credits < cost) return false;
+	g.credits -= cost;
+	g.crew[id] = lv + 1;
+	syncCrew(g);
+	return true;
+}
+
+/** Sends a hired crew member to work on a planet, or to rest with -1. Free. Needs a free slot unless already working. */
+export function assignCrew(g: Game, id: CrewId, pi: number): boolean {
+	if (!g.crew[id]) return false;
+	const at = g.crewAt[id];
+	if (pi < 0) {
+		if (at === undefined) return false;
+		delete g.crewAt[id];
+	} else {
+		if (at === pi || !g.planets[pi]?.unlocked) return false;
+		if (at === undefined && slotsUsed(g) >= slotCount(g)) return false;
+		g.crewAt[id] = pi;
+	}
+	syncCrew(g);
+	return true;
+}
+
 export function unlockPlanet(g: Game, pi: number): boolean {
 	const p = g.planets[pi];
 	if (p.unlocked || pi === 0 || !g.planets[pi - 1].unlocked) return false;
@@ -331,6 +412,7 @@ export function prestige(g: Game): Game {
 export function perkPoints(g: Game) {
 	let spent = 0;
 	for (const id of Object.keys(g.perks) as PerkId[]) if (g.perks[id]) spent += PERKS[id].cost;
+	for (let i = 0; i < g.slots; i++) spent += SLOT_COSTS[i];
 	return g.stardust - spent;
 }
 
@@ -409,8 +491,8 @@ function accepts(m: Machine, k: number): boolean {
 	return uses(m, k) && m.inb.length < (m.t === 'compactor' ? 10 : BUF_IN);
 }
 
-function padCap(p: PlanetState) {
-	return 40 + shipCargo(p.up.cargo) * 2;
+export function padCap(p: PlanetState) {
+	return 40 + shipCap(p) * 2;
 }
 
 /** Try to move an item into cell (x, y), moving in direction dir. */
@@ -508,6 +590,7 @@ function startJob(m: Machine): boolean {
 function tickPlanet(g: Game, pi: number, dt: number) {
 	const p = g.planets[pi];
 	const boost = derived(p);
+	const crew = crewOf(p);
 	const bs = beltSpeed(g.research.belt, !!g.perks.belts) * dt;
 	const tiles = tilesOf(pi, g.blasted[pi]);
 	for (let i = 0; i < CELLS; i++) {
@@ -534,7 +617,7 @@ function tickPlanet(g: Game, pi: number, dt: number) {
 			}
 			case 'drill': {
 				if (tiles[i] === TILE_ORE && m.out.length < BUF_OUT) {
-					m.prog += (dt / MACHINES.drill.time) * levelSpeed(m.lv) * boost[i];
+					m.prog += (dt / MACHINES.drill.time) * levelSpeed(m.lv) * boost[i] * crew.drill;
 					working = true;
 					if (m.prog >= 1) {
 						m.prog -= 1;
@@ -553,7 +636,7 @@ function tickPlanet(g: Game, pi: number, dt: number) {
 				if (!m.job) startJob(m);
 				if (m.job) {
 					const def = MACHINES[m.t];
-					m.prog += (dt / def.time) * levelSpeed(m.lv) * boost[i];
+					m.prog += (dt / def.time) * levelSpeed(m.lv) * boost[i] * crew.machine;
 					working = true;
 					if (m.prog >= 1) {
 						const k = m.kind ?? kindOf(pi, def.outForm);
@@ -574,14 +657,19 @@ function tickPlanet(g: Game, pi: number, dt: number) {
 }
 
 export function travelTime(p: PlanetState, pi: number) {
-	return PLANETS[pi].travel / shipSpeed(p.up.speed);
+	return PLANETS[pi].travel / (shipSpeed(p.up.speed) * crewOf(p).shipSpeed);
+}
+
+/** How much one ship on this route carries. */
+export function shipCap(p: PlanetState) {
+	return Math.round(shipCargo(p.up.cargo) * crewOf(p).cargo);
 }
 
 export const SHIP_WAIT = 2.5;
 
 function tickShips(g: Game, pi: number, dt: number) {
 	const p = g.planets[pi];
-	const cap = shipCargo(p.up.cargo);
+	const cap = shipCap(p);
 	const T = travelTime(p, pi);
 	let docked = false;
 	for (const s of p.ships) {
@@ -622,7 +710,7 @@ function sell(g: Game, pi: number, cargo: number[]) {
 		v += itemValue(k);
 		count += isCrate(k) ? CRATE_SIZE : 1;
 	}
-	v *= sellMult(g);
+	v *= sellMult(g) * crewOf(g.planets[pi]).sell;
 	earn(g, v, true);
 	g.stats.shipped += count;
 	g.stats.flights++;
@@ -632,6 +720,7 @@ function sell(g: Game, pi: number, cargo: number[]) {
 export function tick(g: Game, dt: number) {
 	g.stats.playTime += dt;
 	stepIncome(dt);
+	syncCrew(g);
 	for (let pi = 0; pi < g.planets.length; pi++) if (g.planets[pi].unlocked) tickPlanet(g, pi, dt);
 }
 

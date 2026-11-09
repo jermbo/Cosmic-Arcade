@@ -109,6 +109,7 @@ export const UNLOCKS: Unlock[] = [
 	{ id: 'smelter', title: 'New machine: Smelter', text: 'Melts ore into bars that sell for 4x.', when: (g) => countAll(g, 'drill') >= 3 || g.runEarned >= 150 },
 	{ id: 'ships', title: 'Shipyard open', text: 'Buy more ships, faster engines and bigger holds.', when: (g) => g.stats.flights >= 1 },
 	{ id: 'research', title: 'Research lab online', text: 'Upgrades that help every planet.', when: (g) => g.runEarned >= 250 },
+	{ id: 'crew', title: 'Crew for hire', text: 'Hire a crew member to boost one planet. Tap Crew on a planet.', when: (g) => g.runEarned >= 800 },
 	{ id: 'prestige', title: 'Nova Reset ready', text: 'Reset your run for stardust: a lasting boost to all sales.', when: (g) => g.planets[3].unlocked },
 	...PLANETS.map((p, i) => ({
 		id: `m-${i}`,

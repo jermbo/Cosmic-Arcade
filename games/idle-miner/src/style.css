@@ -1138,3 +1138,62 @@ svg {
 	animation-iteration-count: 1 !important;
 	transition-duration: 0.01s !important;
 }
+
+/* ---------- crew ---------- */
+
+.pv-top__side {
+	display: flex;
+	gap: 6px;
+}
+
+.row.crew {
+	grid-template-columns: auto 1fr auto;
+}
+
+.crew__badge {
+	display: grid;
+	place-items: center;
+	width: 34px;
+	height: 34px;
+	border-radius: 50%;
+	font-weight: 700;
+	color: var(--c);
+	border: 2px solid var(--c);
+	background: color-mix(in srgb, var(--c) 14%, transparent);
+}
+
+.crew.is-new .crew__badge {
+	opacity: 0.45;
+	border-style: dashed;
+}
+
+.crew.is-on {
+	border-color: color-mix(in srgb, var(--gold) 55%, transparent);
+}
+
+.crew__btns {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 6px;
+}
+
+.crew__where {
+	display: block;
+	margin-top: 3px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--muted);
+}
+
+.crew__slots {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	margin-bottom: 10px;
+}
+
+.crew__slots .stat {
+	flex: 1;
+}

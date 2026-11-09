@@ -1,6 +1,6 @@
 // The planet view: the factory grid, drawing and touch / mouse building.
 
-import { COLS, DX, DY, MACHINES, PLANETS, ROWS, TILE_ORE, TILE_ROCK, beltSpeed, shipCargo } from '../core/data.ts';
+import { COLS, DX, DY, MACHINES, PLANETS, ROWS, TILE_ORE, TILE_ROCK, beltSpeed } from '../core/data.ts';
 import type { Dir, MachineType } from '../core/data.ts';
 import * as sim from '../core/sim.ts';
 import { baseTilesOf, tilesOf } from '../core/state.ts';
@@ -428,7 +428,7 @@ export class PlanetView {
 		const x = (cx(i) + 0.5) * s;
 		const y = (cy(i) + 0.5) * s;
 		// stock ring
-		const cap = 40 + shipCargo(p.up.cargo) * 2;
+		const cap = sim.padCap(p);
 		const fill = Math.min(1, p.pad.length / cap);
 		if (fill > 0) {
 			ctx.beginPath();
@@ -460,7 +460,7 @@ export class PlanetView {
 			ctx.globalAlpha = 1;
 		}
 		if (docked && !this.shipAnims.some((a) => a.kind === 'down')) {
-			const load = docked.cargo.length / shipCargo(p.up.cargo);
+			const load = docked.cargo.length / sim.shipCap(p);
 			glow(ctx, x, y, s * 0.6, PLANETS[this.pi].color, 0.3 + load * 0.5);
 			drawShip(ctx, x, y + Math.sin(time * 3) * s * 0.02, upAngle, sz, PLANETS[this.pi].color, 0, time);
 		}

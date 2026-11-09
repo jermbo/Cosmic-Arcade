@@ -1,7 +1,7 @@
 // The shape of a game, a fresh game, the planet maps, and save / load.
 
 import { CELLS, COLS, ROWS, PLANETS, TILE_GROUND, TILE_ORE, TILE_ROCK } from './data.ts';
-import type { Dir, MachineType, PerkId, ResearchId, ShipUpgrade } from './data.ts';
+import type { CrewId, Dir, MachineType, PerkId, ResearchId, ShipUpgrade } from './data.ts';
 
 export interface BeltItem {
 	/** item kind */
@@ -80,6 +80,12 @@ export interface Game {
 	runEarned: number;
 	stardust: number;
 	perks: Partial<Record<PerkId, boolean>>;
+	/** hired crew, by level. Kept through a nova. */
+	crew: Partial<Record<CrewId, number>>;
+	/** where each crew member works: a planet index. Missing means resting. Kept through a nova. */
+	crewAt: Partial<Record<CrewId, number>>;
+	/** crew slots bought with stardust. Kept through a nova. */
+	slots: number;
 	research: Record<ResearchId, number>;
 	planets: PlanetState[];
 	goals: string[];
@@ -113,6 +119,13 @@ export function defaultSettings(): Settings {
 	return { sfx: 0.8, music: 0.5, vibrate: true, reduceMotion: false };
 }
 
+/** After a nova only Cinder is open, so working crew go back there. */
+function crewHome(at: Partial<Record<CrewId, number>>) {
+	const out: Partial<Record<CrewId, number>> = {};
+	for (const id of Object.keys(at) as CrewId[]) if (at[id] !== undefined) out[id] = 0;
+	return out;
+}
+
 export function newGame(keep?: Game): Game {
 	const perks = keep ? keep.perks : {};
 	const extra = perks.hull ? 1 : 0;
@@ -122,6 +135,9 @@ export function newGame(keep?: Game): Game {
 		runEarned: 0,
 		stardust: keep ? keep.stardust : 0,
 		perks,
+		crew: keep ? { ...keep.crew } : {},
+		crewAt: keep ? crewHome(keep.crewAt) : {},
+		slots: keep ? keep.slots : 0,
 		research: { belt: 0, tap: 0, market: 0, offline: 0, blast: 0, beacon: 0 },
 		blasted: keep ? keep.blasted.map((a) => a.slice()) : PLANETS.map(() => []),
 		planets: PLANETS.map((_, i) => makePlanet(i, i === 0, extra)),
@@ -244,6 +260,9 @@ export function deserialize(text: string): Game | null {
 		const g = newGame();
 		Object.assign(g, raw);
 		g.settings = { ...defaultSettings(), ...raw.settings };
+		g.crew = { ...raw.crew };
+		g.crewAt = { ...raw.crewAt };
+		g.slots = Number.isInteger(raw.slots) ? raw.slots : 0;
 		g.research = { belt: 0, tap: 0, market: 0, offline: 0, blast: 0, beacon: 0, ...raw.research };
 		g.blasted = PLANETS.map((_, i) => (Array.isArray(raw.blasted?.[i]) ? raw.blasted[i].filter(Number.isInteger) : []));
 		g.planets = PLANETS.map((_, i) => {
