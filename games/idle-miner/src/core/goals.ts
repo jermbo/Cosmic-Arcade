@@ -1,6 +1,7 @@
 // Goals: the "what next" list, and the features that open up as you play.
 
 import { MACHINES, PLANETS } from './data.ts';
+import { boughtPlots } from './grid.ts';
 import { countAll, countOf, earn, emit, incomeRate, machineUnlocked } from './sim.ts';
 import type { Game } from './state.ts';
 
@@ -55,6 +56,7 @@ export const GOALS: Goal[] = [
 	{ id: 'level5', text: 'Upgrade any machine to level 5', where: 'planet:1', progress: (g) => n(maxLv(g), 5) },
 	{ id: 'belts3', text: 'Get Mag Belts to level 3', where: 'research', progress: (g) => n(g.research.belt, 3) },
 	{ id: 'inc40', text: 'Reach 40 credits per second', where: 'space', progress: (g) => n(Math.floor(peak(g)), 40) },
+	{ id: 'survey', text: 'Buy a plot of land next to your base', where: 'planet:0', progress: (g) => bool(g.planets.some((p) => boughtPlots(p) > 0)) },
 	{ id: 'market2', text: 'Get Trade Deals to level 2', where: 'research', progress: (g) => n(g.research.market, 2) },
 	{ id: 'inc100', text: 'Reach 100 credits per second', where: 'space', progress: (g) => n(Math.floor(peak(g)), 100) },
 	{ id: 'verdance', text: 'Unlock Verdance', where: 'space', progress: (g) => bool(g.planets[2].unlocked) },

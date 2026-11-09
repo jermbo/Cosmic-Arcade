@@ -4,18 +4,19 @@
 // 2. At least one of those ground cells is reachable from the pad on ground only.
 // 3. Generation constrains random ore/rock placement; ensureOreAccessible fixes stragglers.
 
-import { CELLS, COLS, DX, DY, ROWS, TILE_GROUND, TILE_ORE, TILE_ROCK } from './data.ts';
+import { DX, DY, TILE_GROUND, TILE_ORE, TILE_ROCK } from './data.ts';
+import { MAX_CELLS, MAX_COLS, MAX_ROWS, STRIDE, cellIdx } from './grid.ts';
 
 export type OreAccessIssue = { cell: number; reason: 'no-exit' | 'no-path' };
 
 function cellNeighbors(c: number): number[] {
-	const x = c % COLS;
-	const y = (c / COLS) | 0;
+	const x = c % STRIDE;
+	const y = (c / STRIDE) | 0;
 	const out: number[] = [];
 	for (let d = 0; d < 4; d++) {
 		const nx = x + DX[d];
 		const ny = y + DY[d];
-		if (nx >= 0 && ny >= 0 && nx < COLS && ny < ROWS) out.push(ny * COLS + nx);
+		if (nx >= 0 && ny >= 0 && nx < MAX_COLS && ny < MAX_ROWS) out.push(cellIdx(nx, ny));
 	}
 	return out;
 }
@@ -28,7 +29,7 @@ export function oreGroundExits(tiles: Uint8Array, c: number): number[] {
 export function reachableGroundFromPad(tiles: Uint8Array, px: number, py: number): Set<number> {
 	const seen = new Set<number>();
 	const q: number[] = [];
-	for (const n of cellNeighbors(py * COLS + px)) {
+	for (const n of cellNeighbors(cellIdx(px, py))) {
 		if (tiles[n] === TILE_GROUND) {
 			seen.add(n);
 			q.push(n);
@@ -50,7 +51,7 @@ export function reachableGroundFromPad(tiles: Uint8Array, px: number, py: number
 export function validatePlanetTiles(tiles: Uint8Array, px: number, py: number): OreAccessIssue[] {
 	const reach = reachableGroundFromPad(tiles, px, py);
 	const issues: OreAccessIssue[] = [];
-	for (let c = 0; c < CELLS; c++) {
+	for (let c = 0; c < MAX_CELLS; c++) {
 		if (tiles[c] !== TILE_ORE) continue;
 		const exits = oreGroundExits(tiles, c);
 		if (!exits.length) issues.push({ cell: c, reason: 'no-exit' });
@@ -122,11 +123,11 @@ function pokeOpenCorridor(tiles: Uint8Array, oreC: number, reach: Set<number>): 
 
 /** Step 3 — post-process a generated map. */
 export function ensureOreAccessible(tiles: Uint8Array, px: number, py: number): void {
-	for (let c = 0; c < CELLS; c++) if (tiles[c] === TILE_ORE) openOreExit(tiles, c);
+	for (let c = 0; c < MAX_CELLS; c++) if (tiles[c] === TILE_ORE) openOreExit(tiles, c);
 	for (let pass = 0; pass < 64; pass++) {
 		const reach = reachableGroundFromPad(tiles, px, py);
 		let stuck = -1;
-		for (let c = 0; c < CELLS; c++) {
+		for (let c = 0; c < MAX_CELLS; c++) {
 			if (tiles[c] !== TILE_ORE) continue;
 			if (oreGroundExits(tiles, c).some((n) => reach.has(n))) continue;
 			stuck = c;
@@ -140,14 +141,27 @@ export function ensureOreAccessible(tiles: Uint8Array, px: number, py: number): 
 }
 
 /** Step 2 — only place new ore on cells that border ground. */
-export function oreHasGroundExit(tiles: Uint8Array, x: number, y: number): boolean {
-	for (const n of cellNeighbors(y * COLS + x)) if (tiles[n] === TILE_GROUND) return true;
+export function oreHasGroundExit(
+	tiles: Uint8Array,
+	x: number,
+	y: number,
+	_stride = STRIDE,
+	_w = MAX_COLS,
+	_h = MAX_ROWS,
+): boolean {
+	void _stride;
+	void _w;
+	void _h;
+	for (const n of cellNeighbors(cellIdx(x, y))) if (tiles[n] === TILE_GROUND) return true;
 	return false;
 }
 
 /** Step 2 — skip rocks that would remove an ore's last ground exit. */
-export function rockSealsOre(tiles: Uint8Array, x: number, y: number): boolean {
-	const c = y * COLS + x;
+export function rockSealsOre(tiles: Uint8Array, x: number, y: number, _stride = STRIDE, _w = MAX_COLS, _h = MAX_ROWS): boolean {
+	void _stride;
+	void _w;
+	void _h;
+	const c = cellIdx(x, y);
 	for (const n of cellNeighbors(c)) {
 		if (tiles[n] !== TILE_ORE) continue;
 		let exits = 0;

@@ -1,8 +1,6 @@
 // All the fixed game numbers: planets, machines, prices, research, perks.
 
-export const COLS = 12;
-export const ROWS = 8;
-export const CELLS = COLS * ROWS;
+export { COLS, ROWS, CELLS, MAX_COLS, MAX_ROWS, STRIDE, MAX_CELLS } from './grid.ts';
 
 /** 0 right, 1 down, 2 left, 3 up */
 export type Dir = 0 | 1 | 2 | 3;
@@ -48,12 +46,12 @@ export interface PlanetDef {
 }
 
 export const PLANETS: PlanetDef[] = [
-	{ name: 'Cinder', ore: 'Rustite', color: '#ff7a45', light: '#ffc29e', dark: '#7a2a12', value: 1, unlock: 0, travel: 5, newMachine: null, pad: [10, 3], seed: 11, rings: false },
-	{ name: 'Glacia', ore: 'Cryon', color: '#4fd8ff', light: '#b8f1ff', dark: '#11507a', value: 8, unlock: 3000, travel: 6, newMachine: 'crusher', pad: [10, 4], seed: 23, rings: true },
-	{ name: 'Verdance', ore: 'Verdite', color: '#5dff8f', light: '#c2ffd4', dark: '#126b3a', value: 64, unlock: 25e3, travel: 7, newMachine: 'polisher', pad: [1, 3], seed: 37, rings: false },
-	{ name: 'Solara', ore: 'Sunstone', color: '#ffd23f', light: '#fff0b0', dark: '#7a5a0a', value: 512, unlock: 600e3, travel: 8, newMachine: 'pylon', pad: [10, 6], seed: 41, rings: true },
-	{ name: 'Umbra', ore: 'Voidglass', color: '#b47cff', light: '#e2ccff', dark: '#45227a', value: 4096, unlock: 12e6, travel: 9, newMachine: 'compactor', pad: [6, 0], seed: 53, rings: false },
-	{ name: 'Halcyon', ore: 'Helionite', color: '#ff5fae', light: '#ffc2e2', dark: '#7a1450', value: 32768, unlock: 600e6, travel: 10, newMachine: 'forge', pad: [10, 1], seed: 67, rings: true },
+	{ name: 'Cinder', ore: 'Rustite', color: '#ff7a45', light: '#ffc29e', dark: '#7a2a12', value: 1, unlock: 0, travel: 5, newMachine: null, pad: [20, 20], seed: 11, rings: false },
+	{ name: 'Glacia', ore: 'Cryon', color: '#4fd8ff', light: '#b8f1ff', dark: '#11507a', value: 8, unlock: 3000, travel: 6, newMachine: 'crusher', pad: [21, 20], seed: 23, rings: true },
+	{ name: 'Verdance', ore: 'Verdite', color: '#5dff8f', light: '#c2ffd4', dark: '#126b3a', value: 64, unlock: 25e3, travel: 7, newMachine: 'polisher', pad: [20, 21], seed: 37, rings: false },
+	{ name: 'Solara', ore: 'Sunstone', color: '#ffd23f', light: '#fff0b0', dark: '#7a5a0a', value: 512, unlock: 600e3, travel: 8, newMachine: 'pylon', pad: [21, 21], seed: 41, rings: true },
+	{ name: 'Umbra', ore: 'Voidglass', color: '#b47cff', light: '#e2ccff', dark: '#45227a', value: 4096, unlock: 12e6, travel: 9, newMachine: 'compactor', pad: [20, 20], seed: 53, rings: false },
+	{ name: 'Halcyon', ore: 'Helionite', color: '#ff5fae', light: '#ffc2e2', dark: '#7a1450', value: 32768, unlock: 600e6, travel: 10, newMachine: 'forge', pad: [21, 21], seed: 67, rings: true },
 ];
 
 export type MachineType = 'pad' | 'drill' | 'belt' | 'cross' | 'bridge' | 'smelter' | 'crusher' | 'polisher' | 'pylon' | 'compactor' | 'forge';

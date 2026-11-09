@@ -5,7 +5,9 @@ import '@fontsource/chakra-petch/latin-700.css';
 import './style.css';
 
 import { initAudio, setVolumes, sfx, suspendAudio } from './audio.ts';
-import { BUILD_ORDER, COLS, MACHINES, PLANETS, TILE_ORE, beltSpeed, levelSpeed, pylonBoost } from './core/data.ts';
+import { BUILD_ORDER, MACHINES, PLANETS, TILE_ORE, beltSpeed, levelSpeed, pylonBoost } from './core/data.ts';
+import { boughtPlots, cellX, cellY, viewBounds } from './core/grid.ts';
+import { clearPlanetTileCache } from './core/state.ts';
 import type { MachineType } from './core/data.ts';
 import { fmt } from './core/format.ts';
 import { GOALS, checkProgress, currentGoal } from './core/goals.ts';
@@ -42,6 +44,7 @@ const ui = {
 	pvName: $('pv-name'),
 	pvSub: $('pv-sub'),
 	crew: $('btn-crew'),
+	survey: $('btn-survey'),
 	card: $('planet-card'),
 	toolbar: $('toolbar'),
 	inspect: $('inspect'),
@@ -55,6 +58,7 @@ const ui = {
 
 // ---------- state ----------
 
+clearPlanetTileCache();
 let g: Game = loadGame() ?? newGame();
 let hadSave = !!loadGame();
 let started = false;
@@ -86,6 +90,14 @@ const pv = new PlanetView({
 	changed: () => {
 		updateInspect();
 		updateToolbar();
+		relayout();
+		updatePlanetHeader();
+	},
+	expanded: () => {
+		sfx.unlock();
+		saveGame(g);
+		relayout();
+		updatePlanetHeader();
 	},
 });
 
@@ -158,7 +170,8 @@ function relayout() {
 			bottom = 8;
 			right = W - bar.left + 4;
 		} else bottom = H - bar.top + 6;
-		pv.layout(W, H, top, bottom, left, right);
+		const pl = g.planets[pv.pi];
+		pv.layout(W, H, top, bottom, viewBounds(pl), left, right);
 	}
 	const root = document.documentElement.style;
 	root.setProperty('--play-t', `${top}px`);
@@ -270,6 +283,13 @@ function applySettings() {
 
 // ---------- views ----------
 
+function updatePlanetHeader() {
+	const pi = pv.pi;
+	const p = g.planets[pi];
+	ui.pvSub.textContent = `${boughtPlots(p) + 1} plot${boughtPlots(p) ? 's' : ''} · tap a dashed plot to buy land · drag off-land or two fingers to pan`;
+	ui.survey.hidden = true;
+}
+
 function toSpace() {
 	view = 'space';
 	ui.pvTop.hidden = true;
@@ -292,6 +312,7 @@ function toPlanet(pi: number) {
 	pv.open(pi);
 	ui.pvName.textContent = PLANETS[pi].name;
 	ui.pvName.style.color = PLANETS[pi].light;
+	updatePlanetHeader();
 	toolbarKey = '';
 	updateToolbar();
 	clearFx();
@@ -356,27 +377,75 @@ function goToGoal() {
 // ---------- input ----------
 
 const pointers = new Map<number, { x: number; y: number }>();
+/** Two-finger gesture: last finger distance and midpoint. */
+let pinch: { dist: number; x: number; y: number } | null = null;
+/** One-finger press on the space map: a tap on release, or a pan once it moves. */
+let spaceDrag: { id: number; x0: number; y0: number; x: number; y: number; moved: boolean; tap: boolean } | null = null;
+
+/** The camera for the current view. */
+function cam() {
+	return view === 'planet' ? pv : space;
+}
+
+function pinchState() {
+	const [a, b] = [...pointers.values()];
+	return { dist: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
 
 canvas.addEventListener('pointerdown', (e) => {
 	initAudio();
 	if (!started) return;
 	canvas.setPointerCapture?.(e.pointerId);
 	pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-	if (view === 'space') spaceTap(e.clientX, e.clientY);
+	if (pointers.size === 2) {
+		spaceDrag = null;
+		// A second finger turns any drag into pinch + pan.
+		pv.pointerCancel();
+		pinch = pinchState();
+		return;
+	}
+	if (pointers.size > 2) return;
+	if (view === 'space') {
+		spaceDrag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, moved: false, tap: e.button === 0 };
+		return;
+	}
+	if (e.button === 1 || e.button === 2) pv.startPan(e.clientX, e.clientY, e.pointerId);
 	else pv.pointerDown(g, e.clientX, e.clientY, e.pointerId);
 });
 canvas.addEventListener('pointermove', (e) => {
 	if (!started) return;
+	if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+	if (pinch && pointers.size >= 2) {
+		const now = pinchState();
+		if (pinch.dist > 0) cam().zoomAt(now.dist / pinch.dist, now.x, now.y);
+		cam().panBy(now.x - pinch.x, now.y - pinch.y);
+		pinch = now;
+		return;
+	}
+	if (view === 'space' && spaceDrag?.id === e.pointerId) {
+		if (!spaceDrag.moved && Math.hypot(e.clientX - spaceDrag.x0, e.clientY - spaceDrag.y0) > 8) spaceDrag.moved = true;
+		if (spaceDrag.moved) space.panBy(e.clientX - spaceDrag.x, e.clientY - spaceDrag.y);
+		spaceDrag.x = e.clientX;
+		spaceDrag.y = e.clientY;
+		canvas.style.cursor = spaceDrag.moved ? 'grabbing' : canvas.style.cursor;
+		return;
+	}
 	if (view === 'planet') {
 		pv.pointerMove(g, e.clientX, e.clientY, e.pointerId);
-		// Touch has no hover, so no ghost after the finger lifts.
 		if (e.pointerType !== 'mouse' && !pointers.has(e.pointerId)) pv.hover = null;
-	}
-	else canvas.style.cursor = space.hit(g, e.clientX, e.clientY) !== -1 ? 'pointer' : 'default';
+	} else canvas.style.cursor = space.hit(g, e.clientX, e.clientY) !== -1 ? 'pointer' : 'default';
 });
 const up = (e: PointerEvent) => {
 	pointers.delete(e.pointerId);
+	if (pointers.size < 2) pinch = null;
 	if (!started) return;
+	if (view === 'space' && spaceDrag?.id === e.pointerId) {
+		const d = spaceDrag;
+		spaceDrag = null;
+		canvas.style.cursor = 'default';
+		if (!d.moved && d.tap) spaceTap(e.clientX, e.clientY);
+		return;
+	}
 	if (view === 'planet') {
 		pv.pointerUp(g, e.clientX, e.clientY, e.pointerId);
 		if (e.pointerType !== 'mouse') pv.hover = null;
@@ -385,10 +454,54 @@ const up = (e: PointerEvent) => {
 canvas.addEventListener('pointerup', up);
 canvas.addEventListener('pointercancel', (e) => {
 	pointers.delete(e.pointerId);
+	if (pointers.size < 2) pinch = null;
+	spaceDrag = null;
 	pv.pointerCancel();
 });
 canvas.addEventListener('pointerleave', () => (pv.hover = null));
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+/** A mouse wheel moves in big notches; a trackpad sends many small, smooth deltas. */
+function isWheelNotch(e: WheelEvent) {
+	if (e.deltaMode !== 0) return true;
+	return e.deltaX === 0 && Math.abs(e.deltaY) >= 50 && Number.isInteger(e.deltaY);
+}
+
+canvas.addEventListener(
+	'wheel',
+	(e) => {
+		if (!started) return;
+		e.preventDefault();
+		if (e.ctrlKey) {
+			// Trackpad pinch (browsers send it as ctrl + wheel).
+			cam().zoomAt(Math.exp(-e.deltaY * 0.008), e.clientX, e.clientY);
+		} else if (isWheelNotch(e)) {
+			const step = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
+			cam().zoomAt(Math.exp(-Math.max(-120, Math.min(120, step)) * 0.0012), e.clientX, e.clientY);
+		} else {
+			// Two-finger trackpad scroll pans.
+			cam().panBy(-e.deltaX, -e.deltaY);
+			return;
+		}
+		if (view === 'planet') relayout();
+	},
+	{ passive: false },
+);
+
+// Safari sends trackpad pinch as gesture events instead of ctrl + wheel.
+let gestureScale = 1;
+canvas.addEventListener('gesturestart', (e) => {
+	e.preventDefault();
+	gestureScale = 1;
+});
+canvas.addEventListener('gesturechange', (e) => {
+	if (!started) return;
+	e.preventDefault();
+	const ge = e as unknown as { scale: number; clientX: number; clientY: number };
+	cam().zoomAt(ge.scale / gestureScale, ge.clientX, ge.clientY);
+	gestureScale = ge.scale;
+	if (view === 'planet') relayout();
+});
 
 function spaceTap(x: number, y: number) {
 	const hit = space.hit(g, x, y);
@@ -446,9 +559,10 @@ window.addEventListener('keydown', (e) => {
 		return;
 	}
 	if (view !== 'planet') {
+		if (e.key === 'f' || e.key === 'F') space.resetCamera();
 		if (e.key === ' ' && space.selected >= 0 && g.planets[space.selected].unlocked) {
 			e.preventDefault();
-			const p = space.pos[space.selected];
+			const p = space.screenPos(space.selected);
 			spaceTap(p.x, p.y);
 		}
 		return;
@@ -462,18 +576,23 @@ window.addEventListener('keydown', (e) => {
 	if (e.key === '0') setTool(pv.tool === 'remove' ? null : 'remove');
 	if (e.key === 'r' || e.key === 'R') {
 		if (pv.selected !== null) {
-			sim.rotateAt(g, pv.pi, pv.selected % COLS, Math.floor(pv.selected / COLS));
+			sim.rotateAt(g, pv.pi, cellX(pv.selected), cellY(pv.selected));
 			sfx.click();
 		}
 	}
 	if ((e.key === 'Delete' || e.key === 'Backspace') && pv.selected !== null) inspectAct('remove');
 	if (e.key === 'u' || e.key === 'U') inspectAct('upgrade');
+	if (e.key === 'f' || e.key === 'F') {
+		pv.resetCamera();
+		relayout();
+	}
 });
 
 // ---------- toolbar ----------
 
 function availableTools(): MachineType[] {
-	return BUILD_ORDER.filter((t) => sim.machineUnlocked(g, t));
+	const pi = pv.pi;
+	return BUILD_ORDER.filter((t) => sim.toolOnPlanet(g, pi, t));
 }
 
 const seenTools = new Set<string>(['drill', 'belt']);
@@ -556,7 +675,7 @@ function updateInspect() {
 	ui.toolbar.classList.add('is-under');
 	const def = MACHINES[m.t];
 	const p = g.planets[pv.pi];
-	const boost = sim.boostAt(p, c);
+	const boost = sim.boostAt(p, c, pv.pi);
 	const crew = sim.crewOf(p);
 	const crewMult = m.t === 'drill' ? crew.drill : crew.machine;
 	let stats = '';
@@ -636,8 +755,8 @@ ui.inspect.addEventListener('click', (e) => {
 function inspectAct(act: string) {
 	const c = pv.selected;
 	if (c === null) return;
-	const x = c % COLS;
-	const y = Math.floor(c / COLS);
+	const x = cellX(c);
+	const y = cellY(c);
 	if (act === 'upgrade') {
 		if (sim.upgradeMachine(g, pv.pi, x, y)) {
 			sfx.upgrade();
@@ -700,7 +819,10 @@ function updateCard() {
 		const drills = sim.countOf(g, i, 'drill');
 		const rate = space.rate[i] / 12;
 		const sub = rate > 0.05 ? `${fmt(rate)}/s` : drills ? 'Starting up' : 'No factory yet';
-		const tip = drills === 0 ? 'Tap the planet to mine by hand. Open it to build drills.' : `${drills} drill${drills > 1 ? 's' : ''}, ${p.ships.length} ship${p.ships.length > 1 ? 's' : ''}. Each tap mines ${fmt(sim.tapValue(g, i))}.`;
+		const badge = sim.planetBadge(g, i);
+		const flag =
+			badge === 'warn' ? ' ⚠ Stalled' : badge === 'full' ? ' 📦 Pad full' : badge === 'survey' ? ' 🗺 Land for sale' : '';
+		const tip = drills === 0 ? 'Tap the planet to mine by hand. Open it to build drills.' : `${drills} drill${drills > 1 ? 's' : ''}, ${p.ships.length} ship${p.ships.length > 1 ? 's' : ''}. Each tap mines ${fmt(sim.tapValue(g, i))}.${flag}`;
 		html = `<div class="card__head"><span class="card__dot" style="color:${def.color}"></span><span class="card__title">${def.name}</span><span class="card__sub">${def.ore}<br>${sub}</span></div>
 			<p>${tip}</p>
 			<div class="card__row"><button class="btn" data-act="open" id="card-open">Open factory</button>${g.unlocks.includes('ships') ? `<button class="btn btn--ghost" data-act="ships">Ships</button>` : ''}${g.unlocks.includes('crew') ? `<button class="btn btn--ghost" data-act="crew">Crew</button>` : ''}</div>`;
@@ -731,7 +853,7 @@ ui.card.addEventListener('click', (e) => {
 		if (sim.unlockPlanet(g, i)) {
 			sfx.unlock();
 			buzz(30);
-			const p = space.pos[i];
+			const p = space.screenPos(i);
 			ring(p.x, p.y, PLANETS[i].color, p.r, 300, 1);
 			ring(p.x, p.y, '#ffffff', p.r * 0.6, 200, 0.7);
 			burst(p.x, p.y, PLANETS[i].color, 40, 300, { size: 4, life: 1 });
@@ -762,6 +884,7 @@ function updateHud() {
 	ui.nova.hidden = !g.unlocks.includes('prestige');
 	ui.crew.hidden = !g.unlocks.includes('crew');
 	ui.nova.classList.toggle('is-ready', sim.canPrestige(g) && sim.prestigeGain(g) >= Math.max(1, g.stardust));
+	if (view === 'planet' && started) updatePlanetHeader();
 }
 
 function updateGoal() {
@@ -772,7 +895,9 @@ function updateGoal() {
 		ui.goal.classList.add('is-warn');
 		ui.goal.classList.toggle('is-slow', prob.kind === 'slow');
 		ui.goalTag.textContent = prob.kind === 'slow' ? 'Slow' : 'Fix';
-		if (ui.goalText.textContent !== prob.text) ui.goalText.textContent = prob.text;
+		const hint = prob.kind === 'pad' ? 'Tap to open ships' : 'Tap to jump there';
+		const text = `${prob.text} · ${hint}`;
+		if (ui.goalText.textContent !== text) ui.goalText.textContent = text;
 		ui.goalFill.style.width = '0%';
 		return;
 	}
@@ -791,7 +916,13 @@ function updateGoal() {
 		text = `${goal.text} · ${fmt(Math.min(g.credits, cost))} / ${fmt(cost)}`;
 		ui.goalFill.style.width = `${Math.min(100, (g.credits / cost) * 100)}%`;
 	} else {
-		if (want > 1) text += ` (${fmt(have)}/${fmt(want)})`;
+		if (want > 1) {
+			text += ` (${fmt(have)}/${fmt(want)})`;
+			if (have < want && goal.where.startsWith('planet') && g.credits < sim.buildCost(g, Number(goal.where.split(':')[1]) || 0, 'drill')) {
+				const pi = Number(goal.where.split(':')[1] || 0);
+				text += ` · need ${fmt(sim.buildCost(g, pi, 'drill'))} for next drill`;
+			}
+		}
 		ui.goalFill.style.width = `${(have / want) * 100}%`;
 	}
 	ui.goalTag.textContent = `Next ${g.goals.length + 1}/${GOALS.length}`;
@@ -884,7 +1015,7 @@ function updateTutorial() {
 		if (g.stats.taps >= 8 && g.credits >= sim.buildCost(g, 0, 'drill')) advance(1);
 		else if (view === 'space') {
 			space.pointAt = 0;
-			const p = space.pos[0];
+			const p = space.screenPos(0);
 			coach(g.stats.taps === 0 ? 'Tap Cinder to mine ore. Each tap earns credits.' : `Keep tapping! A drill costs ${fmt(sim.buildCost(g, 0, 'drill'))}.`, { x: p.x, y: p.y - p.r, h: p.r * 2 + 36 });
 		} else coach(null);
 		return;
@@ -955,7 +1086,10 @@ function updateTutorial() {
 			return;
 		}
 		if (view === 'space') {
-			coach('Your ship is flying home. Each landing sells the cargo.', { x: space.home.x, y: space.home.y - space.home.r, h: space.home.r * 3 });
+			{
+				const h = space.screenHome();
+				coach('Your ship is flying home. Each landing sells the cargo.', { x: h.x, y: h.y - h.r, h: h.r * 3 });
+			}
 		} else coach(null);
 		return;
 	}
@@ -967,7 +1101,7 @@ function updateTutorial() {
 let tutorialEndAt = 0;
 
 function dist(a: number, b: number) {
-	return Math.abs((a % COLS) - (b % COLS)) + Math.abs(Math.floor(a / COLS) - Math.floor(b / COLS));
+	return Math.abs(cellX(a) - cellX(b)) + Math.abs(cellY(a) - cellY(b));
 }
 
 // ---------- prestige ----------

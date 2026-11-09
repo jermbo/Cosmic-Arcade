@@ -1,6 +1,24 @@
 // The planet view: the factory grid, drawing and touch / mouse building.
 
-import { BRIDGE_SPAN, COLS, DX, DY, MACHINES, PLANETS, ROWS, TILE_ORE, TILE_ROCK, beltSpeed } from '../core/data.ts';
+import { BRIDGE_SPAN, DX, DY, MACHINES, PLANETS, TILE_ORE, TILE_ROCK, beltSpeed } from '../core/data.ts';
+import {
+	MAX_CELLS,
+	MAX_COLS,
+	MAX_ROWS,
+	PLOT,
+	type Bounds,
+	buyablePlots,
+	cellIdx,
+	cellX,
+	cellY,
+	inPlay,
+	nextPlotCost,
+	ownedPlots,
+	plotBounds,
+	plotCells,
+	plotOf,
+	plotOfCell,
+} from '../core/grid.ts';
 import type { Dir, MachineType } from '../core/data.ts';
 import * as sim from '../core/sim.ts';
 import { baseTilesOf, tilesOf } from '../core/state.ts';
@@ -16,33 +34,43 @@ export interface PlanetHooks {
 	toast: (text: string) => void;
 	select: (cell: number | null) => void;
 	changed: () => void;
+	expanded?: () => void;
 }
 
 interface Drag {
 	path: number[];
 	moved: boolean;
-	mode: 'belt' | 'bridge' | 'machine' | 'remove' | 'none';
+	mode: 'belt' | 'bridge' | 'machine' | 'remove' | 'none' | 'pan';
 	pointer: number;
 	startX: number;
 	startY: number;
+	lastX: number;
+	lastY: number;
+	/** pan only: plot for sale under the press, bought if it was a tap */
+	plot?: number | null;
 }
+
+/** Screen pixels a press may move and still count as a tap. */
+const TAP_SLOP = 8;
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 3;
 
 interface Anim {
 	kind: 'up' | 'down';
 	t: number;
 }
 
-const idx = (x: number, y: number) => y * COLS + x;
-const cx = (i: number) => i % COLS;
-const cy = (i: number) => Math.floor(i / COLS);
+const idx = cellIdx;
+const cx = cellX;
+const cy = cellY;
 
 const RED = '#ff5d73';
 const AMBER = '#ffb347';
 
 /** A pulsing outline around a cell. */
-function blink(ctx: CanvasRenderingContext2D, i: number, s: number, color: string, time: number, width: number) {
+function blink(ctx: CanvasRenderingContext2D, i: number, s: number, color: string, time: number, width: number, ox: number, oy: number) {
 	const a = 0.35 + 0.35 * Math.sin(time * 6);
-	roundRect(ctx, cx(i) * s + 2, cy(i) * s + 2, s - 4, s - 4, s * 0.18);
+	roundRect(ctx, (cellX(i) - ox) * s + 2, (cellY(i) - oy) * s + 2, s - 4, s - 4, s * 0.18);
 	ctx.strokeStyle = withAlpha(color, a);
 	ctx.lineWidth = width;
 	ctx.stroke();
@@ -57,13 +85,22 @@ export class PlanetView {
 	ox = 0;
 	oy = 0;
 	rot = false;
+	gridCols = 12;
+	gridRows = 8;
+	offX = 0;
+	offY = 0;
+	zoom = 1;
+	panX = 0;
+	panY = 0;
+	private viewW = 0;
+	private viewH = 0;
 	private drag: Drag | null = null;
 	/** Blocked machines on this planet. Backups are held a moment so the marks do not flicker. */
 	blocks: sim.Block[] = [];
 	private held = new Map<number, { b: sim.Block; t: number; pi: number }>();
 	private boardCache: HTMLCanvasElement | null = null;
 	private boardKey = '';
-	private lastSpark = new Float32Array(COLS * ROWS);
+	private lastSpark = new Float32Array(MAX_CELLS);
 	private shipAnims: Anim[] = [];
 	/** For the tutorial: cells to point at. */
 	highlight: number[] = [];
@@ -80,76 +117,193 @@ export class PlanetView {
 		this.drag = null;
 		this.shipAnims = [];
 		this.boardKey = '';
+		this.zoom = 1;
+		this.panX = 0;
+		this.panY = 0;
 	}
 
-	/** Fits the grid in the free area. Turns it 90 degrees on tall screens. */
-	layout(w: number, h: number, top: number, bottom: number, left = 0, right = 0) {
-		const availW = w - left - right;
-		const availH = h - top - bottom;
-		const pad = 12;
-		const flat = Math.min((availW - pad * 2) / COLS, (availH - pad * 2) / ROWS);
-		const tall = Math.min((availW - pad * 2) / ROWS, (availH - pad * 2) / COLS);
-		this.rot = tall > flat * 1.08;
-		this.ts = Math.floor(Math.max(flat, tall));
-		const gw = (this.rot ? ROWS : COLS) * this.ts;
-		const gh = (this.rot ? COLS : ROWS) * this.ts;
-		this.ox = Math.round(left + (availW - gw) / 2);
-		this.oy = Math.round(top + (availH - gh) / 2);
+	resetCamera() {
+		this.zoom = 1;
+		this.panX = 0;
+		this.panY = 0;
+	}
+
+	invalidateBoard() {
 		this.boardKey = '';
 	}
 
-	/** Screen point to grid cell, or null. */
-	cellAt(sx: number, sy: number): number | null {
+	/** Zoom by a factor, keeping the board point under (sx, sy) in place. */
+	zoomAt(factor: number, sx: number, sy: number) {
+		const z0 = this.zoom;
+		const z1 = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z0 * factor));
+		if (z1 === z0) return;
+		const w = (this.rot ? this.gridRows : this.gridCols) * this.ts;
+		const h = (this.rot ? this.gridCols : this.gridRows) * this.ts;
+		// layout() keeps the board centred, so its origin shifts as the zoom changes.
+		const ox1 = this.ox + (w * (z0 - z1)) / 2;
+		const oy1 = this.oy + (h * (z0 - z1)) / 2;
+		const k = z1 / z0;
+		this.panX = sx - ox1 - (sx - this.ox - this.panX) * k;
+		this.panY = sy - oy1 - (sy - this.oy - this.panY) * k;
+		this.ox = ox1;
+		this.oy = oy1;
+		this.zoom = z1;
+		this.clampPan();
+	}
+
+	panBy(dx: number, dy: number) {
+		this.panX += dx;
+		this.panY += dy;
+		this.clampPan();
+	}
+
+	/** Start a camera drag (mouse right / middle button). */
+	startPan(sx: number, sy: number, id: number) {
+		this.drag = { path: [], moved: true, mode: 'pan', pointer: id, startX: sx, startY: sy, lastX: sx, lastY: sy, plot: null };
+	}
+
+	/** Keep part of the board on screen. */
+	private clampPan() {
+		const ts = this.tileScale();
+		const w = (this.rot ? this.gridRows : this.gridCols) * ts;
+		const h = (this.rot ? this.gridCols : this.gridRows) * ts;
+		const mx = Math.max(0, (w + this.viewW) / 2 - 80);
+		const my = Math.max(0, (h + this.viewH) / 2 - 80);
+		this.panX = Math.min(mx, Math.max(-mx, this.panX));
+		this.panY = Math.min(my, Math.max(-my, this.panY));
+	}
+
+	/** Fits the grid in the free area, north up. */
+	layout(w: number, h: number, top: number, bottom: number, b: Bounds, left = 0, right = 0) {
+		this.offX = b.x0;
+		this.offY = b.y0;
+		this.gridCols = b.x1 - b.x0 + 1;
+		this.gridRows = b.y1 - b.y0 + 1;
+		const availW = w - left - right;
+		const availH = h - top - bottom;
+		this.viewW = availW;
+		this.viewH = availH;
+		const pad = 12;
+		const cols = this.gridCols;
+		const rows = this.gridRows;
+		// Never rotate: land grows in any direction, and a turning board makes "right" mean a different plot.
+		this.rot = false;
+		this.ts = Math.floor(Math.min((availW - pad * 2) / cols, (availH - pad * 2) / rows));
+		const z = this.zoom;
+		const gw = (this.rot ? rows : cols) * this.ts * z;
+		const gh = (this.rot ? cols : rows) * this.ts * z;
+		this.ox = Math.round(left + (availW - gw) / 2);
+		this.oy = Math.round(top + (availH - gh) / 2);
+		this.boardKey = '';
+		this.clampPan();
+	}
+
+	private tileScale() {
+		return this.ts * this.zoom;
+	}
+
+	private tileX(i: number) {
+		return cellX(i) - this.offX;
+	}
+
+	private tileY(i: number) {
+		return cellY(i) - this.offY;
+	}
+
+	/** Screen point to a plot that can be bought, or null. */
+	plotAt(sx: number, sy: number, g: Game): number | null {
+		const ts = this.tileScale();
 		let gx: number;
 		let gy: number;
 		if (this.rot) {
-			gx = (sy - this.oy) / this.ts;
-			gy = (this.ox + ROWS * this.ts - sx) / this.ts;
+			gx = (sy - this.oy - this.panY) / ts;
+			gy = (this.ox + this.panX + this.gridRows * ts - sx) / ts;
 		} else {
-			gx = (sx - this.ox) / this.ts;
-			gy = (sy - this.oy) / this.ts;
+			gx = (sx - this.ox - this.panX) / ts;
+			gy = (sy - this.oy - this.panY) / ts;
 		}
-		const x = Math.floor(gx);
-		const y = Math.floor(gy);
-		if (x < 0 || y < 0 || x >= COLS || y >= ROWS) return null;
+		const x = Math.floor(gx) + this.offX;
+		const y = Math.floor(gy) + this.offY;
+		if (x < 0 || y < 0 || x >= MAX_COLS || y >= MAX_ROWS) return null;
+		const plot = plotOf(x, y);
+		return buyablePlots(g.planets[this.pi]).includes(plot) ? plot : null;
+	}
+
+	tryBuyPlot(g: Game, plot: number): boolean {
+		const r = sim.buyPlot(g, this.pi, plot);
+		if (!r.ok) return false;
+		const name = PLANETS[this.pi].name;
+		this.hooks.toast(r.ore > 0 ? `New land on ${name} · ${r.ore} ore tile${r.ore > 1 ? 's' : ''}` : `New land on ${name} — room to build`);
+		this.hooks.sound('place');
+		this.invalidateBoard();
+		this.hooks.changed();
+		this.hooks.expanded?.();
+		return true;
+	}
+
+	/** Screen point to grid cell, or null. */
+	cellAt(sx: number, sy: number, p: import('../core/state.ts').PlanetState): number | null {
+		const ts = this.tileScale();
+		let gx: number;
+		let gy: number;
+		if (this.rot) {
+			gx = (sy - this.oy - this.panY) / ts;
+			gy = (this.ox + this.panX + this.gridRows * ts - sx) / ts;
+		} else {
+			gx = (sx - this.ox - this.panX) / ts;
+			gy = (sy - this.oy - this.panY) / ts;
+		}
+		const x = Math.floor(gx) + this.offX;
+		const y = Math.floor(gy) + this.offY;
+		if (!inPlay(x, y, p, this.pi)) return null;
 		return idx(x, y);
 	}
 
 	/** Grid point (in tiles) to screen point. */
 	toScreen(gx: number, gy: number) {
-		if (this.rot) return { x: this.ox + (ROWS - gy) * this.ts, y: this.oy + gx * this.ts };
-		return { x: this.ox + gx * this.ts, y: this.oy + gy * this.ts };
+		const ts = this.tileScale();
+		if (this.rot) return { x: this.ox + this.panX + (this.gridRows - gy) * ts, y: this.oy + this.panY + gx * ts };
+		return { x: this.ox + this.panX + gx * ts, y: this.oy + this.panY + gy * ts };
 	}
 
 	cellCenter(i: number) {
-		return this.toScreen(cx(i) + 0.5, cy(i) + 0.5);
+		return this.toScreen(this.tileX(i) + 0.5, this.tileY(i) + 0.5);
 	}
 
 	/** The screen box of the board. */
 	bounds() {
-		const w = (this.rot ? ROWS : COLS) * this.ts;
-		const h = (this.rot ? COLS : ROWS) * this.ts;
-		return { x: this.ox, y: this.oy, w, h };
+		const ts = this.tileScale();
+		const w = (this.rot ? this.gridRows : this.gridCols) * ts;
+		const h = (this.rot ? this.gridCols : this.gridRows) * ts;
+		return { x: this.ox + this.panX, y: this.oy + this.panY, w, h };
 	}
 
 	// ---------- input ----------
 
 	pointerDown(g: Game, sx: number, sy: number, id: number) {
-		const c = this.cellAt(sx, sy);
+		const c = this.cellAt(sx, sy, g.planets[this.pi]);
 		if (c === null) {
-			this.hooks.select(null);
+			// Off your land: drag to pan, tap a plot for sale to buy it.
+			this.drag = { path: [], moved: false, mode: 'pan', pointer: id, startX: sx, startY: sy, lastX: sx, lastY: sy, plot: this.plotAt(sx, sy, g) };
 			return;
 		}
 		const mode = this.tool === 'belt' ? 'belt' : this.tool === 'bridge' ? 'bridge' : this.tool === 'remove' ? 'remove' : this.tool ? 'machine' : 'none';
-		this.drag = { path: [c], moved: false, mode, pointer: id, startX: sx, startY: sy };
+		this.drag = { path: [c], moved: false, mode, pointer: id, startX: sx, startY: sy, lastX: sx, lastY: sy };
 		if (mode === 'remove') this.removeCell(g, c, true);
 	}
 
 	pointerMove(g: Game, sx: number, sy: number, id: number) {
-		const c = this.cellAt(sx, sy);
+		const c = this.cellAt(sx, sy, g.planets[this.pi]);
 		this.hover = c;
 		const d = this.drag;
 		if (!d || d.pointer !== id) return;
+		if (d.mode === 'pan') {
+			if (!d.moved && Math.hypot(sx - d.startX, sy - d.startY) > TAP_SLOP) d.moved = true;
+			if (d.moved) this.panBy(sx - d.lastX, sy - d.lastY);
+			d.lastX = sx;
+			d.lastY = sy;
+			return;
+		}
 		if (!d.moved && Math.hypot(sx - d.startX, sy - d.startY) > this.ts * 0.45) {
 			d.moved = true;
 			// Dragging with no tool lays belts.
@@ -190,7 +344,14 @@ export class PlanetView {
 		const d = this.drag;
 		if (!d || d.pointer !== id) return;
 		this.drag = null;
-		const c = this.cellAt(sx, sy);
+		if (d.mode === 'pan') {
+			if (d.moved) return;
+			if (d.plot != null) {
+				if (!this.tryBuyPlot(g, d.plot)) this.hooks.sound('error');
+			} else this.hooks.select(null);
+			return;
+		}
+		const c = this.cellAt(sx, sy, g.planets[this.pi]);
 		if (d.mode === 'belt') {
 			if (!d.moved && d.path.length === 1) this.tapBelt(g, d.path[0]);
 			else this.commitBelts(g, d.path);
@@ -411,37 +572,47 @@ export class PlanetView {
 	draw(ctx: CanvasRenderingContext2D, g: Game, time: number, dt: number) {
 		const p = g.planets[this.pi];
 		const def = PLANETS[this.pi];
+		const cols = this.gridCols;
+		const rows = this.gridRows;
 		const s = this.ts;
+		const z = this.zoom;
 		ctx.save();
 		if (this.rot) {
-			ctx.translate(this.ox + ROWS * s, this.oy);
+			ctx.translate(this.ox + this.panX + rows * s * z, this.oy + this.panY);
 			ctx.rotate(Math.PI / 2);
-		} else ctx.translate(this.ox, this.oy);
+		} else ctx.translate(this.ox + this.panX, this.oy + this.panY);
+		ctx.scale(z, z);
 
 		// board
 		const blasted = g.blasted[this.pi];
-		const key = `${this.pi}:${s}:${blasted.length}`;
+		const key = `${this.pi}:${s}:${blasted.length}:${ownedPlots(p).join(',')}`;
+		const box = { x0: this.offX, y0: this.offY, x1: this.offX + cols - 1, y1: this.offY + rows - 1 };
 		if (key !== this.boardKey || !this.boardCache) {
-			this.boardCache = this.renderBoard(s, blasted);
+			this.boardCache = this.renderBoard(s, blasted, box, ownedPlots(p));
 			this.boardKey = key;
 		}
-		glow(ctx, (COLS * s) / 2, (ROWS * s) / 2, COLS * s * 0.75, def.color, 0.12);
-		ctx.drawImage(this.boardCache, -8, -8, COLS * s + 16, ROWS * s + 16);
+		glow(ctx, (cols * s) / 2, (rows * s) / 2, cols * s * 0.75, def.color, 0.12);
+		ctx.drawImage(this.boardCache, -8, -8, cols * s + 16, rows * s + 16);
 
 		// ore sparkle
 		const tiles = tilesOf(this.pi, blasted);
-		for (let i = 0; i < tiles.length; i++) {
-			if (tiles[i] !== TILE_ORE || p.cells[i]) continue;
-			const tw = Math.sin(time * 2 + i * 1.7);
-			if (tw > 0.6) glow(ctx, (cx(i) + 0.5) * s, (cy(i) + 0.5) * s, s * 0.5, def.color, (tw - 0.6) * 1.2);
+		for (let y = box.y0; y <= box.y1; y++) {
+			for (let x = box.x0; x <= box.x1; x++) {
+				const i = idx(x, y);
+				if (tiles[i] !== TILE_ORE || p.cells[i] || !inPlay(x, y, p)) continue;
+				const tw = Math.sin(time * 2 + i * 1.7);
+				if (tw > 0.6) glow(ctx, (x - box.x0 + 0.5) * s, (y - box.y0 + 0.5) * s, s * 0.5, def.color, (tw - 0.6) * 1.2);
+			}
 		}
+
+		this.drawPlotOffers(ctx, g, s, time);
 
 		// pylon auras
 		for (let i = 0; i < p.cells.length; i++) {
 			const m = p.cells[i];
 			if (!m || m.t !== 'pylon') continue;
 			const pulse = 0.5 + 0.5 * Math.sin(time * 2.5);
-			roundRect(ctx, (cx(i) - 1) * s + 3, (cy(i) - 1) * s + 3, s * 3 - 6, s * 3 - 6, s * 0.3);
+			roundRect(ctx, (this.tileX(i) - 1) * s + 3, (this.tileY(i) - 1) * s + 3, s * 3 - 6, s * 3 - 6, s * 0.3);
 			ctx.fillStyle = withAlpha(MACHINES.pylon.color, 0.05 + pulse * 0.04);
 			ctx.fill();
 			ctx.setLineDash([s * 0.12, s * 0.1]);
@@ -459,26 +630,26 @@ export class PlanetView {
 		for (let i = 0; i < p.cells.length; i++) {
 			const m = p.cells[i];
 			if (!m) continue;
-			if (m.t === 'belt') drawBelt(ctx, m.d, m.bend ?? -1, cx(i) * s, cy(i) * s, s, offset);
-			else if (m.t === 'bridge') drawBridgeEnd(ctx, m.d, !!m.end, cx(i) * s, cy(i) * s, s, offset);
+			if (m.t === 'belt') drawBelt(ctx, m.d, m.bend ?? -1, this.tileX(i) * s, this.tileY(i) * s, s, offset);
+			else if (m.t === 'bridge') drawBridgeEnd(ctx, m.d, !!m.end, this.tileX(i) * s, this.tileY(i) * s, s, offset);
 			else if (m.t === 'cross') {
 				// across runs below, down passes over it on a deck
-				const [h, v] = sim.crossLanes(p, i);
-				drawBelt(ctx, h, -1, cx(i) * s, cy(i) * s, s, offset);
-				for (const it of m.items) if (it.e % 2 === 0) drawMoving(ctx, it, it.e, i, s, u);
-				drawCrossDeck(ctx, v, cx(i) * s, cy(i) * s, s, offset);
-				for (const it of m.items) if (it.e % 2 === 1) drawMoving(ctx, it, it.e, i, s, u);
+				const [h, v] = sim.crossLanes(p, i, this.pi);
+				drawBelt(ctx, h, -1, this.tileX(i) * s, this.tileY(i) * s, s, offset);
+				for (const it of m.items) if (it.e % 2 === 0) drawMoving(ctx, it, it.e, i, s, u, this.offX, this.offY);
+				drawCrossDeck(ctx, v, this.tileX(i) * s, this.tileY(i) * s, s, offset);
+				for (const it of m.items) if (it.e % 2 === 1) drawMoving(ctx, it, it.e, i, s, u, this.offX, this.offY);
 			}
 		}
 		// items on belts and coming off bridges
 		for (let i = 0; i < p.cells.length; i++) {
 			const m = p.cells[i];
-			if (m?.t === 'bridge' && m.end) for (const it of m.items) drawMoving(ctx, it, m.d, i, s, u);
+			if (m?.t === 'bridge' && m.end) for (const it of m.items) drawMoving(ctx, it, m.d, i, s, u, this.offX, this.offY);
 		}
 		for (let i = 0; i < p.cells.length; i++) {
 			const m = p.cells[i];
 			if (!m || m.t !== 'belt') continue;
-			for (const it of m.items) drawMoving(ctx, it, m.d, i, s, u);
+			for (const it of m.items) drawMoving(ctx, it, m.d, i, s, u, this.offX, this.offY);
 		}
 
 		// machines
@@ -488,28 +659,28 @@ export class PlanetView {
 		for (let i = 0; i < p.cells.length; i++) {
 			const m = p.cells[i];
 			if (!m || m.t === 'belt' || m.t === 'cross' || m.t === 'bridge') continue;
-			drawMachine(ctx, { t: m.t, d: m.d, lv: m.lv, glow: m.glow || 0, prog: m.job ? m.prog : 0 }, cx(i) * s, cy(i) * s, s, time);
+			drawMachine(ctx, { t: m.t, d: m.d, lv: m.lv, glow: m.glow || 0, prog: m.job ? m.prog : 0 }, this.tileX(i) * s, this.tileY(i) * s, s, time);
 			if (m.t === 'pad') this.drawPad(ctx, g, i, time, dt);
 			const b = blockOf.get(i);
 			// blocked: red blink for a dead end, amber for a backup
-			if (b) blink(ctx, i, s, b.kind === 'dead' ? RED : AMBER, time, 2);
+			if (b) blink(ctx, i, s, b.kind === 'dead' ? RED : AMBER, time, 2, this.offX, this.offY);
 			// items waiting inside, as small dots
-			if (m.out.length && m.t !== 'pad') drawItem(ctx, m.out[0], cx(i) * s + s * 0.8, cy(i) * s + s * 0.8, s * 0.09);
+			if (m.out.length && m.t !== 'pad') drawItem(ctx, m.out[0], this.tileX(i) * s + s * 0.8, this.tileY(i) * s + s * 0.8, s * 0.09);
 		}
 		// items this machine cannot use, sliding across on top of it
 		for (let i = 0; i < p.cells.length; i++) {
 			const m = p.cells[i];
-			if (m?.thru?.length) for (const it of m.thru) drawMoving(ctx, it, m.d, i, s, u);
+			if (m?.thru?.length) for (const it of m.thru) drawMoving(ctx, it, m.d, i, s, u, this.offX, this.offY);
 		}
 
 		// bridge decks pass over everything, with their items on top
 		for (let i = 0; i < p.cells.length; i++) {
 			const m = p.cells[i];
 			if (m?.t !== 'bridge' || m.end || m.link === undefined) continue;
-			const ax = (cx(i) + 0.5) * s;
-			const ay = (cy(i) + 0.5) * s;
-			const bx = (cx(m.link) + 0.5) * s;
-			const by = (cy(m.link) + 0.5) * s;
+			const ax = (this.tileX(i) + 0.5) * s;
+			const ay = (this.tileY(i) + 0.5) * s;
+			const bx = (this.tileX(m.link) + 0.5) * s;
+			const by = (this.tileY(m.link) + 0.5) * s;
 			drawBridgeDeck(ctx, ax, ay, bx, by, s, offset);
 			// items ride from this end's back edge to the far end's back edge
 			const hx = DX[m.d] * s * 0.5;
@@ -546,21 +717,21 @@ export class PlanetView {
 			if (done.has(b.cell)) continue;
 			done.add(b.cell);
 			if (b.kind === 'slow') {
-				blink(ctx, b.cell, s, AMBER, time, 3);
+				blink(ctx, b.cell, s, AMBER, time, 3, this.offX, this.offY);
 				continue;
 			}
 			// The cell to turn, then an X where it points (or at its edge, if off the map).
-			blink(ctx, b.cell, s, RED, time, 3);
+			blink(ctx, b.cell, s, RED, time, 3, this.offX, this.offY);
 			const a = 0.8 + 0.2 * Math.sin(time * 6);
 			let x: number;
 			let y: number;
 			if (b.target >= 0) {
-				x = (cx(b.target) + 0.5) * s;
-				y = (cy(b.target) + 0.5) * s;
+				x = (this.tileX(b.target) + 0.5) * s;
+				y = (this.tileY(b.target) + 0.5) * s;
 			} else {
 				const d = b.dir;
-				x = (cx(b.cell) + 0.5 + DX[d] * 0.5) * s;
-				y = (cy(b.cell) + 0.5 + DY[d] * 0.5) * s;
+				x = (this.tileX(b.cell) + 0.5 + DX[d] * 0.5) * s;
+				y = (this.tileY(b.cell) + 0.5 + DY[d] * 0.5) * s;
 			}
 			const r = s * 0.2;
 			const w = Math.max(4, s * 0.1);
@@ -587,8 +758,8 @@ export class PlanetView {
 	private drawPad(ctx: CanvasRenderingContext2D, g: Game, i: number, time: number, dt: number) {
 		const p = g.planets[this.pi];
 		const s = this.ts;
-		const x = (cx(i) + 0.5) * s;
-		const y = (cy(i) + 0.5) * s;
+		const x = (this.tileX(i) + 0.5) * s;
+		const y = (this.tileY(i) + 0.5) * s;
 		// stock ring
 		const cap = sim.padCap(p);
 		const fill = Math.min(1, p.pad.length / cap);
@@ -634,7 +805,7 @@ export class PlanetView {
 		// tutorial highlights
 		for (const c of this.highlight) {
 			const a = 0.5 + 0.5 * Math.sin(time * 5);
-			roundRect(ctx, cx(c) * s + 2, cy(c) * s + 2, s - 4, s - 4, s * 0.2);
+			roundRect(ctx, this.tileX(c) * s + 2, this.tileY(c) * s + 2, s - 4, s - 4, s * 0.2);
 			ctx.strokeStyle = withAlpha('#ffffff', 0.4 + a * 0.5);
 			ctx.lineWidth = 2.5;
 			ctx.stroke();
@@ -642,7 +813,7 @@ export class PlanetView {
 		// selection
 		if (this.selected !== null) {
 			const c = this.selected;
-			roundRect(ctx, cx(c) * s - 2, cy(c) * s - 2, s + 4, s + 4, s * 0.22);
+			roundRect(ctx, this.tileX(c) * s - 2, this.tileY(c) * s - 2, s + 4, s + 4, s * 0.22);
 			ctx.strokeStyle = '#ffffff';
 			ctx.lineWidth = 2;
 			ctx.setLineDash([6, 4]);
@@ -663,10 +834,10 @@ export class PlanetView {
 				const m = p.cells[c];
 				if (cross.has(k)) {
 					cost += sim.buildCost(g, this.pi, 'cross');
-					roundRect(ctx, cx(c) * s + 1, cy(c) * s + 1, s - 2, s - 2, s * 0.15);
+					roundRect(ctx, this.tileX(c) * s + 1, this.tileY(c) * s + 1, s - 2, s - 2, s * 0.15);
 					ctx.fillStyle = withAlpha(g.credits >= cost ? '#5ef2ff' : '#ff5d73', 0.16);
 					ctx.fill();
-					drawCrossDeck(ctx, dirs[k], cx(c) * s, cy(c) * s, s, (time * 1.5) % 1, 0.75);
+					drawCrossDeck(ctx, dirs[k], this.tileX(c) * s, this.tileY(c) * s, s, (time * 1.5) % 1, 0.75);
 					continue;
 				}
 				const bad = tiles[c] === TILE_ROCK;
@@ -674,10 +845,10 @@ export class PlanetView {
 				if (m && k === d.path.length - 1 && k > 0) continue;
 				if (!m && !bad) cost += price;
 				const ok = !bad && g.credits >= cost;
-				roundRect(ctx, cx(c) * s + 1, cy(c) * s + 1, s - 2, s - 2, s * 0.15);
+				roundRect(ctx, this.tileX(c) * s + 1, this.tileY(c) * s + 1, s - 2, s - 2, s * 0.15);
 				ctx.fillStyle = withAlpha(ok ? '#5ef2ff' : '#ff5d73', 0.16);
 				ctx.fill();
-				drawBelt(ctx, dirs[k], -1, cx(c) * s, cy(c) * s, s, (time * 1.5) % 1, 0.75);
+				drawBelt(ctx, dirs[k], -1, this.tileX(c) * s, this.tileY(c) * s, s, (time * 1.5) % 1, 0.75);
 			}
 			this.previewCost = cost;
 			this.previewAt = d.path[d.path.length - 1];
@@ -689,7 +860,7 @@ export class PlanetView {
 			const check = b >= 0 ? sim.canBridge(g, this.pi, a, b) : null;
 			const col = !check || check.ok ? '#5ef2ff' : '#ff5d73';
 			for (const c of b >= 0 ? [a, b] : [a]) {
-				roundRect(ctx, cx(c) * s + 1, cy(c) * s + 1, s - 2, s - 2, s * 0.15);
+				roundRect(ctx, this.tileX(c) * s + 1, this.tileY(c) * s + 1, s - 2, s - 2, s * 0.15);
 				ctx.fillStyle = withAlpha(col, 0.2);
 				ctx.fill();
 				ctx.strokeStyle = col;
@@ -699,16 +870,16 @@ export class PlanetView {
 			if (b >= 0) {
 				const dd = dirTo(a, b);
 				const t = (time * 1.5) % 1;
-				drawBridgeEnd(ctx, dd, false, cx(a) * s, cy(a) * s, s, t, 0.7);
-				drawBridgeEnd(ctx, dd, true, cx(b) * s, cy(b) * s, s, t, 0.7);
-				drawBridgeDeck(ctx, (cx(a) + 0.5) * s, (cy(a) + 0.5) * s, (cx(b) + 0.5) * s, (cy(b) + 0.5) * s, s, t, 0.7);
+				drawBridgeEnd(ctx, dd, false, this.tileX(a) * s, this.tileY(a) * s, s, t, 0.7);
+				drawBridgeEnd(ctx, dd, true, this.tileX(b) * s, this.tileY(b) * s, s, t, 0.7);
+				drawBridgeDeck(ctx, (this.tileX(a) + 0.5) * s, (this.tileY(a) + 0.5) * s, (this.tileX(b) + 0.5) * s, (this.tileY(b) + 0.5) * s, s, t, 0.7);
 				this.ghost = { cell: b, ok: check!.ok, text: check!.ok ? fmtShort(check!.cost) : check!.why };
 			} else this.ghost = { cell: a, ok: true, text: 'Drag to the far end' };
 			return;
 		}
 		if (!d && this.hover !== null && this.tool === 'bridge') {
 			const c = this.hover;
-			roundRect(ctx, cx(c) * s + 1, cy(c) * s + 1, s - 2, s - 2, s * 0.15);
+			roundRect(ctx, this.tileX(c) * s + 1, this.tileY(c) * s + 1, s - 2, s - 2, s * 0.15);
 			ctx.strokeStyle = withAlpha('#5ef2ff', 0.6);
 			ctx.lineWidth = 1.5;
 			ctx.stroke();
@@ -718,20 +889,20 @@ export class PlanetView {
 		// machine ghost
 		const ghostCell = d && d.mode === 'machine' ? d.path[0] : !d ? this.hover : null;
 		if (ghostCell !== null && this.tool && this.tool !== 'remove' && this.tool !== 'belt') {
-			const check = sim.canPlace(g, this.pi, cx(ghostCell), cy(ghostCell), this.tool);
-			const dir = sim.autoDir(g, this.pi, cx(ghostCell), cy(ghostCell), 0);
-			roundRect(ctx, cx(ghostCell) * s + 1, cy(ghostCell) * s + 1, s - 2, s - 2, s * 0.15);
+			const check = sim.canPlace(g, this.pi, this.tileX(ghostCell), this.tileY(ghostCell), this.tool);
+			const dir = sim.autoDir(g, this.pi, this.tileX(ghostCell), this.tileY(ghostCell), 0);
+			roundRect(ctx, this.tileX(ghostCell) * s + 1, this.tileY(ghostCell) * s + 1, s - 2, s - 2, s * 0.15);
 			ctx.fillStyle = withAlpha(check.ok ? '#5ef2ff' : '#ff5d73', 0.22);
 			ctx.fill();
 			ctx.strokeStyle = check.ok ? '#5ef2ff' : '#ff5d73';
 			ctx.lineWidth = 2;
 			ctx.stroke();
 			ctx.globalAlpha = 0.6;
-			drawMachine(ctx, { t: this.tool, d: dir, lv: 1, glow: 0, prog: 0 }, cx(ghostCell) * s, cy(ghostCell) * s, s, time);
+			drawMachine(ctx, { t: this.tool, d: dir, lv: 1, glow: 0, prog: 0 }, this.tileX(ghostCell) * s, this.tileY(ghostCell) * s, s, time);
 			ctx.globalAlpha = 1;
 			this.ghost = { cell: ghostCell, ok: check.ok, text: check.ok ? fmtShort(check.cost) : check.why };
 		} else if (ghostCell !== null && this.tool === 'belt' && !d) {
-			roundRect(ctx, cx(ghostCell) * s + 1, cy(ghostCell) * s + 1, s - 2, s - 2, s * 0.15);
+			roundRect(ctx, this.tileX(ghostCell) * s + 1, this.tileY(ghostCell) * s + 1, s - 2, s - 2, s * 0.15);
 			ctx.strokeStyle = withAlpha('#5ef2ff', 0.6);
 			ctx.lineWidth = 1.5;
 			ctx.stroke();
@@ -739,7 +910,7 @@ export class PlanetView {
 		} else if (ghostCell !== null && this.tool === 'remove') {
 			const m = p.cells[ghostCell];
 			const rock = !m && tilesOf(this.pi, g.blasted[this.pi])[ghostCell] === TILE_ROCK;
-			roundRect(ctx, cx(ghostCell) * s + 1, cy(ghostCell) * s + 1, s - 2, s - 2, s * 0.15);
+			roundRect(ctx, this.tileX(ghostCell) * s + 1, this.tileY(ghostCell) * s + 1, s - 2, s - 2, s * 0.15);
 			if (rock) {
 				const check = sim.canBlast(g, this.pi, ghostCell);
 				ctx.strokeStyle = check.ok ? '#ffb347' : withAlpha('#ff5d73', 0.6);
@@ -780,22 +951,66 @@ export class PlanetView {
 		}
 	}
 
-	private renderBoard(s: number, blasted: readonly number[]): HTMLCanvasElement {
+	/** Plots for sale: dashed outline, faint ore hints, price in the middle. */
+	private drawPlotOffers(ctx: CanvasRenderingContext2D, g: Game, s: number, time: number) {
+		const p = g.planets[this.pi];
+		const tiles = tilesOf(this.pi, g.blasted[this.pi]);
+		const def = PLANETS[this.pi];
+		const cost = nextPlotCost(this.pi, p);
+		const afford = g.credits >= cost;
+		const pulse = afford ? 0.65 + 0.35 * Math.sin(time * 3) : 0.45;
+		for (const plot of buyablePlots(p)) {
+			const b = plotBounds(plot);
+			const x0 = (b.x0 - this.offX) * s;
+			const y0 = (b.y0 - this.offY) * s;
+			const w = PLOT * s;
+			roundRect(ctx, x0 + 4, y0 + 4, w - 8, w - 8, s * 0.35);
+			ctx.fillStyle = withAlpha(def.dark, afford ? 0.22 : 0.12);
+			ctx.fill();
+			ctx.setLineDash([s * 0.35, s * 0.25]);
+			ctx.strokeStyle = withAlpha(afford ? '#ffe58a' : '#8892b8', pulse);
+			ctx.lineWidth = 2;
+			ctx.stroke();
+			ctx.setLineDash([]);
+			for (const c of plotCells(plot)) {
+				if (tiles[c] !== TILE_ORE) continue;
+				ctx.fillStyle = withAlpha(def.color, afford ? 0.28 : 0.16);
+				ctx.beginPath();
+				ctx.arc((cellX(c) - this.offX + 0.5) * s, (cellY(c) - this.offY + 0.5) * s, s * 0.16, 0, Math.PI * 2);
+				ctx.fill();
+			}
+			const size = Math.max(12, Math.floor(s * 0.55));
+			ctx.save();
+			ctx.translate(x0 + w / 2, y0 + w / 2);
+			if (this.rot) ctx.rotate(-Math.PI / 2);
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+			label(ctx, 0, 0, fmtShort(cost), afford ? '#ffe58a' : '#ff9aaa', size);
+			ctx.restore();
+		}
+	}
+
+	private renderBoard(s: number, blasted: readonly number[], box: Bounds, owned: number[]): HTMLCanvasElement {
 		const def = PLANETS[this.pi];
 		const c = document.createElement('canvas');
 		const dpr = Math.min(2, window.devicePixelRatio || 1);
-		c.width = (COLS * s + 16) * dpr;
-		c.height = (ROWS * s + 16) * dpr;
+		const cols = box.x1 - box.x0 + 1;
+		const rows = box.y1 - box.y0 + 1;
+		c.width = (cols * s + 16) * dpr;
+		c.height = (rows * s + 16) * dpr;
 		const g = c.getContext('2d')!;
 		g.scale(dpr, dpr);
 		g.translate(8, 8);
 		const ground = mix(def.dark, '#0a0e1a', 0.72);
-		roundRect(g, -6, -6, COLS * s + 12, ROWS * s + 12, s * 0.3);
-		g.fillStyle = mix(def.dark, '#05070f', 0.85);
-		g.fill();
-		g.strokeStyle = withAlpha(def.color, 0.35);
-		g.lineWidth = 2;
-		g.stroke();
+		for (const plot of owned) {
+			const b = plotBounds(plot);
+			roundRect(g, (b.x0 - box.x0) * s - 3, (b.y0 - box.y0) * s - 3, PLOT * s + 6, PLOT * s + 6, s * 0.2);
+			g.fillStyle = mix(def.dark, '#05070f', 0.85);
+			g.fill();
+			g.strokeStyle = withAlpha(def.color, 0.3);
+			g.lineWidth = 2;
+			g.stroke();
+		}
 		// Walk the first map, so the random detail on other tiles stays the same after a blast.
 		const tiles = baseTilesOf(this.pi);
 		let seed = def.seed;
@@ -803,21 +1018,27 @@ export class PlanetView {
 			seed = (seed * 16807) % 2147483647;
 			return seed / 2147483647;
 		};
-		for (let i = 0; i < tiles.length; i++) {
-			const x = cx(i) * s;
-			const y = cy(i) * s;
-			roundRect(g, x + 1.5, y + 1.5, s - 3, s - 3, s * 0.14);
-			g.fillStyle = (cx(i) + cy(i)) % 2 ? ground : mix(ground, '#ffffff', 0.025);
-			g.fill();
-			if (tiles[i] === TILE_ORE) {
+		for (let y = box.y0; y <= box.y1; y++) {
+			for (let x = box.x0; x <= box.x1; x++) {
+				const i = idx(x, y);
+				if (!owned.includes(plotOfCell(i))) continue;
+				seed = (def.seed * 977 + i * 7919) % 2147483647 || 1;
+				const lx = x - box.x0;
+				const ly = y - box.y0;
+				const x0 = lx * s;
+				const y0 = ly * s;
+				roundRect(g, x0 + 1.5, y0 + 1.5, s - 3, s - 3, s * 0.14);
+				g.fillStyle = (x + y) % 2 ? ground : mix(ground, '#ffffff', 0.025);
+				g.fill();
+				if (tiles[i] === TILE_ORE) {
 				g.fillStyle = withAlpha(def.color, 0.12);
 				g.fill();
 				g.strokeStyle = withAlpha(def.color, 0.45);
 				g.lineWidth = 1.2;
 				g.stroke();
 				for (let k = 0; k < 3; k++) {
-					const px = x + s * (0.25 + r() * 0.5);
-					const py = y + s * (0.25 + r() * 0.5);
+					const px = x0 + s * (0.25 + r() * 0.5);
+					const py = y0 + s * (0.25 + r() * 0.5);
 					const cs = s * (0.08 + r() * 0.07);
 					g.beginPath();
 					g.moveTo(px, py - cs * 1.4);
@@ -839,7 +1060,7 @@ export class PlanetView {
 				// a shallow crater where a rock was
 				for (let k = 0; k < 7; k++) r();
 				g.beginPath();
-				g.ellipse(x + s / 2, y + s / 2, s * 0.3, s * 0.24, 0, 0, Math.PI * 2);
+				g.ellipse(x0 + s / 2, y0 + s / 2, s * 0.3, s * 0.24, 0, 0, Math.PI * 2);
 				g.fillStyle = withAlpha('#000000', 0.18);
 				g.fill();
 				g.strokeStyle = withAlpha(def.light, 0.1);
@@ -851,7 +1072,7 @@ export class PlanetView {
 				for (let k = 0; k < n; k++) {
 					const a = (k / n) * Math.PI * 2;
 					const rr = s * (0.3 + r() * 0.1);
-					g.lineTo(x + s / 2 + Math.cos(a) * rr, y + s / 2 + Math.sin(a) * rr * 0.85);
+					g.lineTo(x0 + s / 2 + Math.cos(a) * rr, y0 + s / 2 + Math.sin(a) * rr * 0.85);
 				}
 				g.closePath();
 				g.fillStyle = mix(def.dark, '#1c2030', 0.6);
@@ -861,13 +1082,14 @@ export class PlanetView {
 				g.stroke();
 				g.fillStyle = withAlpha(def.light, 0.08);
 				g.beginPath();
-				g.arc(x + s * 0.42, y + s * 0.4, s * 0.12, 0, Math.PI * 2);
+				g.arc(x0 + s * 0.42, y0 + s * 0.4, s * 0.12, 0, Math.PI * 2);
 				g.fill();
 			} else if (r() < 0.25) {
 				g.fillStyle = withAlpha(def.light, 0.05);
 				g.beginPath();
-				g.arc(x + s * (0.2 + r() * 0.6), y + s * (0.2 + r() * 0.6), s * 0.05, 0, Math.PI * 2);
+				g.arc(x0 + s * (0.2 + r() * 0.6), y0 + s * (0.2 + r() * 0.6), s * 0.05, 0, Math.PI * 2);
 				g.fill();
+				}
 			}
 		}
 		return c;
@@ -894,7 +1116,7 @@ function dirTo(a: number, b: number): Dir {
 function neighbor(i: number, d: Dir): number | null {
 	const x = cx(i) + DX[d];
 	const y = cy(i) + DY[d];
-	if (x < 0 || y < 0 || x >= COLS || y >= ROWS) return null;
+	if (x < 0 || y < 0 || x >= MAX_COLS || y >= MAX_ROWS) return null;
 	return idx(x, y);
 }
 
@@ -910,9 +1132,9 @@ function label(ctx: CanvasRenderingContext2D, x: number, y: number, text: string
 
 
 /** An item moving across a cell: in from side `it.e`, out the side `out`, along a curve. */
-function drawMoving(ctx: CanvasRenderingContext2D, it: BeltItem, out: Dir, i: number, s: number, u: number) {
-	const x0 = (cx(i) + 0.5) * s;
-	const y0 = (cy(i) + 0.5) * s;
+function drawMoving(ctx: CanvasRenderingContext2D, it: BeltItem, out: Dir, i: number, s: number, u: number, ox: number, oy: number) {
+	const x0 = (cellX(i) - ox + 0.5) * s;
+	const y0 = (cellY(i) - oy + 0.5) * s;
 	const ax = x0 - DX[it.e] * s * 0.5;
 	const ay = y0 - DY[it.e] * s * 0.5;
 	const bx = x0 + DX[out] * s * 0.5;

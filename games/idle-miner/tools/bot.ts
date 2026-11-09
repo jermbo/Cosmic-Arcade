@@ -2,7 +2,8 @@
 // Run: node tools/bot.ts [minutes] [tapsPerSecond]
 // It prints when each goal and unlock happens, and flags long gaps.
 
-import { BUF_IN, COLS, DX, DY, MACHINES, PERKS, PLANETS, ROWS, TILE_ORE, TILE_ROCK, opposite } from '../src/core/data.ts';
+import { BUF_IN, DX, DY, MACHINES, PERKS, PLANETS, TILE_ORE, TILE_ROCK, opposite } from '../src/core/data.ts';
+import { STRIDE, buyablePlots, countOreInCells, nextPlotCost, ownedBounds, plotCells } from '../src/core/grid.ts';
 import type { Dir, MachineType, PerkId, ResearchId, ShipUpgrade } from '../src/core/data.ts';
 import { GOALS, checkProgress, currentGoal } from '../src/core/goals.ts';
 import * as sim from '../src/core/sim.ts';
@@ -31,7 +32,7 @@ interface Plan {
 const plans: Plan[] = [];
 
 const idx = sim.idx;
-const xy = (i: number) => [i % COLS, Math.floor(i / COLS)] as const;
+const xy = (i: number) => [i % STRIDE, Math.floor(i / STRIDE)] as const;
 
 function planFor(pi: number): Plan {
 	if (plans[pi]) return plans[pi];
@@ -44,7 +45,10 @@ function planFor(pi: number): Plan {
 		if (cells.length === 5) {
 			const [ex, ey] = xy(cells[4]);
 			let open = 0;
-			for (let oy = -2; oy <= 2; oy++) for (let ox = -2; ox <= 2; ox++) if (sim.inGrid(ex + ox, ey + oy) && tiles[idx(ex + ox, ey + oy)] !== TILE_ROCK) open++;
+			const pl = g.planets[pi];
+			for (let oy = -2; oy <= 2; oy++)
+				for (let ox = -2; ox <= 2; ox++)
+					if (sim.inGrid(g, pi, ex + ox, ey + oy) && tiles[idx(ex + ox, ey + oy)] !== TILE_ROCK) open++;
 			score += open * 0.15;
 			if (!best || score > best.score) best = { cells: cells.slice(), dirs: dirs.slice(), score };
 			return;
@@ -53,7 +57,7 @@ function planFor(pi: number): Plan {
 		for (const d of [0, 1, 2, 3] as Dir[]) {
 			const nx = x + DX[d];
 			const ny = y + DY[d];
-			if (!sim.inGrid(nx, ny)) continue;
+			if (!sim.inGrid(g, pi, nx, ny)) continue;
 			const n = idx(nx, ny);
 			if (n === pad || cells.includes(n) || tiles[n] === TILE_ROCK) continue;
 			const straight = dirs.length && opposite(dirs[dirs.length - 1]) === d ? 0.2 : 0;
@@ -95,7 +99,7 @@ function pathToNet(pi: number, start: number, dryRun: boolean): number {
 		for (const d of [0, 1, 2, 3] as Dir[]) {
 			const nx = x + DX[d];
 			const ny = y + DY[d];
-			if (!sim.inGrid(nx, ny)) continue;
+			if (!sim.inGrid(g, pi, nx, ny)) continue;
 			const n = idx(nx, ny);
 			const m = g.planets[pi].cells[n];
 			if (n === head || n === plan.chain[3] || (plan.net.has(n) && m && m.t === 'belt' && m.d !== opposite(d))) {
@@ -159,7 +163,7 @@ function nextDrillSpot(pi: number): { ore: number; cost: number; start: number; 
 		for (const d of [0, 1, 2, 3] as Dir[]) {
 			const nx = x + DX[d];
 			const ny = y + DY[d];
-			if (!sim.inGrid(nx, ny)) continue;
+			if (!sim.inGrid(g, pi, nx, ny)) continue;
 			const n = idx(nx, ny);
 			const m = cells[n];
 			let cost: number;
@@ -261,6 +265,13 @@ function options(): Option[] {
 		const spot = nextDrillSpot(pi);
 		const drillGoal = (['drills3', 'drills6', 'drills8'].includes(goal) && pi === 0) || (['glacia2', 'glacia6'].includes(goal) && pi === 1) || (goal === 'verd5' && pi === 2) || (goal === 'solara5' && pi === 3) || goal === 'drills25';
 		if (spot) opts.push({ what: `drill p${pi}`, cost: spot.cost, score: drills === 0 || drillGoal ? 10 : jam ? 0.3 : 2, run: () => buildDrill(pi) });
+		// land: the plot with the most ore, when there is no room left or the goal asks
+		const forSale = buyablePlots(p);
+		if (forSale.length && (!spot || goal === 'survey')) {
+			const tiles = tilesOf(pi, g.blasted[pi]);
+			const plot = forSale.reduce((a, b) => (countOreInCells(tiles, plotCells(b)) > countOreInCells(tiles, plotCells(a)) ? b : a));
+			opts.push({ what: `land p${pi}`, cost: nextPlotCost(pi, p), score: goal === 'survey' ? 5 : 3, run: () => sim.buyPlot(g, pi, plot).ok });
+		}
 		const up = upgradeLowest(pi, 'drill');
 		if (up && (drills >= 3 || goal === 'upgrade')) opts.push({ what: `up drill p${pi}`, cost: up.cost, score: goal === 'upgrade' ? 5 : jam ? 0.2 : 1.6, run: up.run });
 		if (jam && g.unlocks.includes('research') && g.research.belt < sim.RESEARCH.belt.max) opts.push({ what: 'research belt', cost: sim.researchCost(g, 'belt'), score: 3, run: () => sim.buyResearch(g, 'belt') });
@@ -268,7 +279,9 @@ function options(): Option[] {
 		if (sim.machineUnlocked(g, 'pylon') && sim.countOf(g, pi, 'pylon') < 2) {
 			const near = [plan.chain[2], plan.chain[3]].flatMap((c) => {
 				const [x, y] = xy(c);
-				return [0, 1, 2, 3].map((d) => [x + DX[d], y + DY[d]]).filter(([a, b]) => sim.inGrid(a, b) && free(pi, idx(a, b)) && !plan.net.has(idx(a, b)));
+				return [0, 1, 2, 3]
+					.map((d) => [x + DX[d], y + DY[d]] as const)
+					.filter(([a, b]) => sim.inGrid(g, pi, a, b) && free(pi, idx(a, b)) && !plan.net.has(idx(a, b)));
 			});
 			if (near.length) opts.push({ what: `pylon p${pi}`, cost: sim.buildCost(g, pi, 'pylon'), score: 2.5, run: () => sim.place(g, pi, near[0][0], near[0][1], 'pylon', 0) });
 		}
@@ -422,9 +435,10 @@ if (process.argv.includes('--map')) {
 		if (!p.unlocked) return;
 		console.log(`\n${PLANETS[pi].name}  ships ${p.ships.length} cargo ${p.up.cargo} speed ${p.up.speed}  pad ${p.pad.length}`);
 		const tiles = tilesOf(pi);
-		for (let y = 0; y < ROWS; y++) {
+		const box = ownedBounds(p);
+		for (let y = box.y0; y <= box.y1; y++) {
 			let row = '';
-			for (let x = 0; x < COLS; x++) {
+			for (let x = box.x0; x <= box.x1; x++) {
 				const m = p.cells[idx(x, y)];
 				const tl = tiles[idx(x, y)];
 				row += m ? (m.t === 'belt' ? arrow[m.d] : sym[m.t] + (m.lv > 9 ? '+' : m.lv)) .padEnd(2) : tl === TILE_ORE ? 'o ' : tl === TILE_ROCK ? 'X ' : '. ';

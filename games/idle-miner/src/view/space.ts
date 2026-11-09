@@ -2,7 +2,7 @@
 
 import { PLANETS } from '../core/data.ts';
 import { fmt } from '../core/format.ts';
-import { SHIP_WAIT } from '../core/sim.ts';
+import { SHIP_WAIT, planetBadge } from '../core/sim.ts';
 import type { Game } from '../core/state.ts';
 import { drawPlanet, drawShip, glow, roundRect, withAlpha } from './draw.ts';
 import { burst, popup, ring } from './fx.ts';
@@ -33,6 +33,14 @@ export class SpaceView {
 	/** For the tutorial: a planet to point at. */
 	pointAt = -1;
 	showLabels = true;
+	zoom = 1;
+	panX = 0;
+	panY = 0;
+	/** Centre of the free area: the camera zooms around it. */
+	private cx = 0;
+	private cy = 0;
+	private viewW = 0;
+	private viewH = 0;
 
 	constructor() {
 		for (let i = 0; i < 220; i++) this.stars.push({ x: Math.random(), y: Math.random(), z: Math.random(), s: Math.random(), p: Math.random() * 6.28 });
@@ -46,6 +54,10 @@ export class SpaceView {
 		const availH = h - top - bottom;
 		const cxx = left + availW / 2;
 		const cyy = top + availH / 2;
+		this.cx = cxx;
+		this.cy = cyy;
+		this.viewW = availW;
+		this.viewH = availH;
 		const base = Math.min(availW, availH);
 		const r = Math.max(18, Math.min(46, base * 0.068));
 		this.home = { x: cxx, y: cyy, r: r * 0.95 };
@@ -53,14 +65,63 @@ export class SpaceView {
 		const ry = Math.min(availH * 0.37, availW * 0.7);
 		this.pos = PLANETS.map((_, i) => ({ x: cxx + Math.cos(ANGLES[i]) * rx * DIST[i], y: cyy + Math.sin(ANGLES[i]) * ry * DIST[i], r: r * (1 + i * 0.04) }));
 		this.nebula = this.renderNebula(w, h);
+		this.clampPan();
+	}
+
+	toScreen(x: number, y: number) {
+		return { x: this.cx + (x - this.cx) * this.zoom + this.panX, y: this.cy + (y - this.cy) * this.zoom + this.panY };
+	}
+
+	toWorld(sx: number, sy: number) {
+		return { x: this.cx + (sx - this.cx - this.panX) / this.zoom, y: this.cy + (sy - this.cy - this.panY) / this.zoom };
+	}
+
+	/** A planet's spot on screen, after the camera. */
+	screenPos(i: number) {
+		const p = this.pos[i];
+		return { ...this.toScreen(p.x, p.y), r: p.r * this.zoom };
+	}
+
+	screenHome() {
+		return { ...this.toScreen(this.home.x, this.home.y), r: this.home.r * this.zoom };
+	}
+
+	/** Zoom by a factor, keeping the map point under (sx, sy) in place. */
+	zoomAt(factor: number, sx: number, sy: number) {
+		const w = this.toWorld(sx, sy);
+		this.zoom = Math.min(2.5, Math.max(0.6, this.zoom * factor));
+		this.panX = sx - this.cx - (w.x - this.cx) * this.zoom;
+		this.panY = sy - this.cy - (w.y - this.cy) * this.zoom;
+		this.clampPan();
+	}
+
+	panBy(dx: number, dy: number) {
+		this.panX += dx;
+		this.panY += dy;
+		this.clampPan();
+	}
+
+	resetCamera() {
+		this.zoom = 1;
+		this.panX = 0;
+		this.panY = 0;
+	}
+
+	/** Keep the planets within reach. */
+	private clampPan() {
+		const mx = (this.viewW * this.zoom) / 2;
+		const my = (this.viewH * this.zoom) / 2;
+		this.panX = Math.min(mx, Math.max(-mx, this.panX));
+		this.panY = Math.min(my, Math.max(-my, this.panY));
 	}
 
 	/** Which planet (0..5), -2 for home, or -1. */
-	hit(g: Game, sx: number, sy: number): number {
+	hit(g: Game, sx0: number, sy0: number): number {
+		const { x: sx, y: sy } = this.toWorld(sx0, sy0);
 		for (let i = 0; i < this.pos.length; i++) {
 			if (!this.visible(g, i)) continue;
 			const p = this.pos[i];
-			if (Math.hypot(sx - p.x, sy - p.y) < Math.max(p.r * 1.35, 30)) return i;
+			if (Math.hypot(sx - p.x, sy - p.y) < Math.max(p.r * 1.35, 30 / this.zoom)) return i;
 		}
 		if (Math.hypot(sx - this.home.x, sy - this.home.y) < this.home.r * 1.4) return -2;
 		return -1;
@@ -71,14 +132,14 @@ export class SpaceView {
 	}
 
 	tapPlanet(i: number, value: number, color: string) {
-		const p = this.pos[i];
+		const p = this.screenPos(i);
 		this.bump[i] = 1;
 		burst(p.x, p.y, color, 7, 180, { size: 3, life: 0.5 });
 		popup(p.x, p.y - p.r - 8, '+' + fmt(value), '#ffe58a', 18);
 	}
 
 	onSold(pi: number, amount: number) {
-		const h = this.home;
+		const h = this.screenHome();
 		this.homeBump = 1;
 		const col = PLANETS[pi].color;
 		ring(h.x, h.y, col, h.r * 0.8, h.r * 3, 0.7);
@@ -89,7 +150,7 @@ export class SpaceView {
 	}
 
 	onDepart(pi: number) {
-		const p = this.pos[pi];
+		const p = this.screenPos(pi);
 		burst(p.x, p.y, PLANETS[pi].light, 6, 80, { size: 2, life: 0.5 });
 	}
 
@@ -138,6 +199,10 @@ export class SpaceView {
 			this.rate[i] *= Math.exp(-dt / 12);
 		}
 		this.homeBump = Math.max(0, this.homeBump - dt * 3);
+		ctx.save();
+		ctx.translate(this.cx + this.panX, this.cy + this.panY);
+		ctx.scale(this.zoom, this.zoom);
+		ctx.translate(-this.cx, -this.cy);
 
 		// routes
 		for (let i = 0; i < 6; i++) {
@@ -194,6 +259,7 @@ export class SpaceView {
 		}
 
 		if (this.showLabels) this.drawLabels(ctx, g);
+		ctx.restore();
 	}
 
 	private drawSky(ctx: CanvasRenderingContext2D, time: number) {
@@ -338,6 +404,21 @@ export class SpaceView {
 			ctx.stroke();
 		}
 		drawPlanet(ctx, i, p.x, p.y, p.r * scale, time, locked, 1 - Math.sin(b * Math.PI) * 0.06);
+		if (st.unlocked) {
+			const badge = planetBadge(g, i);
+			if (badge) {
+				const bx = p.x + p.r * 0.85;
+				const by = p.y - p.r * 0.85;
+				const col = badge === 'warn' ? '#ff5d73' : badge === 'full' ? '#5ef2ff' : '#ffd23f';
+				ctx.beginPath();
+				ctx.arc(bx, by, 7, 0, Math.PI * 2);
+				ctx.fillStyle = col;
+				ctx.fill();
+				ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+				ctx.lineWidth = 1.5;
+				ctx.stroke();
+			}
+		}
 	}
 
 	private drawLabels(ctx: CanvasRenderingContext2D, g: Game) {

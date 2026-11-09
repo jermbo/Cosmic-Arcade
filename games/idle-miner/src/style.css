@@ -151,6 +151,11 @@ svg {
 	transform: scale(0.94);
 }
 
+.pill--gold {
+	box-shadow: inset 0 0 0 1px rgba(255, 213, 58, 0.45);
+	color: #ffe58a;
+}
+
 .pill--nova {
 	color: #ffe9a8;
 	border-color: rgba(255, 210, 63, 0.4);

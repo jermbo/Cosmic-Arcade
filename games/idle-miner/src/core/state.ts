@@ -1,6 +1,20 @@
 // The shape of a game, a fresh game, the planet maps, and save / load.
 
-import { CELLS, COLS, ROWS, PLANETS, TILE_GROUND, TILE_ORE, TILE_ROCK } from './data.ts';
+import { MACHINES, PLANETS, TILE_GROUND, TILE_ORE, TILE_ROCK, upgradeCost } from './data.ts';
+import {
+	CENTER_PLOT,
+	MAX_CELLS,
+	MAX_COLS,
+	MAX_ROWS,
+	PLOT_RADIUS,
+	PLOTS,
+	STRIDE,
+	cellIdx,
+	plotBounds,
+	plotIdx,
+	plotRing,
+} from './grid.ts';
+import type { Bounds } from './grid.ts';
 import { ensureOreAccessible, oreHasGroundExit, rockSealsOre, validatePlanetTiles } from './tile-access.ts';
 import type { CrewId, Dir, MachineType, PerkId, ResearchId, ShipUpgrade } from './data.ts';
 
@@ -58,6 +72,8 @@ export interface PlanetState {
 	up: Record<ShipUpgrade, number>;
 	/** counts of each machine bought, for prices */
 	built: Partial<Record<MachineType, number>>;
+	/** Owned land plots (see grid.ts). Always includes the center plot. */
+	plots: number[];
 }
 
 export interface Settings {
@@ -112,12 +128,12 @@ export function makeMachine(t: MachineType, d: Dir): Machine {
 }
 
 function makePlanet(index: number, unlocked: boolean, extraShips: number): PlanetState {
-	const cells: (Machine | null)[] = new Array(CELLS).fill(null);
+	const cells: (Machine | null)[] = new Array(MAX_CELLS).fill(null);
 	const [px, py] = PLANETS[index].pad;
-	cells[py * COLS + px] = makeMachine('pad', 0);
+	cells[cellIdx(px, py)] = makeMachine('pad', 0);
 	const ships: Ship[] = [];
 	for (let i = 0; i < 1 + extraShips; i++) ships.push(makeShip());
-	return { unlocked, cells, pad: [], ships, up: { ships: 0, speed: 0, cargo: 0 }, built: {} };
+	return { unlocked, cells, pad: [], ships, up: { ships: 0, speed: 0, cargo: 0 }, built: {}, plots: [CENTER_PLOT] };
 }
 
 export function defaultSettings(): Settings {
@@ -161,6 +177,7 @@ export function newGame(keep?: Game): Game {
 		// The layout comes back at level 1. Kept machines keep their count for prices.
 		p.cells = old.cells.map((m) => (m ? makeMachine(m.t, m.d) : null));
 		p.built = { ...old.built };
+		p.plots = old.plots.slice();
 	}
 	if (keep && perks.start) g.unlocks.push('smelter', 'ships', 'research');
 	return g;
@@ -205,40 +222,77 @@ export function baseTilesOf(index: number): Uint8Array {
 	if (tileCache[index]) return tileCache[index];
 	const def = PLANETS[index];
 	const r = rng(def.seed * 7919);
-	const tiles = new Uint8Array(CELLS);
+	const tiles = new Uint8Array(MAX_CELLS);
 	const [px, py] = def.pad;
 	const nearPad = (x: number, y: number) => Math.abs(x - px) <= 1 && Math.abs(y - py) <= 1;
-	const free = (x: number, y: number) => x >= 0 && y >= 0 && x < COLS && y < ROWS && !nearPad(x, y) && tiles[y * COLS + x] === TILE_GROUND;
-	// Ore in 3 patches, far enough from the pad that belts matter.
-	let placed = 0;
-	let tries = 0;
-	const want = 13 + index;
-	while (placed < want && tries < 500) {
-		tries++;
-		let x = 1 + Math.floor(r() * (COLS - 2));
-		let y = 1 + Math.floor(r() * (ROWS - 2));
-		if (Math.abs(x - px) + Math.abs(y - py) < 4 || !free(x, y)) continue;
-		const size = 4 + Math.floor(r() * 3);
-		for (let i = 0; i < size && placed < want; i++) {
-			if (free(x, y) && oreHasGroundExit(tiles, x, y)) {
-				tiles[y * COLS + x] = TILE_ORE;
-				placed++;
+	const free = (x: number, y: number) =>
+		x >= 0 && y >= 0 && x < MAX_COLS && y < MAX_ROWS && !nearPad(x, y) && tiles[cellIdx(x, y)] === TILE_GROUND;
+	const inBox = (b: Bounds, x: number, y: number) => x >= b.x0 && y >= b.y0 && x <= b.x1 && y <= b.y1;
+	const placeOre = (b: Bounds, want: number) => {
+		let placed = 0;
+		let tries = 0;
+		while (placed < want && tries < 200) {
+			tries++;
+			let x = b.x0 + Math.floor(r() * (b.x1 - b.x0 + 1));
+			let y = b.y0 + Math.floor(r() * (b.y1 - b.y0 + 1));
+			if (Math.abs(x - px) + Math.abs(y - py) < 3 || !free(x, y)) continue;
+			const size = 2 + Math.floor(r() * 3);
+			for (let i = 0; i < size && placed < want; i++) {
+				if (free(x, y) && oreHasGroundExit(tiles, x, y, STRIDE, MAX_COLS, MAX_ROWS)) {
+					tiles[cellIdx(x, y)] = TILE_ORE;
+					placed++;
+				}
+				const d = Math.floor(r() * 4);
+				x += [1, 0, -1, 0][d];
+				y += [0, 1, 0, -1][d];
+				if (!inBox(b, x, y)) break;
 			}
-			const d = Math.floor(r() * 4);
-			x += [1, 0, -1, 0][d];
-			y += [0, 1, 0, -1][d];
 		}
-	}
-	// A few rocks to build around.
-	let rocks = 0;
-	tries = 0;
-	while (rocks < 5 + index && tries < 500) {
-		tries++;
-		const x = Math.floor(r() * COLS);
-		const y = Math.floor(r() * ROWS);
-		if (!free(x, y) || rockSealsOre(tiles, x, y)) continue;
-		tiles[y * COLS + x] = TILE_ROCK;
-		rocks++;
+	};
+	const placeRocks = (b: Bounds, want: number) => {
+		let rocks = 0;
+		let tries = 0;
+		while (rocks < want && tries < 120) {
+			tries++;
+			const x = b.x0 + Math.floor(r() * (b.x1 - b.x0 + 1));
+			const y = b.y0 + Math.floor(r() * (b.y1 - b.y0 + 1));
+			if (!free(x, y) || rockSealsOre(tiles, x, y, STRIDE, MAX_COLS, MAX_ROWS)) continue;
+			tiles[cellIdx(x, y)] = TILE_ROCK;
+			rocks++;
+		}
+	};
+	// One plot next to the start is always rich, so the first purchase pays off.
+	const firstRich = [
+		plotIdx(PLOT_RADIUS + 1, PLOT_RADIUS),
+		plotIdx(PLOT_RADIUS, PLOT_RADIUS + 1),
+		plotIdx(PLOT_RADIUS - 1, PLOT_RADIUS),
+		plotIdx(PLOT_RADIUS, PLOT_RADIUS - 1),
+	][Math.floor(r() * 4)];
+	for (let plot = 0; plot < PLOTS * PLOTS; plot++) {
+		const ring = plotRing(plot);
+		const b = plotBounds(plot);
+		let ore: number;
+		let rocks: number;
+		if (ring === 0) {
+			ore = 4 + Math.floor(r() * 6); // 4–9 starter nodes
+			rocks = 1 + Math.floor(r() * 2);
+		} else {
+			// Richer land further out; some plots are mostly rock.
+			const roll = plot === firstRich ? 0 : r();
+			const rich = 0.15 + ring * 0.12;
+			if (roll < rich) {
+				ore = 7 + ring * 2 + Math.floor(r() * 4);
+				rocks = 1 + Math.floor(r() * 3);
+			} else if (roll < rich + 0.3) {
+				ore = Math.floor(r() * 3);
+				rocks = 6 + Math.floor(r() * 5);
+			} else {
+				ore = 2 + Math.floor(r() * 4);
+				rocks = 2 + Math.floor(r() * 3);
+			}
+		}
+		placeOre(b, ore);
+		placeRocks(b, rocks + Math.floor(index / 2));
 	}
 	ensureOreAccessible(tiles, px, py);
 	const issues = validatePlanetTiles(tiles, px, py);
@@ -248,6 +302,22 @@ export function baseTilesOf(index: number): Uint8Array {
 	}
 	tileCache[index] = tiles;
 	return tiles;
+}
+
+/** What a layout cost to build, for paying it back. */
+function layoutRefund(pi: number, cells: (Machine | null)[]): number {
+	const value = PLANETS[pi].value;
+	const count: Partial<Record<MachineType, number>> = {};
+	let total = 0;
+	for (const m of cells) {
+		if (!m || m.t === 'pad') continue;
+		const def = MACHINES[m.t];
+		const n = count[m.t] ?? 0;
+		count[m.t] = n + 1;
+		total += m.t === 'belt' ? def.cost * value : def.cost * value * Math.pow(def.growth, n);
+		for (let lv = 1; lv < (m.lv || 1); lv++) total += upgradeCost(m.t, lv, value);
+	}
+	return Math.ceil(total);
 }
 
 // ---------- save / load ----------
@@ -285,12 +355,21 @@ export function deserialize(text: string): Game | null {
 			const base = makePlanet(i, i === 0, 0);
 			const src = raw.planets[i];
 			if (!src) return base;
-			return {
+			const { expand: _e, revealed: _r, survey: _s, ...kept } = src;
+			const planet: PlanetState = {
 				...base,
-				...src,
+				...kept,
 				up: { ...base.up, ...src.up },
 				cells: (src.cells as (Machine | null)[]).map((m) => (m ? { ...makeMachine(m.t, m.d), ...m, items: m.items || [] } : null)),
 			};
+			if (Array.isArray(src.plots) && src.cells.length === MAX_CELLS) {
+				planet.plots = src.plots.filter(Number.isInteger);
+				return planet;
+			}
+			// Saves from before land plots: the old map does not fit, so clear it and pay the machines back.
+			g.credits += layoutRefund(i, planet.cells);
+			g.blasted[i] = [];
+			return { ...planet, cells: base.cells, built: {}, plots: base.plots };
 		});
 		return g;
 	} catch {

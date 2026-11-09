@@ -8,8 +8,6 @@ import {
 	BLAST_GROWTH,
 	BUF_IN,
 	BUF_OUT,
-	CELLS,
-	COLS,
 	CRATE_BONUS,
 	CRATE_SIZE,
 	DUST_BONUS,
@@ -21,7 +19,6 @@ import {
 	PLANETS,
 	PRESTIGE_PLANET,
 	RESEARCH,
-	ROWS,
 	SHIP_UPS,
 	TILE_ORE,
 	TILE_ROCK,
@@ -49,6 +46,19 @@ import {
 	upgradeCost,
 } from './data.ts';
 import type { CrewBoost, CrewId, Dir, MachineType, PerkId, ResearchId, ShipUpgrade } from './data.ts';
+import {
+	MAX_CELLS,
+	buyablePlots,
+	cellIdx,
+	cellX,
+	cellY,
+	countOreInCells,
+	inPlay,
+	nextPlotCost,
+	ownedBounds,
+	ownedPlots,
+	plotCells,
+} from './grid.ts';
 import { makeMachine, makeShip, newGame, tilesOf } from './state.ts';
 import type { BeltItem, Game, Machine, PlanetState } from './state.ts';
 
@@ -141,6 +151,32 @@ export function machineUnlocked(g: Game, t: MachineType): boolean {
 	return i >= 0 && g.planets[i].unlocked;
 }
 
+/** Toolbar on a planet: no crushers on Cinder, etc. */
+export function toolOnPlanet(g: Game, pi: number, t: MachineType): boolean {
+	if (!machineUnlocked(g, t)) return false;
+	if (t === 'drill' || t === 'belt' || t === 'cross' || t === 'bridge' || t === 'smelter') return true;
+	const intro = PLANETS.findIndex((p) => p.newMachine === t);
+	if (intro < 0) return true;
+	return pi >= intro;
+}
+
+export function buyPlot(g: Game, pi: number, plot: number): { ok: true; ore: number } | { ok: false } {
+	const p = g.planets[pi];
+	if (!p.unlocked || !buyablePlots(p).includes(plot)) return { ok: false };
+	const cost = nextPlotCost(pi, p);
+	if (g.credits < cost) return { ok: false };
+	g.credits -= cost;
+	ownedPlots(p).push(plot);
+	markDirty(p);
+	return { ok: true, ore: countOreInCells(tilesOf(pi, g.blasted[pi]), plotCells(plot), TILE_ORE) };
+}
+
+export function cheapestPlot(g: Game, pi: number): number {
+	const p = g.planets[pi];
+	if (!buyablePlots(p).length) return 0;
+	return nextPlotCost(pi, p);
+}
+
 export function offlineCapHours(g: Game) {
 	return BASE_OFFLINE_HOURS + g.research.offline + (g.perks.nap ? 4 : 0);
 }
@@ -177,8 +213,12 @@ export function researchCost(g: Game, r: ResearchId) {
 
 // ---------- grid helpers ----------
 
-export const idx = (x: number, y: number) => y * COLS + x;
-export const inGrid = (x: number, y: number) => x >= 0 && y >= 0 && x < COLS && y < ROWS;
+export const idx = cellIdx;
+
+/** Node bot helper — playable bounds on a planet. */
+export function inGrid(g: Game, pi: number, x: number, y: number) {
+	return inPlay(x, y, g.planets[pi], pi);
+}
 
 export type PlaceCheck = { ok: true; cost: number } | { ok: false; why: string; cost: number };
 
@@ -186,7 +226,7 @@ export function canPlace(g: Game, pi: number, x: number, y: number, t: MachineTy
 	const cost = buildCost(g, pi, t);
 	if (t === 'cross') return { ok: false, why: 'Drag a belt across a belt', cost };
 	if (t === 'bridge') return { ok: false, why: 'Drag from one end to the other', cost };
-	if (!inGrid(x, y)) return { ok: false, why: 'Off the map', cost };
+	if (!inPlay(x, y, g.planets[pi], pi)) return { ok: false, why: 'Off the map', cost };
 	const tile = tilesOf(pi, g.blasted[pi])[idx(x, y)];
 	const here = g.planets[pi].cells[idx(x, y)];
 	if (tile === TILE_ROCK) return { ok: false, why: 'Rock in the way', cost };
@@ -198,19 +238,20 @@ export function canPlace(g: Game, pi: number, x: number, y: number, t: MachineTy
 
 /** Best facing for a new machine: toward a belt or machine that can take items. */
 export function autoDir(g: Game, pi: number, x: number, y: number, fallback: Dir): Dir {
-	const cells = g.planets[pi].cells;
+	const planet = g.planets[pi];
+	const cells = planet.cells;
 	// First choice: a belt next to us that does not point at us.
 	for (const d of [fallback, 0, 1, 2, 3] as Dir[]) {
 		const nx = x + DX[d];
 		const ny = y + DY[d];
-		if (!inGrid(nx, ny)) continue;
+		if (!inPlay(nx, ny, planet, pi)) continue;
 		const m = cells[idx(nx, ny)];
 		if (m && m.t === 'belt' && m.d !== opposite(d)) return d;
 	}
 	for (const d of [fallback, 0, 1, 2, 3] as Dir[]) {
 		const nx = x + DX[d];
 		const ny = y + DY[d];
-		if (!inGrid(nx, ny)) continue;
+		if (!inPlay(nx, ny, planet, pi)) continue;
 		const m = cells[idx(nx, ny)];
 		if (m && m.t !== 'belt' && m.t !== 'drill' && m.t !== 'pylon') return d;
 	}
@@ -234,23 +275,23 @@ export function straightBelt(g: Game, pi: number, c: number, skip: number[] = []
 	const m = p.cells[c];
 	if (!m || m.t !== 'belt') return false;
 	for (const side of [(m.d + 1) % 4, (m.d + 3) % 4] as Dir[]) {
-		const nc = targetOf(c, side);
+		const nc = targetOf(c, side, p, pi);
 		const n = nc >= 0 && !skip.includes(nc) ? p.cells[nc] : null;
-		if (n && feeds(n, nc, c)) return false;
+		if (n && feeds(n, nc, c, p, pi)) return false;
 	}
 	return true;
 }
 
 /** Does machine n at cell nc send items into cell c? */
-function feeds(n: Machine, nc: number, c: number): boolean {
+function feeds(n: Machine, nc: number, c: number, p: PlanetState, pi: number): boolean {
 	if (n.t === 'pad' || n.t === 'pylon') return false;
 	if (n.t === 'cross') return true;
 	if (n.t === 'bridge' && !n.end) return false;
-	return targetOf(nc, n.d) === c;
+	return targetOf(nc, n.d, p, pi) === c;
 }
 
 /** Which way each lane of a crossing flows: [across, down]. */
-export function crossLanes(p: PlanetState, c: number): [Dir, Dir] {
+export function crossLanes(p: PlanetState, c: number, pi: number): [Dir, Dir] {
 	const lanes: [Dir, Dir] = [0, 1];
 	const m = p.cells[c]!;
 	for (const axis of [0, 1] as const) {
@@ -261,9 +302,9 @@ export function crossLanes(p: PlanetState, c: number): [Dir, Dir] {
 		}
 		// Empty lane: go by whichever side feeds it.
 		for (const d of (axis === 0 ? [0, 2] : [1, 3]) as Dir[]) {
-			const nc = targetOf(c, opposite(d));
+			const nc = targetOf(c, opposite(d), p, pi);
 			const n = nc >= 0 ? p.cells[nc] : null;
-			if (n && n.t !== 'cross' && feeds(n, nc, c)) {
+			if (n && n.t !== 'cross' && feeds(n, nc, c, p, pi)) {
 				lanes[axis] = d;
 				break;
 			}
@@ -291,10 +332,10 @@ export function makeCross(g: Game, pi: number, c: number, skip: number[] = []): 
 /** Can a bridge go from cell a to cell b? */
 export function canBridge(g: Game, pi: number, a: number, b: number): PlaceCheck {
 	const cost = buildCost(g, pi, 'bridge');
-	const ax = a % COLS;
-	const ay = Math.floor(a / COLS);
-	const bx = b % COLS;
-	const by = Math.floor(b / COLS);
+	const ax = cellX(a);
+	const ay = cellY(a);
+	const bx = cellX(b);
+	const by = cellY(b);
 	const span = Math.abs(bx - ax) + Math.abs(by - ay);
 	if (ax !== bx && ay !== by) return { ok: false, why: 'Go in a straight line', cost };
 	if (span < 2) return { ok: false, why: 'Drag further', cost };
@@ -315,8 +356,8 @@ export function placeBridge(g: Game, pi: number, a: number, b: number): boolean 
 	if (!check.ok) return false;
 	g.credits -= check.cost;
 	const p = g.planets[pi];
-	const dx = Math.sign((b % COLS) - (a % COLS));
-	const dy = Math.sign(Math.floor(b / COLS) - Math.floor(a / COLS));
+	const dx = Math.sign((cellX(b)) - (cellX(a)));
+	const dy = Math.sign(cellY(b) - cellY(a));
 	const d = (dx > 0 ? 0 : dy > 0 ? 1 : dx < 0 ? 2 : 3) as Dir;
 	const start = makeMachine('bridge', d);
 	start.link = b;
@@ -332,7 +373,7 @@ export function placeBridge(g: Game, pi: number, a: number, b: number): boolean 
 
 /** Tiles from a bridge's start to its end. */
 export function bridgeSpan(c: number, link: number): number {
-	return Math.abs((link % COLS) - (c % COLS)) + Math.abs(Math.floor(link / COLS) - Math.floor(c / COLS));
+	return Math.abs(cellX(link) - cellX(c)) + Math.abs(cellY(link) - cellY(c));
 }
 
 /** A bridge start whose far end is still there. */
@@ -551,29 +592,32 @@ export function markDirty(p: PlanetState) {
 	boostMap.delete(p);
 }
 
-function derived(p: PlanetState): Float32Array {
+function derived(p: PlanetState, pi: number): Float32Array {
 	let b = boostMap.get(p);
 	if (b) return b;
-	b = new Float32Array(CELLS).fill(1);
-	for (let i = 0; i < CELLS; i++) {
-		const m = p.cells[i];
-		if (!m) continue;
-		if (m.t === 'pylon') {
-			const x = i % COLS;
-			const y = Math.floor(i / COLS);
-			for (let oy = -1; oy <= 1; oy++)
-				for (let ox = -1; ox <= 1; ox++) if ((ox || oy) && inGrid(x + ox, y + oy)) b[idx(x + ox, y + oy)] += pylonBoost(m.lv);
+	b = new Float32Array(MAX_CELLS).fill(1);
+	const box = ownedBounds(p);
+	for (let y = box.y0; y <= box.y1; y++) {
+		for (let x = box.x0; x <= box.x1; x++) {
+			const i = cellIdx(x, y);
+			const m = p.cells[i];
+			if (!m) continue;
+			if (m.t === 'pylon') {
+				for (let oy = -1; oy <= 1; oy++)
+					for (let ox = -1; ox <= 1; ox++)
+						if ((ox || oy) && inPlay(x + ox, y + oy, p, pi)) b[idx(x + ox, y + oy)] += pylonBoost(m.lv);
+			}
+			if (m.t === 'belt') m.bend = beltBend(p, i, m, pi);
 		}
-		if (m.t === 'belt') m.bend = beltBend(p, i, m);
 	}
 	boostMap.set(p, b);
 	return b;
 }
 
 /** For drawing: if the only thing feeding this belt is from a side, the belt curves. */
-function beltBend(p: PlanetState, i: number, m: Machine): number {
-	const x = i % COLS;
-	const y = Math.floor(i / COLS);
+function beltBend(p: PlanetState, i: number, m: Machine, pi: number): number {
+	const x = cellX(i);
+	const y = cellY(i);
 	const back = opposite(m.d);
 	let side = -1;
 	let count = 0;
@@ -582,7 +626,7 @@ function beltBend(p: PlanetState, i: number, m: Machine): number {
 		if (d === m.d) continue;
 		const nx = x + DX[d];
 		const ny = y + DY[d];
-		if (!inGrid(nx, ny)) continue;
+		if (!inPlay(nx, ny, p, pi)) continue;
 		const n = p.cells[idx(nx, ny)];
 		if (!n || n.t === 'pylon' || n.t === 'pad') continue;
 		if (n.t === 'bridge' && !n.end) continue;
@@ -603,8 +647,8 @@ function beltBend(p: PlanetState, i: number, m: Machine): number {
 	return count === 1 && !fromBack && side >= 0 ? opposite(side as Dir) : -1;
 }
 
-export function boostAt(p: PlanetState, i: number) {
-	return derived(p)[i];
+export function boostAt(p: PlanetState, i: number, pi: number) {
+	return derived(p, pi)[i];
 }
 
 // ---------- the tick ----------
@@ -625,8 +669,8 @@ export function padCap(p: PlanetState) {
 }
 
 /** Try to move an item into cell (x, y), moving in direction dir. */
-function push(p: PlanetState, x: number, y: number, dir: Dir, k: number): boolean {
-	if (!inGrid(x, y)) return false;
+function push(p: PlanetState, x: number, y: number, dir: Dir, k: number, pi: number): boolean {
+	if (!inPlay(x, y, p, pi)) return false;
 	const m = p.cells[idx(x, y)];
 	if (!m) return false;
 	switch (m.t) {
@@ -696,27 +740,27 @@ function moveLine(items: BeltItem[], step: number, span: number, out: (k: number
 	}
 }
 
-function moveCross(p: PlanetState, i: number, m: Machine, bs: number) {
-	const x = i % COLS;
-	const y = Math.floor(i / COLS);
+function moveCross(p: PlanetState, i: number, m: Machine, bs: number, pi: number) {
+	const x = cellX(i);
+	const y = cellY(i);
 	for (const lane of [0, 1]) {
 		const items = m.items.filter((it) => it.e % 2 === lane);
 		if (!items.length) continue;
 		const e = items[0].e;
-		moveLine(items, bs, 1, (k) => push(p, x + DX[e], y + DY[e], e, k));
+		moveLine(items, bs, 1, (k) => push(p, x + DX[e], y + DY[e], e, k, pi));
 		// keep the other lane, plus what is left of this one
 		m.items = m.items.filter((it) => it.e % 2 !== lane).concat(items);
 	}
 }
 
-function tryOutput(p: PlanetState, i: number, m: Machine, dt: number) {
+function tryOutput(p: PlanetState, i: number, m: Machine, dt: number, pi: number) {
 	if (!m.out.length) {
 		m.stuck = 0;
 		return;
 	}
-	const x = i % COLS;
-	const y = Math.floor(i / COLS);
-	if (push(p, x + DX[m.d], y + DY[m.d], m.d, m.out[0])) {
+	const x = cellX(i);
+	const y = cellY(i);
+	if (push(p, x + DX[m.d], y + DY[m.d], m.d, m.out[0], pi)) {
 		m.out.shift();
 		m.stuck = 0;
 	} else if (m.out.length >= BUF_OUT) m.stuck = (m.stuck || 0) + dt;
@@ -766,24 +810,27 @@ function startJob(m: Machine): boolean {
 
 function tickPlanet(g: Game, pi: number, dt: number) {
 	const p = g.planets[pi];
-	const boost = derived(p);
+	const boost = derived(p, pi);
 	const crew = crewOf(p);
 	const bs = beltSpeed(g.research.belt, !!g.perks.belts) * dt;
 	const tiles = tilesOf(pi, g.blasted[pi]);
-	for (let i = 0; i < CELLS; i++) {
-		const m = p.cells[i];
-		if (!m) continue;
-		let working = false;
-		switch (m.t) {
+	const box = ownedBounds(p);
+	for (let y = box.y0; y <= box.y1; y++) {
+		for (let x = box.x0; x <= box.x1; x++) {
+			const i = cellIdx(x, y);
+			const m = p.cells[i];
+			if (!m) continue;
+			let working = false;
+			switch (m.t) {
 			case 'belt': {
 				const items = m.items;
 				if (!items.length) break;
 				const front = items[0];
 				front.p += bs;
 				if (front.p >= 1) {
-					const x = i % COLS;
-					const y = Math.floor(i / COLS);
-					if (push(p, x + DX[m.d], y + DY[m.d], m.d, front.k)) items.shift();
+					const x = cellX(i);
+					const y = cellY(i);
+					if (push(p, x + DX[m.d], y + DY[m.d], m.d, front.k, pi)) items.shift();
 					else front.p = 1;
 				}
 				for (let n = items[0] === front ? 1 : 0; n < items.length; n++) {
@@ -793,19 +840,19 @@ function tickPlanet(g: Game, pi: number, dt: number) {
 				break;
 			}
 			case 'cross':
-				if (m.items.length) moveCross(p, i, m, bs);
+				if (m.items.length) moveCross(p, i, m, bs, pi);
 				break;
 			case 'bridge': {
 				if (!m.items.length) break;
-				const x = i % COLS;
-				const y = Math.floor(i / COLS);
+				const x = cellX(i);
+				const y = cellY(i);
 				if (m.end) {
-					moveLine(m.items, bs, 1, (k) => push(p, x + DX[m.d], y + DY[m.d], m.d, k));
+					moveLine(m.items, bs, 1, (k) => push(p, x + DX[m.d], y + DY[m.d], m.d, k, pi));
 				} else if (bridgeOk(p, i, m)) {
 					const span = bridgeSpan(i, m.link!);
-					const ex = m.link! % COLS;
-					const ey = Math.floor(m.link! / COLS);
-					moveLine(m.items, bs / span, span, (k) => push(p, ex, ey, m.d, k));
+					const ex = cellX(m.link!);
+					const ey = cellY(m.link!);
+					moveLine(m.items, bs / span, span, (k) => push(p, ex, ey, m.d, k, pi));
 				}
 				break;
 			}
@@ -819,7 +866,7 @@ function tickPlanet(g: Game, pi: number, dt: number) {
 						emit({ type: 'made', planet: pi, cell: i, t: m.t });
 					}
 				}
-				tryOutput(p, i, m, dt);
+				tryOutput(p, i, m, dt, pi);
 				break;
 			}
 			case 'pad':
@@ -842,10 +889,11 @@ function tickPlanet(g: Game, pi: number, dt: number) {
 					}
 				}
 				moveThru(m, bs);
-				tryOutput(p, i, m, dt);
+				tryOutput(p, i, m, dt, pi);
 			}
+			}
+			if (m.glow !== undefined || working) m.glow = Math.max(0, Math.min(1, (m.glow || 0) + (working ? dt * 4 : -dt * 2)));
 		}
-		if (m.glow !== undefined || working) m.glow = Math.max(0, Math.min(1, (m.glow || 0) + (working ? dt * 4 : -dt * 2)));
 	}
 	tickShips(g, pi, dt);
 }
@@ -975,15 +1023,16 @@ export const STUCK_SLOW = 15;
  */
 export type Block = { kind: 'dead'; from: number; cell: number; target: number; dir: Dir; why: string } | { kind: 'slow'; from: number; cell: number };
 
-function targetOf(c: number, d: Dir): number {
-	const x = (c % COLS) + DX[d];
-	const y = Math.floor(c / COLS) + DY[d];
-	return inGrid(x, y) ? idx(x, y) : -1;
+function targetOf(c: number, d: Dir, planet: PlanetState, pi: number): number {
+	const x = cellX(c) + DX[d];
+	const y = cellY(c) + DY[d];
+	return inPlay(x, y, planet, pi) ? idx(x, y) : -1;
 }
 
 /** Why cell c facing d is a dead end, or null if items can go that way. */
 function deadWhy(g: Game, pi: number, c: number, d: Dir): string | null {
-	const t = targetOf(c, d);
+	const planet = g.planets[pi];
+	const t = targetOf(c, d, planet, pi);
 	if (t < 0) return 'points off the map';
 	const n = g.planets[pi].cells[t];
 	if (!n) return tilesOf(pi, g.blasted[pi])[t] === TILE_ROCK ? 'points at a rock' : 'points at empty ground';
@@ -1004,9 +1053,9 @@ export function traceBlock(g: Game, pi: number, from: number): Block | null {
 	let dir = start.d;
 	// Cell and way in, since a line may pass one crossing twice.
 	const seen = new Set<number>([from * 4 + dir]);
-	for (let step = 0; step <= CELLS * 2; step++) {
+	for (let step = 0; step <= MAX_CELLS * 2; step++) {
 		const why = deadWhy(g, pi, c, dir);
-		const t = targetOf(c, dir);
+		const t = targetOf(c, dir, p, pi);
 		if (why) return { kind: 'dead', from, cell: c, target: t, dir, why };
 		if (seen.has(t * 4 + dir)) return { kind: 'dead', from, cell: c, target: t, dir, why: 'feeds back into its own line' };
 		seen.add(t * 4 + dir);
@@ -1046,12 +1095,16 @@ export function traceBlock(g: Game, pi: number, from: number): Block | null {
 export function planetBlocks(g: Game, pi: number, min = STUCK_SHOW): (Block & { stuck: number })[] {
 	const p = g.planets[pi];
 	const list: (Block & { stuck: number })[] = [];
-	for (let i = 0; i < CELLS; i++) {
-		const m = p.cells[i];
-		const stuck = m?.stuck || 0;
-		if (stuck <= min) continue;
-		const b = traceBlock(g, pi, i);
-		if (b) list.push({ ...b, stuck });
+	const box = ownedBounds(p);
+	for (let y = box.y0; y <= box.y1; y++) {
+		for (let x = box.x0; x <= box.x1; x++) {
+			const i = cellIdx(x, y);
+			const m = p.cells[i];
+			const stuck = m?.stuck || 0;
+			if (stuck <= min) continue;
+			const b = traceBlock(g, pi, i);
+			if (b) list.push({ ...b, stuck });
+		}
 	}
 	return list;
 }
@@ -1066,7 +1119,7 @@ export function fixDir(g: Game, pi: number, c: number): Dir | null {
 	let bestScore = 0;
 	for (let d = 0 as Dir; d < 4; d = (d + 1) as Dir) {
 		if (deadWhy(g, pi, c, d)) continue;
-		const n = p.cells[targetOf(c, d)]!;
+		const n = p.cells[targetOf(c, d, p, pi)]!;
 		// Skip anything that feeds into us, or items would go round in a circle.
 		if (n.t !== 'pad' && n.d === opposite(d)) continue;
 		const score = n.t === 'pad' || (k !== undefined && n.t !== 'belt' && uses(n, k)) ? 3 : n.t === 'belt' ? 2 : 1;
@@ -1082,7 +1135,7 @@ export function fixDir(g: Game, pi: number, c: number): Dir | null {
 export function fixAt(g: Game, pi: number, c: number): boolean {
 	const d = fixDir(g, pi, c);
 	if (d === null) return false;
-	rotateAt(g, pi, c % COLS, Math.floor(c / COLS), d);
+	rotateAt(g, pi, cellX(c), cellY(c), d);
 	return true;
 }
 
@@ -1129,6 +1182,20 @@ export function countAll(g: Game, t: MachineType) {
 	let n = 0;
 	for (let pi = 0; pi < g.planets.length; pi++) n += countOf(g, pi, t);
 	return n;
+}
+
+export type PlanetBadge = 'warn' | 'full' | 'survey' | null;
+
+/** Small space-map hint on a planet. */
+export function planetBadge(g: Game, pi: number): PlanetBadge {
+	const p = g.planets[pi];
+	if (!p.unlocked) return null;
+	if (p.pad.length >= padCap(p)) return 'full';
+	if (buyablePlots(p).length && g.credits >= nextPlotCost(pi, p)) return 'survey';
+	for (const b of planetBlocks(g, pi, STUCK_DEAD)) {
+		if (b.kind === 'dead') return 'warn';
+	}
+	return null;
 }
 
 export { RESEARCH, SHIP_UPS, MACHINES, PLANETS };
