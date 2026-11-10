@@ -1,18 +1,25 @@
 {
 	"name": "crash-report",
 	"private": true,
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"type": "module",
 	"scripts": {
 		"dev": "vite --open --port 4005",
 		"build": "tsc && vite build",
-		"preview": "vite preview"
+		"preview": "vite preview --port 4006",
+		"bot": "node tools/bot.ts"
 	},
 	"devDependencies": {
+		"@types/three": "0.186.0",
 		"typescript": "7.0.2",
 		"vite": "8.3.6"
 	},
 	"dependencies": {
+		"@dimforge/rapier3d-compat": "0.12.0",
 		"three": "0.186.0"
+	},
+	"arcade": {
+		"engine": "three.js",
+		"outDir": "dist"
 	}
 }
