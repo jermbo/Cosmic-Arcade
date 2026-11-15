@@ -3,8 +3,8 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-		<meta name="theme-color" content="#bfe3f5" />
-		<meta name="description" content="A cozy builder on floating sky islands. Place cottages, paths and ponds, and watch your islands come alive." />
+		<meta name="theme-color" content="#8fc6ec" />
+		<meta name="description" content="A cozy elf builder on floating sky islands. Grow tree homes, draw moss paths, and unlock a chain of islands." />
 		<link rel="icon" type="image/svg+xml" href="favicon.svg" />
 		<title>Petalwisp Isles</title>
 	</head>
@@ -21,6 +21,9 @@
 					<span class="goal__text" id="goal-text"></span>
 					<span class="goal__count" id="goal-count"></span>
 				</button>
+				<button class="round" id="btn-isles" type="button" aria-label="Islands">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h16l-3 5-3 1-2 5-2-5-3-1zM9 9c0-3 1.500-5 3-5s3 2 3 5" /></svg>
+				</button>
 				<button class="round" id="btn-book" type="button" aria-label="Book of magic links">
 					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7c-2-1.5-4.5-2-8-2v13c3.500 0 6 .5 8 2 2-1.500 4.500-2 8-2V5c-3.500 0-6 .5-8 2zM12 7v13" /></svg>
 					<span class="round__badge" id="book-count">0</span>
@@ -29,6 +32,11 @@
 
 			<div class="dock" id="dock" hidden>
 				<p class="dock__hint" id="hint"></p>
+				<div class="roadbar" id="roadbar" hidden>
+					<span class="roadbar__text" id="roadbar-text"></span>
+					<button class="btn btn--ghost" id="road-no" type="button">Cancel</button>
+					<button class="btn btn--big" id="road-yes" type="button">Build</button>
+				</div>
 				<div class="dock__tools dock__tools--start">
 					<button class="round" id="btn-undo" type="button" aria-label="Undo">
 						<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l-5 5 5 5M4 10h10a5 5 0 0 1 0 10h-3" /></svg>
@@ -53,7 +61,7 @@
 
 			<section class="title" id="title">
 				<div class="title__logo">
-					<p class="title__kicker">A cozy sky garden</p>
+					<p class="title__kicker">An elven sky grove</p>
 					<h1>Petalwisp <em>Isles</em></h1>
 				</div>
 				<div class="title__buttons">

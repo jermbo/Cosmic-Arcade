@@ -65,27 +65,38 @@ export function initLife(): void {
 
 /* Looks */
 
-const COATS = [0xf7a8b8, 0x9fd0ff, 0xb9e8b0, 0xf9dc8a, 0xc9a8ff, 0xffc49a, 0x8fded0];
+const CLOAKS = [0x4fae78, 0x3f9f9a, 0xb86fa8, 0xd9a441, 0x8a6fc8, 0xc8664a, 0x5f8fd0, 0x6fa84a];
+const HAIR = [0xf2e2b0, 0xe8a85a, 0xb86a3c, 0xd9d9e8, 0x7a5a44, 0xf2c2d0];
+const SKIN = [0xfff0e0, 0xf2d2b4, 0xd9a98a, 0xffe6d6];
 
+/** A small elf: a cloak, pointed ears and a leaf cap. */
 function makeVillager(seed: number): { obj: THREE.Group; arm: THREE.Object3D } {
 	const rand = rng(seed + 1);
-	const coat = pick(COATS, rand());
-	const hat = pick(COATS, rand());
+	const cloak = pick(CLOAKS, rand());
+	const hair = pick(HAIR, rand());
+	const skin = pick(SKIN, rand());
+	const cap = pick([0x3f9a6a, 0x4fae78, 0x6fc487, 0xd9a441, 0xb86fa8], rand());
 	const k = new Kit();
-	k.ball('solid', coat, 0.1, 0, 0.12, 0, { sy: 1.15 });
-	k.ball('solid', 0xfff0e0, 0.085, 0, 0.275, 0);
-	k.cyl('solid', hat, 0.012, 0.1, 0.15, 6, 0, 0.325, 0);
-	k.ball('solid', 0xffffff, 0.028, 0, 0.485, 0);
-	k.box('solid', 0x5a4a66, 0.018, 0.022, 0.01, -0.032, 0.275, -0.08);
-	k.box('solid', 0x5a4a66, 0.018, 0.022, 0.01, 0.032, 0.275, -0.08);
-	k.box('solid', 0xffb3c1, 0.02, 0.012, 0.01, -0.055, 0.255, -0.07);
-	k.box('solid', 0xffb3c1, 0.02, 0.012, 0.01, 0.055, 0.255, -0.07);
-	k.box('solid', 0x8a6f5a, 0.045, 0.03, 0.07, -0.04, 0, -0.01);
-	k.box('solid', 0x8a6f5a, 0.045, 0.03, 0.07, 0.04, 0, -0.01);
-	k.ball('solid', coat, 0.032, -0.105, 0.15, 0);
+	k.cyl('solid', cloak, 0.055, 0.115, 0.2, 7, 0, 0.02, 0);
+	k.ball('solid', skin, 0.085, 0, 0.275, 0);
+	k.ball('solid', hair, 0.088, 0, 0.29, 0.02, { sy: 0.9 });
+	// Long pointed ears.
+	k.cyl('solid', skin, 0.003, 0.024, 0.11, 4, 0.115, 0.24, 0.005, { rz: -1.05 });
+	k.cyl('solid', skin, 0.003, 0.024, 0.11, 4, -0.115, 0.24, 0.005, { rz: 1.05 });
+	// A leaf cap with a curl at the tip.
+	k.cyl('solid', cap, 0.01, 0.095, 0.16, 6, 0, 0.33, 0.01, { rx: 0.25 });
+	k.ball('solid', cap, 0.022, 0, 0.49, 0.06);
+	k.box('solid', 0x4a3a56, 0.018, 0.024, 0.01, -0.032, 0.275, -0.08);
+	k.box('solid', 0x4a3a56, 0.018, 0.024, 0.01, 0.032, 0.275, -0.08);
+	k.box('solid', 0xffa8b8, 0.02, 0.012, 0.01, -0.055, 0.253, -0.07);
+	k.box('solid', 0xffa8b8, 0.02, 0.012, 0.01, 0.055, 0.253, -0.07);
+	k.box('solid', 0x6e4f3a, 0.045, 0.03, 0.07, -0.04, 0, -0.01);
+	k.box('solid', 0x6e4f3a, 0.045, 0.03, 0.07, 0.04, 0, -0.01);
+	k.ball('solid', 0xffe7a3, 0.016, 0, 0.2, -0.062);
+	k.ball('solid', cloak, 0.032, -0.105, 0.15, 0);
 	const obj = k.build();
 	const armKit = new Kit();
-	armKit.ball('solid', coat, 0.032, 0, 0.06, 0, { sy: 1.6 });
+	armKit.ball('solid', cloak, 0.032, 0, 0.06, 0, { sy: 1.6 });
 	const arm = armKit.build();
 	arm.position.set(0.1, 0.12, 0);
 	obj.add(arm);
@@ -94,7 +105,7 @@ function makeVillager(seed: number): { obj: THREE.Group; arm: THREE.Object3D } {
 
 function makeCritter(seed: number): THREE.Group {
 	const rand = rng(seed + 3);
-	const fur = pick([0xe4f2cf, 0xf7e9dc, 0xdcebf7, 0xf7dcea], rand());
+	const fur = pick([0xe4f2cf, 0xf7e9dc, 0xdcebf7, 0xf7dcea, 0xd9c2a8], rand());
 	const k = new Kit();
 	k.ball('solid', fur, 0.085, 0, 0.075, 0, { sy: 0.85, sz: 1.2 });
 	k.cyl('solid', 0x8fd3a0, 0.004, 0.028, 0.1, 4, -0.035, 0.12, 0.01, { rz: 0.25, rx: 0.2 });
@@ -482,7 +493,7 @@ function updateCritters(dt: number): void {
 
 export function updateLife(dt: number): void {
 	const t = env.time;
-	const bedtime = env.night > 0.72 || env.rain > 0.5;
+	const bedtime = env.night > 0.72;
 
 	for (const [k, left] of moveIn) {
 		if (left - dt > 0) {
@@ -577,12 +588,12 @@ export function updateLife(dt: number): void {
 
 	updateCritters(dt);
 
-	// Trees grow. Water and rain help.
+	// Trees grow. Water helps.
 	for (const [k, p] of S.pieces) {
 		if (p.t !== 'tree') continue;
 		const g = p.g ?? 1;
 		if (g < 1) {
-			const speed = (isWet(k) ? 2.2 : 1) * (env.rain > 0.5 ? 1.8 : 1);
+			const speed = isWet(k) ? 2.2 : 1;
 			const next = Math.min(1, g + (dt / TUNE.treeGrowTime) * speed);
 			p.g = next;
 			if ((g < 0.45 && next >= 0.45) || next >= 1) {

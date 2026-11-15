@@ -10,9 +10,9 @@ type Channel = 'solid' | 'glow' | 'lamp' | 'water' | 'crystal';
 /** Shared materials. The sky changes `glow` at night. */
 export const MAT = {
 	solid: new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }),
-	glow: new THREE.MeshLambertMaterial({ color: 0x8a7f9a, emissive: 0xffcf7a, emissiveIntensity: 0, flatShading: true }),
+	glow: new THREE.MeshLambertMaterial({ color: 0x9a8a78, emissive: 0xffc866, emissiveIntensity: 0, flatShading: true }),
 	lamp: new THREE.MeshBasicMaterial({ vertexColors: true }),
-	water: new THREE.MeshLambertMaterial({ color: 0x9adcf0, emissive: 0x2a6f8f, emissiveIntensity: 0.35, transparent: true, opacity: 0.86, flatShading: true }),
+	water: new THREE.MeshLambertMaterial({ color: 0x86d4ee, emissive: 0x2a7f9f, emissiveIntensity: 0.4, transparent: true, opacity: 0.86, flatShading: true }),
 	crystal: new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x6a4fa0, emissiveIntensity: 0.55, transparent: true, opacity: 0.92, flatShading: true }),
 };
 
@@ -119,22 +119,6 @@ export class Kit {
 	}
 }
 
-/** A roof shape: a triangle pushed along z. It stands on y = 0. */
-function prism(w: number, h: number, d: number): THREE.BufferGeometry {
-	const x = w / 2;
-	const z = d / 2;
-	// prettier-ignore
-	const v = [
-		-x, 0, z, x, 0, z, 0, h, z,
-		x, 0, -z, -x, 0, -z, 0, h, -z,
-		x, 0, z, x, 0, -z, 0, h, -z, x, 0, z, 0, h, -z, 0, h, z,
-		-x, 0, -z, -x, 0, z, 0, h, z, -x, 0, -z, 0, h, z, 0, h, -z,
-	];
-	const g = new THREE.BufferGeometry();
-	g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(v), 3));
-	return g;
-}
-
 /** What a model needs to know about its place. */
 export interface Ctx {
 	r: number;
@@ -159,66 +143,113 @@ export const blankCtx = (r = 0): Ctx => ({ r, seed: 7, growth: 1, sides: ['land'
 
 const yawOf = (r: number): number => (-r * Math.PI) / 2;
 
-const WALLS = [0xfff4e2, 0xfde7ef, 0xe6f5ea, 0xece6fb, 0xfff0d2];
-const ROOFS = [0xf2978a, 0x7fc8c2, 0xb79ce6, 0xf2c46b, 0xf29bb8, 0x8fb8ec];
-const WOOD = 0xd9b38c;
-const WOOD_DARK = 0xb98f6c;
-const STONE = 0xc9c4d8;
-const LEAVES = [0x8fd3a0, 0x79c49a, 0xa6dba0, 0x8fd3a0, 0x93d6b4, 0xf7b8cf, 0xf9c6dc, 0x86d1c4, 0xf5d58a];
-const BLOOMS = [0xffb3cb, 0xfff1a8, 0xd9b8ff, 0xffffff, 0xffc9a3, 0xa8e0ff];
+const BARK = 0x8a6248;
+const BARK_DARK = 0x6e4f3a;
+const BARK_LIGHT = 0xa67c5b;
+const WOOD = 0xc49a6c;
+const WOOD_DARK = 0x9a7450;
+const ROPE = 0xd8c08f;
+const STONE = 0xb9b8c8;
+const MOSS = 0x5fae6e;
+const GOLD = 0xffe7a3;
+/** Crowns of the tree homes: deep greens, with a few in gold, plum and teal. */
+const CANOPY = [0x3f9a6a, 0x4fae78, 0x2f8f6a, 0x5aa85a, 0x3f9a6a, 0xd9a441, 0xb86fa8, 0x3f9f9a];
+const LEAVES = [0x4fae78, 0x3f9a6a, 0x6fc487, 0x58b58a, 0x7fcf8f, 0xe8a8c8, 0xf2c46b, 0x6fc9b8, 0xb79ce6];
+const BLOOMS = [0xffa3c4, 0xfff1a8, 0xc9a8ff, 0xffffff, 0xffb98a, 0x9fe0ff];
+
+const lighter = (hex: number, by: number): number => _c.set(hex).lerp(_white, by).getHex();
+const _white = new THREE.Color(0xffffff);
 
 /** Does a path arm reach toward this side? */
 function pathJoins(ctx: Ctx, d: number): boolean {
 	const s = ctx.sides[d];
 	if (s === 'path' || s === 'bridge') return true;
-	// A cottage, a bench, a stall or a dock joins when it faces this cell.
+	// A tree home or a stall joins when it faces this cell.
 	if (s === 'cottage' || s === 'market') return ctx.sideR[d] === (d + 2) % 4;
 	if (s === 'dock') return true;
 	return false;
 }
 
+/** Flat stones with moss between them. */
 function path(k: Kit, ctx: Ctx): void {
 	const rand = rng(ctx.seed);
 	const arms = [0, 1, 2, 3].filter((d) => pathJoins(ctx, d));
-	const shade = (): number => pick([0xefe4cc, 0xe8dcc0, 0xf3ead6], rand());
+	const shade = (): number => pick([0xc9cdb6, 0xb9c2a6, 0xd6d6c2, 0xbfc7b0], rand());
+	const moss = (x: number, z: number): Kit => k.ball('solid', pick([MOSS, 0x4fa068, 0x7fcf8f], rand()), 0.06 + rand() * 0.03, x, 0.02, z, { sy: 0.35 });
 	if (!arms.length) {
 		k.cyl('solid', shade(), 0.2, 0.22, 0.045, 7, 0, 0, 0);
-		k.cyl('solid', shade(), 0.09, 0.1, 0.04, 6, 0.3, 0, 0.22);
-		k.cyl('solid', shade(), 0.08, 0.09, 0.04, 6, -0.28, 0, -0.26);
+		k.cyl('solid', shade(), 0.1, 0.11, 0.04, 6, 0.3, 0, 0.22);
+		k.cyl('solid', shade(), 0.09, 0.1, 0.04, 6, -0.28, 0, -0.26);
+		moss(0.2, -0.2);
+		moss(-0.22, 0.24);
 		return;
 	}
-	k.box('solid', shade(), 0.38, 0.045, 0.38, 0, 0, 0);
+	k.cyl('solid', shade(), 0.22, 0.24, 0.05, 7, 0, 0, 0, { ry: rand() * 3 });
 	for (const d of arms) {
-		const along = DZ[d] !== 0;
 		for (let i = 0; i < 2; i++) {
-			const off = 0.275 + i * 0.16;
-			k.box('solid', shade(), along ? 0.36 : 0.15, 0.04, along ? 0.15 : 0.36, DX[d] * off, 0, DZ[d] * off);
+			const off = 0.3 + i * 0.16;
+			const side = (rand() - 0.5) * 0.08;
+			k.cyl('solid', shade(), 0.12 + rand() * 0.03, 0.14, 0.042, 6, DX[d] * off + DZ[d] * side, 0, DZ[d] * off + DX[d] * side, { ry: rand() * 3 });
 		}
+		moss(DX[d] * 0.38 + DZ[d] * 0.2, DZ[d] * 0.38 + DX[d] * 0.2);
+	}
+	moss((rand() - 0.5) * 0.5, (rand() - 0.5) * 0.5);
+	if (rand() < 0.3) {
+		// A tiny glow cap grows beside some stones.
+		const x = rand() < 0.5 ? 0.36 : -0.36;
+		k.cyl('solid', 0xfff4e2, 0.012, 0.016, 0.06, 4, x, 0, 0.36);
+		k.cyl('glow', 0, 0.01, 0.04, 0.03, 5, x, 0.055, 0.36);
 	}
 }
 
+/** A home grown into a tree: a round door in the trunk and a crown of leaves for a roof. */
 function cottage(k: Kit, ctx: Ctx): void {
 	const rand = rng(ctx.clusterSeed);
-	const wall = pick(WALLS, rand());
-	const roof = pick(ROOFS, rand());
-	// Joined cottages: a wall and a roof run to each cottage next door.
+	const leaf = pick(CANOPY, rand());
+	const leaf2 = lighter(leaf, 0.22);
+	const own = rng(ctx.seed);
+	// Homes side by side: a rope walk and shared leaves run to each neighbour.
 	for (let d = 0; d < 4; d++) {
 		if (ctx.sides[d] !== 'cottage') continue;
 		const along = DZ[d] !== 0;
-		k.box('solid', wall, along ? 0.5 : 0.52, 0.38, along ? 0.52 : 0.5, DX[d] * 0.25, 0, DZ[d] * 0.25);
-		k.add('solid', prism(0.62, 0.28, 0.52), roof, DX[d] * 0.25, 0.38, DZ[d] * 0.25, { ry: along ? 0 : Math.PI / 2 });
+		k.box('solid', WOOD, along ? 0.12 : 0.5, 0.025, along ? 0.5 : 0.12, DX[d] * 0.3, 0.6, DZ[d] * 0.3);
+		for (const side of [-1, 1]) k.box('solid', ROPE, along ? 0.012 : 0.5, 0.012, along ? 0.5 : 0.012, DX[d] * 0.3 + (along ? side * 0.07 : 0), 0.7, DZ[d] * 0.3 + (along ? 0 : side * 0.07));
+		k.ball('solid', leaf, 0.3, DX[d] * 0.5, 1.02, DZ[d] * 0.5, { sy: 0.75 });
 	}
 	k.yaw(yawOf(ctx.r));
-	k.box('solid', wall, 0.64, 0.4, 0.56, 0, 0, 0);
-	k.add('solid', prism(0.72, 0.36, 0.76), roof, 0, 0.4, 0, { ry: Math.PI / 2 });
-	k.box('solid', 0xa87c5f, 0.14, 0.22, 0.03, 0, 0, -0.285);
-	k.box('solid', 0xe8d9b8, 0.2, 0.03, 0.08, 0, 0, -0.33);
-	k.box('glow', 0, 0.11, 0.11, 0.02, -0.2, 0.17, -0.285);
-	k.box('glow', 0, 0.11, 0.11, 0.02, 0.2, 0.17, -0.285);
-	k.box('glow', 0, 0.02, 0.11, 0.12, 0.325, 0.17, 0.05);
-	k.box('glow', 0, 0.02, 0.11, 0.12, -0.325, 0.17, 0.05);
-	k.box('solid', 0xd7b9a5, 0.09, 0.26, 0.09, 0.2, 0.46, 0.12);
-	if (ctx.homed) k.glow(0, 0.2, -0.36, 0xffd58a, 0.7);
+	for (let i = 0; i < 5; i++) {
+		const a = (i / 5) * Math.PI * 2 + 0.5;
+		k.cyl('solid', BARK_DARK, 0.03, 0.075, 0.3, 5, Math.cos(a) * 0.28, -0.03, Math.sin(a) * 0.28, { rz: Math.cos(a) * 0.8, rx: -Math.sin(a) * 0.8 });
+	}
+	k.cyl('solid', BARK, 0.21, 0.29, 0.62, 7, 0, 0, 0);
+	k.cyl('solid', BARK_LIGHT, 0.13, 0.21, 0.32, 7, 0, 0.62, 0);
+	// The door, with a frame and a leaf over it.
+	k.cyl('solid', 0xe8c98a, 0.115, 0.115, 0.03, 9, 0, 0.115, -0.262, { rx: Math.PI / 2 });
+	k.cyl('solid', 0x6f4530, 0.09, 0.09, 0.04, 9, 0, 0.11, -0.272, { rx: Math.PI / 2 });
+	k.ball('solid', GOLD, 0.014, 0.045, 0.14, -0.295);
+	k.ball('solid', leaf2, 0.14, 0, 0.31, -0.3, { sy: 0.3 });
+	k.box('solid', 0xc9cdb6, 0.2, 0.025, 0.1, 0, 0, -0.34);
+	// Round windows that glow at night.
+	for (const a of [-0.85, 0.85]) k.ball('glow', 0, 0.055, Math.sin(a) * 0.225, 0.38, -Math.cos(a) * 0.225);
+	k.ball('glow', 0, 0.045, 0, 0.72, -0.165);
+	k.ball('glow', 0, 0.045, 0.16, 0.7, 0.06);
+	// A little balcony and shelf mushrooms on the bark.
+	k.cyl('solid', WOOD, 0.15, 0.13, 0.03, 7, 0.27, 0.5, 0.08);
+	for (const a of [0, 1.1, 2.2]) k.box('solid', WOOD_DARK, 0.015, 0.09, 0.015, 0.27 + Math.cos(a - 0.4) * 0.13, 0.53, 0.08 + Math.sin(a - 0.4) * 0.13);
+	k.cyl('solid', 0xf2d9b0, 0.085, 0.06, 0.03, 6, -0.26, 0.2 + own() * 0.06, 0.1);
+	k.cyl('solid', 0xf7c9a8, 0.07, 0.05, 0.03, 6, -0.2, 0.36, 0.2);
+	// The crown.
+	k.ball('solid', leaf, 0.42, 0, 1.02, 0, { sy: 0.8, ry: own() * 3 });
+	k.ball('solid', leaf2, 0.29, 0.25, 0.92, 0.14, { ry: own() * 3 });
+	k.ball('solid', leaf, 0.27, -0.24, 0.94, -0.1, { ry: own() * 3 });
+	k.ball('solid', leaf2, 0.22, 0.04, 1.32, -0.05, { ry: own() * 3 });
+	k.ball('solid', leaf, 0.2, -0.05, 0.9, 0.3, { ry: own() * 3 });
+	if (ctx.homed) {
+		// A lantern hangs by the door when an elf lives here.
+		k.box('solid', BARK_DARK, 0.012, 0.16, 0.012, 0.2, 0.5, -0.27);
+		k.ball('lamp', GOLD, 0.045, 0.2, 0.47, -0.27);
+		k.glow(0.2, 0.47, -0.27, 0xffd58a, 0.9);
+	}
 }
 
 function tree(k: Kit, ctx: Ctx): void {
@@ -227,22 +258,24 @@ function tree(k: Kit, ctx: Ctx): void {
 	const leaf2 = pick(LEAVES.slice(0, 5), rand());
 	const stage = ctx.growth >= 1 ? 2 : ctx.growth >= 0.45 ? 1 : 0;
 	if (stage === 0) {
-		k.ball('solid', 0xb08968, 0.1, 0, 0.01, 0, { sy: 0.4 });
-		k.cyl('solid', 0x9a7455, 0.012, 0.018, 0.16, 5, 0, 0, 0);
-		k.ball('solid', 0xa6dba0, 0.055, 0.045, 0.17, 0, { sy: 0.5, rz: 0.5 });
-		k.ball('solid', 0x8fd3a0, 0.05, -0.04, 0.14, 0.01, { sy: 0.5, rz: -0.5 });
+		k.ball('solid', 0x8a6f58, 0.1, 0, 0.01, 0, { sy: 0.4 });
+		k.cyl('solid', BARK_DARK, 0.012, 0.018, 0.16, 5, 0, 0, 0);
+		k.ball('solid', 0x7fcf8f, 0.055, 0.045, 0.17, 0, { sy: 0.5, rz: 0.5 });
+		k.ball('solid', 0x6fc487, 0.05, -0.04, 0.14, 0.01, { sy: 0.5, rz: -0.5 });
 		return;
 	}
 	if (stage === 1) {
-		k.cyl('solid', 0x9a7455, 0.035, 0.05, 0.26, 6, 0, 0, 0);
+		k.cyl('solid', BARK, 0.035, 0.05, 0.26, 6, 0, 0, 0);
 		k.ball('solid', leaf, 0.21, 0, 0.4, 0, { ry: rand() * 3 });
 		k.ball('solid', leaf2, 0.13, 0.1, 0.54, 0.04, { ry: rand() * 3 });
 		return;
 	}
-	k.cyl('solid', 0x9a7455, 0.055, 0.085, 0.42, 6, 0, 0, 0);
-	k.ball('solid', leaf, 0.31, 0, 0.6, 0, { ry: rand() * 3, sy: 0.9 });
-	k.ball('solid', leaf2 === leaf ? 0x9fdcae : leaf, 0.24, 0.13, 0.84, 0.05, { ry: rand() * 3 });
-	k.ball('solid', leaf, 0.19, -0.11, 0.97, -0.06, { ry: rand() * 3 });
+	k.cyl('solid', BARK, 0.055, 0.09, 0.46, 6, 0, 0, 0);
+	k.cyl('solid', BARK, 0.02, 0.035, 0.2, 5, 0.09, 0.3, 0.02, { rz: -0.8 });
+	k.ball('solid', leaf, 0.32, 0, 0.66, 0, { ry: rand() * 3, sy: 0.9 });
+	k.ball('solid', leaf2 === leaf ? lighter(leaf, 0.2) : leaf, 0.25, 0.14, 0.9, 0.05, { ry: rand() * 3 });
+	k.ball('solid', lighter(leaf, 0.12), 0.2, -0.12, 1.04, -0.06, { ry: rand() * 3 });
+	k.ball('solid', leaf, 0.17, 0.2, 0.52, 0.04, { ry: rand() * 3 });
 	if (ctx.combos.includes('firefly')) {
 		for (let i = 0; i < 5; i++) k.ball('lamp', 0xfff6a8, 0.022, (rand() - 0.5) * 0.6, 0.5 + rand() * 0.5, (rand() - 0.5) * 0.6);
 		k.glow(0, 0.75, 0, 0xfff3a0, 1.3);
@@ -251,14 +284,14 @@ function tree(k: Kit, ctx: Ctx): void {
 
 function flower(k: Kit, ctx: Ctx): void {
 	const rand = rng(ctx.seed);
-	k.cyl('solid', 0xb89272, 0.4, 0.43, 0.05, 8, 0, 0, 0);
+	k.cyl('solid', 0x7a5a44, 0.4, 0.43, 0.05, 8, 0, 0, 0);
 	for (let i = 0; i < 9; i++) {
 		const a = (i / 9) * Math.PI * 2 + rand();
 		const rad = i === 0 ? 0 : 0.14 + rand() * 0.18;
 		const x = Math.cos(a) * rad;
 		const z = Math.sin(a) * rad;
-		const h = 0.1 + rand() * 0.1;
-		k.box('solid', 0x8fcf8f, 0.016, h, 0.016, x, 0.04, z);
+		const h = 0.1 + rand() * 0.12;
+		k.box('solid', 0x5fae6e, 0.016, h, 0.016, x, 0.04, z);
 		k.ball('solid', pick(BLOOMS, rand()), 0.05, x, 0.06 + h, z, { sy: 0.7, ry: rand() * 3 });
 		k.ball('solid', 0xffe08a, 0.02, x, 0.09 + h, z);
 	}
@@ -276,53 +309,68 @@ function pond(k: Kit, ctx: Ctx): void {
 	const spring = ctx.combos.includes('spring');
 	k.box(spring ? 'lamp' : 'water', spring ? 0xa9f5ee : 0, x1 - x0, 0.04, z1 - z0, (x0 + x1) / 2, 0, (z0 + z1) / 2);
 	if (spring) k.glow(0, 0.1, 0, 0x9ff3ee, 1.6);
-	// Stones on each side that is not joined to water.
+	// Mossy stones on each side that is not joined to water.
 	for (let d = 0; d < 4; d++) {
 		if (joined[d]) continue;
 		for (let i = -2; i <= 2; i++) {
 			const t = i * 0.2 + (rand() - 0.5) * 0.05;
 			const x = DX[d] * 0.44 + (DX[d] === 0 ? t : 0);
 			const z = DZ[d] * 0.44 + (DZ[d] === 0 ? t : 0);
-			k.ball('solid', pick([0xd9d4e4, 0xcfc8dc, 0xe6e1ee], rand()), 0.075 + rand() * 0.03, x, 0.03, z, { sy: 0.6, ry: rand() * 3 });
+			k.ball('solid', pick([0xc4c6d0, 0xb4b8c4, 0xd2d4dc, MOSS], rand()), 0.075 + rand() * 0.03, x, 0.03, z, { sy: 0.6, ry: rand() * 3 });
 		}
 	}
 	const lx = (rand() - 0.5) * 0.4;
 	const lz = (rand() - 0.5) * 0.4;
-	k.cyl('solid', 0x8fd3a0, 0.09, 0.09, 0.012, 7, lx, 0.04, lz);
+	k.cyl('solid', 0x6fc487, 0.09, 0.09, 0.012, 7, lx, 0.04, lz);
 	k.ball('solid', 0xffc1d9, 0.035, lx + 0.02, 0.07, lz, { sy: 0.7 });
 }
 
+/** A bent vine that holds glowing seed pods. */
 function lantern(k: Kit): void {
-	k.cyl('solid', STONE, 0.07, 0.09, 0.05, 6, 0, 0, 0);
-	k.box('solid', 0x7a6a86, 0.04, 0.56, 0.04, 0, 0.04, 0);
-	k.box('solid', 0x7a6a86, 0.2, 0.03, 0.03, 0.08, 0.57, 0);
-	k.box('solid', 0x7a6a86, 0.012, 0.07, 0.012, 0.16, 0.5, 0);
-	k.cyl('solid', 0x7a6a86, 0.02, 0.085, 0.05, 4, 0.16, 0.46, 0, { ry: Math.PI / 4 });
-	k.box('lamp', 0xffe7a3, 0.1, 0.12, 0.1, 0.16, 0.34, 0);
-	k.box('solid', 0x7a6a86, 0.11, 0.015, 0.11, 0.16, 0.325, 0);
-	k.glow(0.16, 0.4, 0, 0xffd27a, 1.5);
+	k.ball('solid', MOSS, 0.09, 0, 0.01, 0, { sy: 0.4 });
+	k.cyl('solid', BARK_DARK, 0.025, 0.045, 0.34, 5, -0.02, 0, 0, { rz: 0.12 });
+	k.cyl('solid', BARK_DARK, 0.018, 0.025, 0.3, 5, 0.02, 0.3, 0, { rz: -0.5 });
+	k.cyl('solid', BARK_DARK, 0.012, 0.018, 0.16, 5, 0.13, 0.52, 0, { rz: -1.35 });
+	k.ball('solid', 0x6fc487, 0.05, -0.07, 0.3, 0.02, { sy: 0.4, rz: 0.6 });
+	k.ball('solid', 0x4fae78, 0.045, 0.02, 0.44, -0.04, { sy: 0.4, rz: -0.5 });
+	k.box('solid', BARK_DARK, 0.008, 0.1, 0.008, 0.19, 0.48, 0);
+	k.ball('solid', 0x4fae78, 0.06, 0.19, 0.47, 0, { sy: 0.4 });
+	k.ball('lamp', GOLD, 0.075, 0.19, 0.39, 0, { sy: 1.15 });
+	k.box('solid', BARK_DARK, 0.008, 0.07, 0.008, 0.08, 0.5, 0.03);
+	k.ball('lamp', 0xfff1c4, 0.04, 0.08, 0.47, 0.03);
+	k.glow(0.19, 0.4, 0, 0xffd27a, 1.6);
 }
 
+/** A rope bridge of planks, with vines that hang below. */
 function bridge(k: Kit, ctx: Ctx): void {
+	const rand = rng(ctx.seed + 2);
 	const joined = ctx.sides.map((s) => s !== null);
-	k.box('solid', WOOD_DARK, 0.5, 0.08, 0.5, 0, -0.12, 0);
-	for (let i = -1; i <= 1; i++) k.box('solid', i === 0 ? 0xe3c19c : WOOD, 0.62, 0.06, 0.2, 0, -0.03, i * 0.207);
+	k.box('solid', WOOD_DARK, 0.5, 0.06, 0.5, 0, -0.11, 0);
+	for (let i = -1; i <= 1; i++) k.box('solid', i === 0 ? 0xd9b78a : WOOD, 0.62, 0.05, 0.2, 0, -0.03, i * 0.207);
 	for (let d = 0; d < 4; d++) {
 		const along = DZ[d] !== 0;
 		const px = DZ[d] === 0 ? 0 : 0.31;
 		const pz = DX[d] === 0 ? 0 : 0.31;
 		if (joined[d]) {
-			k.box('solid', WOOD, along ? 0.62 : 0.2, 0.06, along ? 0.2 : 0.62, DX[d] * 0.405, -0.03, DZ[d] * 0.405);
+			k.box('solid', WOOD, along ? 0.62 : 0.2, 0.05, along ? 0.2 : 0.62, DX[d] * 0.405, -0.03, DZ[d] * 0.405);
 			for (const side of [-1, 1]) {
-				k.box('solid', 0xfff4e2, along ? 0.025 : 0.2, 0.025, along ? 0.2 : 0.025, DX[d] * 0.405 + side * px, 0.17, DZ[d] * 0.405 + side * pz);
+				k.box('solid', ROPE, along ? 0.02 : 0.2, 0.02, along ? 0.2 : 0.02, DX[d] * 0.405 + side * px, 0.17, DZ[d] * 0.405 + side * pz);
 			}
 		} else {
-			k.box('solid', 0xfff4e2, along ? 0.62 : 0.025, 0.025, along ? 0.025 : 0.62, DX[d] * 0.31, 0.17, DZ[d] * 0.31);
+			k.box('solid', ROPE, along ? 0.62 : 0.02, 0.02, along ? 0.02 : 0.62, DX[d] * 0.31, 0.17, DZ[d] * 0.31);
 		}
 	}
 	for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-		k.box('solid', WOOD_DARK, 0.05, 0.24, 0.05, sx * 0.31, -0.03, sz * 0.31);
-		k.ball('solid', 0xf7b8cf, 0.035, sx * 0.31, 0.23, sz * 0.31);
+		k.box('solid', BARK_DARK, 0.05, 0.25, 0.05, sx * 0.31, -0.04, sz * 0.31);
+		k.ball('solid', 0x6fc487, 0.045, sx * 0.31, 0.23, sz * 0.31, { sy: 0.7 });
+	}
+	for (let i = 0; i < 3; i++) {
+		const len = 0.15 + rand() * 0.4;
+		k.box('solid', MOSS, 0.025, len, 0.025, (rand() - 0.5) * 0.5, -0.11 - len, (rand() - 0.5) * 0.5);
+	}
+	if (rand() < 0.35) {
+		k.ball('lamp', GOLD, 0.035, 0.31, 0.3, 0.31);
+		k.glow(0.31, 0.3, 0.31, 0xffd27a, 0.8);
 	}
 }
 
@@ -330,7 +378,8 @@ function crystal(k: Kit, ctx: Ctx): void {
 	const rand = rng(ctx.seed);
 	const tones = pick([[0xc7a8ff, 0xe0ccff], [0x9fe0ff, 0xc9f0ff], [0xffb3e6, 0xffd6f1]], rand());
 	k.ball('solid', STONE, 0.14, 0.05, 0.03, 0.03, { sy: 0.5 });
-	k.ball('solid', 0xb9b4c9, 0.1, -0.15, 0.03, -0.08, { sy: 0.5 });
+	k.ball('solid', 0xa9a8ba, 0.1, -0.15, 0.03, -0.08, { sy: 0.5 });
+	k.ball('solid', MOSS, 0.06, 0.12, 0.05, -0.1, { sy: 0.4 });
 	k.gem('crystal', tones[0], 0.17, 0, 0.3, 0, { sy: 1.9, rz: 0.08 });
 	k.gem('crystal', tones[1], 0.11, 0.17, 0.18, 0.06, { sy: 1.7, rz: -0.4 });
 	k.gem('crystal', tones[1], 0.09, -0.14, 0.16, -0.05, { sy: 1.7, rz: 0.45 });
@@ -338,27 +387,33 @@ function crystal(k: Kit, ctx: Ctx): void {
 	k.glow(0, 0.35, 0, tones[0], 1.2);
 }
 
+/** A seat cut from a fallen log. */
 function bench(k: Kit, ctx: Ctx): void {
 	k.yaw(yawOf(ctx.r));
-	k.box('solid', WOOD, 0.54, 0.04, 0.2, 0, 0.15, 0.04);
-	k.box('solid', WOOD, 0.54, 0.16, 0.035, 0, 0.23, 0.15);
+	k.add('solid', new THREE.CylinderGeometry(0.105, 0.115, 0.56, 7), BARK, 0, 0.11, 0.04, { rz: Math.PI / 2 });
+	k.box('solid', 0xe3c79c, 0.5, 0.025, 0.17, 0, 0.19, 0.04);
 	for (const sx of [-1, 1]) {
-		k.box('solid', WOOD_DARK, 0.04, 0.15, 0.04, sx * 0.22, 0, -0.03);
-		k.box('solid', WOOD_DARK, 0.04, 0.4, 0.04, sx * 0.22, 0, 0.15);
+		k.cyl('solid', 0xe3c79c, 0.1, 0.1, 0.012, 7, sx * 0.285, 0.105, 0.04, { rz: Math.PI / 2 });
+		k.cyl('solid', BARK_DARK, 0.018, 0.022, 0.42, 5, sx * 0.2, 0, 0.16, { rz: sx * -0.08 });
 	}
-	k.box('solid', 0xf7b8cf, 0.2, 0.03, 0.17, -0.12, 0.19, 0.04);
+	k.box('solid', BARK_DARK, 0.5, 0.03, 0.03, 0, 0.33, 0.16);
+	k.box('solid', BARK_DARK, 0.5, 0.025, 0.025, 0, 0.25, 0.16);
+	k.ball('solid', 0x6fc487, 0.09, -0.12, 0.215, 0.04, { sy: 0.25 });
+	k.cyl('solid', 0xfff4e2, 0.012, 0.016, 0.05, 4, 0.25, 0.2, -0.02);
+	k.cyl('solid', 0xf28fa0, 0.008, 0.035, 0.03, 5, 0.25, 0.245, -0.02);
 	if (ctx.combos.includes('nook')) {
-		k.box('solid', 0xc9a8ff, 0.12, 0.025, 0.09, 0.14, 0.19, 0.03, { ry: 0.3 });
+		k.box('solid', 0xc9a8ff, 0.12, 0.025, 0.09, 0.12, 0.205, 0.03, { ry: 0.3 });
 		k.glow(0, 0.3, 0, 0xffd58a, 1.4);
 	}
 }
 
 function waterfall(k: Kit, ctx: Ctx): void {
 	const rand = rng(ctx.seed);
-	k.ball('solid', 0xbdb8cf, 0.3, 0, 0.2, 0, { sy: 0.9, ry: rand() * 3 });
-	k.ball('solid', 0xaaa5c0, 0.19, 0.22, 0.12, 0.16, { ry: rand() * 3 });
-	k.ball('solid', 0xcbc6da, 0.15, -0.22, 0.1, -0.14, { ry: rand() * 3 });
-	k.ball('solid', 0x9fd9a8, 0.08, -0.1, 0.42, 0.1, { sy: 0.5 });
+	k.ball('solid', 0xa9a8ba, 0.3, 0, 0.2, 0, { sy: 0.9, ry: rand() * 3 });
+	k.ball('solid', 0x9896ac, 0.19, 0.22, 0.12, 0.16, { ry: rand() * 3 });
+	k.ball('solid', 0xb9b8c8, 0.15, -0.22, 0.1, -0.14, { ry: rand() * 3 });
+	k.ball('solid', MOSS, 0.1, -0.1, 0.42, 0.1, { sy: 0.5 });
+	k.ball('solid', 0x4fa068, 0.07, 0.16, 0.3, -0.12, { sy: 0.5 });
 	k.ball('water', 0, 0.11, 0.02, 0.44, -0.02, { sy: 0.45 });
 	for (let d = 0; d < 4; d++) {
 		const toPond = ctx.sides[d] === 'pond';
@@ -368,7 +423,7 @@ function waterfall(k: Kit, ctx: Ctx): void {
 		// A stream down the rock, then a channel to the edge of the cell.
 		k.box('water', 0, along ? 0.2 : 0.05, 0.42, along ? 0.05 : 0.2, DX[d] * 0.27, 0.02, DZ[d] * 0.27, along ? { rx: -DZ[d] * 0.35 } : { rz: DX[d] * 0.35 });
 		k.box('water', 0, along ? 0.22 : 0.3, 0.04, along ? 0.3 : 0.22, DX[d] * 0.36, 0, DZ[d] * 0.36);
-		if (spill) k.box('water', 0, along ? 0.22 : 0.06, 3.2, along ? 0.06 : 0.22, DX[d] * 0.52, -3.17, DZ[d] * 0.52);
+		if (spill) k.box('water', 0, along ? 0.22 : 0.06, 5, along ? 0.06 : 0.22, DX[d] * 0.54, -4.97, DZ[d] * 0.54);
 	}
 	if (ctx.combos.includes('rainbow')) {
 		const bands = [0xff9aa2, 0xffcf8a, 0xfff1a8, 0x9be7a5, 0x9fd0ff, 0xc9a8ff];
@@ -376,24 +431,29 @@ function waterfall(k: Kit, ctx: Ctx): void {
 	}
 }
 
+/** A tall flower. Its petals are sails that turn in the wind. */
 function windmill(k: Kit, ctx: Ctx): void {
 	k.yaw(yawOf(ctx.r));
-	k.cyl('solid', 0xfff4e2, 0.17, 0.27, 0.8, 6, 0, 0, 0);
-	k.cyl('solid', 0xf7d9c4, 0.2, 0.2, 0.05, 6, 0, 0.78, 0);
-	k.cyl('solid', 0xf2978a, 0.02, 0.24, 0.3, 6, 0, 0.83, 0);
-	k.box('solid', 0xa87c5f, 0.13, 0.2, 0.04, 0, 0, -0.255);
-	k.box('glow', 0, 0.09, 0.09, 0.03, 0, 0.42, -0.215);
-	k.box('solid', WOOD_DARK, 0.04, 0.04, 0.14, 0, 0.72, -0.24);
+	k.cyl('solid', 0x4fa068, 0.045, 0.085, 0.86, 6, 0, 0, 0);
+	for (let i = 0; i < 4; i++) {
+		const a = (i / 4) * Math.PI * 2 + 0.6;
+		k.ball('solid', i % 2 ? 0x6fc487 : 0x4fae78, 0.2, Math.cos(a) * 0.2, 0.06, Math.sin(a) * 0.2, { sy: 0.18, ry: -a, sz: 0.5 });
+	}
+	k.ball('solid', 0x6fc487, 0.12, 0.09, 0.42, 0.03, { sy: 0.2, sz: 0.5, rz: 0.5 });
+	k.ball('solid', 0x4fae78, 0.11, -0.09, 0.56, -0.02, { sy: 0.2, sz: 0.5, rz: -0.5 });
+	k.ball('solid', 0x4fa068, 0.09, 0, 0.86, -0.02);
+	k.box('solid', 0x4fa068, 0.035, 0.035, 0.12, 0, 0.85, -0.1);
 }
 
-/** The sails of the windmill. They are a part of their own, so that they can turn. */
-function windmillSails(): THREE.Group {
+/** The petals of the wind bloom. They are a part of their own, so that they can turn. */
+function windmillSails(seed: number): THREE.Group {
+	const rand = rng(seed);
+	const tone = pick([0xffa3c4, 0xc9a8ff, 0xffd66b, 0x9fe0ff], rand());
 	const k = new Kit();
-	k.ball('solid', WOOD_DARK, 0.05, 0, 0, 0);
-	for (let i = 0; i < 4; i++) {
-		const a = (i * Math.PI) / 2;
-		k.box('solid', WOOD, 0.025, 0.42, 0.02, -Math.sin(a) * 0.21, Math.cos(a) * 0.21 - 0.21, 0, { rz: a });
-		k.box('solid', 0xfffaf0, 0.11, 0.3, 0.012, -Math.sin(a) * 0.26 + Math.cos(a) * 0.055, Math.cos(a) * 0.26 + Math.sin(a) * 0.055 - 0.15, 0, { rz: a });
+	k.ball('solid', 0xffd66b, 0.065, 0, 0, 0, { sz: 0.6 });
+	for (let i = 0; i < 5; i++) {
+		const a = (i * Math.PI * 2) / 5;
+		k.ball('solid', i % 2 ? lighter(tone, 0.45) : tone, 0.17, -Math.sin(a) * 0.22, Math.cos(a) * 0.22, 0.01, { rz: a, sx: 0.5, sy: 1.15, sz: 0.1 });
 	}
 	return k.build();
 }
@@ -408,71 +468,145 @@ function mushroom(k: Kit, ctx: Ctx): void {
 		const h = 0.07 + rand() * 0.09;
 		const r = 0.07 + rand() * 0.035;
 		k.cyl('solid', 0xfff4e2, 0.022, 0.03, h, 5, x, 0, z);
-		k.cyl('solid', pick([0xf28fa0, 0xc9a8f0, 0xffc48a, 0xf7a8c4], rand()), 0.02, r, r * 0.8, 6, x, h - 0.01, z);
+		k.cyl('solid', pick([0xe86f86, 0xb48cf0, 0xffb060, 0xf28fb4], rand()), 0.02, r, r * 0.8, 6, x, h - 0.01, z);
 		if (fairy) k.ball('lamp', 0xe9d6ff, 0.016, x, h + r * 0.85, z);
 	}
-	k.ball('solid', 0x9fd9a8, 0.06, 0.03, 0.01, -0.02, { sy: 0.4 });
+	k.ball('solid', MOSS, 0.06, 0.03, 0.01, -0.02, { sy: 0.4 });
 	if (fairy) k.glow(0, 0.15, 0, 0xd4b3ff, 1.6);
 }
 
 function dock(k: Kit, ctx: Ctx): void {
 	k.yaw(yawOf(ctx.r));
-	for (let i = 0; i < 5; i++) k.box('solid', i % 2 ? WOOD : 0xe3c19c, 0.46, 0.05, 0.15, 0, 0, 0.12 - i * 0.165);
+	for (let i = 0; i < 5; i++) k.box('solid', i % 2 ? WOOD : 0xd9b78a, 0.46, 0.05, 0.15, 0, 0, 0.12 - i * 0.165);
 	for (const sx of [-1, 1]) {
-		k.box('solid', WOOD_DARK, 0.05, 0.5, 0.05, sx * 0.2, -0.4, -0.58);
-		k.box('solid', WOOD_DARK, 0.05, 0.22, 0.05, sx * 0.2, -0.17, -0.1);
+		k.box('solid', BARK_DARK, 0.05, 0.5, 0.05, sx * 0.2, -0.4, -0.58);
+		k.box('solid', BARK_DARK, 0.05, 0.22, 0.05, sx * 0.2, -0.17, -0.1);
 	}
-	k.box('solid', 0xfff4e2, 0.05, 0.36, 0.05, -0.2, 0.05, -0.58);
-	k.box('solid', 0xf2978a, 0.055, 0.07, 0.055, -0.2, 0.2, -0.58);
-	k.ball('lamp', 0xffe7a3, 0.05, -0.2, 0.46, -0.58);
-	k.glow(-0.2, 0.46, -0.58, 0xffd27a, 1);
+	k.cyl('solid', BARK, 0.02, 0.03, 0.4, 5, -0.2, 0.05, -0.58);
+	k.ball('solid', 0x4fae78, 0.06, -0.2, 0.47, -0.58, { sy: 0.4 });
+	k.ball('lamp', GOLD, 0.05, -0.2, 0.41, -0.58);
+	k.glow(-0.2, 0.41, -0.58, 0xffd27a, 1);
 	k.box('solid', WOOD, 0.14, 0.1, 0.12, 0.13, 0.05, 0.02);
+	k.box('solid', MOSS, 0.03, 0.3, 0.03, 0.2, -0.3, -0.3);
 }
 
-/** The balloon boat at the sky dock. */
+/** The leaf boat at the sky dock. A seed puff holds it up. */
 function dockBoat(seed: number): THREE.Group {
 	const rand = rng(seed);
 	const k = new Kit();
-	const tone = pick([0xf9a8c4, 0xa8d8f9, 0xf9dc8a, 0xb9e8b0], rand());
-	k.ball('solid', 0xf7d2b0, 0.2, 0, 0, 0, { sy: 0.45, sz: 1.5 });
-	k.box('solid', WOOD_DARK, 0.3, 0.03, 0.42, 0, 0.05, 0);
-	k.box('solid', WOOD_DARK, 0.012, 0.3, 0.012, 0.1, 0.06, 0.12);
-	k.box('solid', WOOD_DARK, 0.012, 0.3, 0.012, -0.1, 0.06, -0.12);
-	k.ball('solid', tone, 0.24, 0, 0.56, 0, { sy: 0.9 });
-	k.ball('solid', 0xfff4e2, 0.13, 0, 0.36, 0, { sy: 0.5 });
+	const tone = pick([0xfff4e2, 0xffd6ea, 0xfff1a8, 0xd6f0ff], rand());
+	k.ball('solid', 0x4fae78, 0.2, 0, 0, 0, { sy: 0.4, sz: 1.6 });
+	k.ball('solid', 0x6fc487, 0.16, 0, 0.03, 0, { sy: 0.3, sz: 1.5 });
+	k.box('solid', ROPE, 0.01, 0.34, 0.01, 0.08, 0.04, 0.12);
+	k.box('solid', ROPE, 0.01, 0.34, 0.01, -0.08, 0.04, -0.12);
+	k.ball('solid', tone, 0.25, 0, 0.58, 0, { sy: 0.9 });
+	for (let i = 0; i < 6; i++) {
+		const a = (i / 6) * Math.PI * 2;
+		k.ball('solid', 0xffffff, 0.07, Math.cos(a) * 0.2, 0.6, Math.sin(a) * 0.2);
+	}
 	return k.build();
 }
 
+/** A stall under a big mushroom cap. */
 function market(k: Kit, ctx: Ctx): void {
 	const rand = rng(ctx.seed);
 	k.yaw(yawOf(ctx.r));
-	k.box('solid', 0xfff4e2, 0.64, 0.2, 0.3, 0, 0, 0.04);
-	k.box('solid', WOOD, 0.68, 0.03, 0.34, 0, 0.2, 0.04);
-	for (const sx of [-1, 1]) for (const sz of [-0.15, 0.23]) k.box('solid', WOOD_DARK, 0.035, 0.58, 0.035, sx * 0.32, 0, sz);
-	const stripe = pick([0xf7a8b8, 0x9fd0ff, 0xb9e8b0, 0xf9dc8a], rand());
-	for (let i = 0; i < 6; i++) k.box('solid', i % 2 ? 0xfffaf0 : stripe, 0.125, 0.03, 0.56, -0.3125 + i * 0.125, 0.58, 0.02, { rx: 0.22 });
-	for (let i = 0; i < 4; i++) k.ball('solid', pick([0xff9aa2, 0xffcf8a, 0xc9a8ff, 0x9be7a5], rand()), 0.05, -0.22 + i * 0.14, 0.27, 0.02 + (rand() - 0.5) * 0.1);
-	k.box('solid', WOOD_DARK, 0.16, 0.12, 0.14, 0.2, 0, -0.27);
-	k.ball('solid', 0xffcf8a, 0.045, 0.2, 0.15, -0.27);
+	const cap = pick([0xe86f86, 0xb48cf0, 0xffb060, 0x4fb0a8], rand());
+	k.add('solid', new THREE.CylinderGeometry(0.11, 0.12, 0.6, 7), BARK, 0, 0.12, -0.04, { rz: Math.PI / 2 });
+	k.box('solid', 0xe3c79c, 0.56, 0.025, 0.2, 0, 0.215, -0.04);
+	k.cyl('solid', 0xfff4e2, 0.08, 0.11, 0.6, 7, 0, 0, 0.24);
+	k.cyl('solid', cap, 0.08, 0.5, 0.2, 9, 0, 0.58, 0.08);
+	k.cyl('solid', lighter(cap, 0.25), 0.02, 0.09, 0.06, 7, 0, 0.77, 0.08);
+	k.cyl('solid', 0xfff4e2, 0.46, 0.46, 0.02, 9, 0, 0.565, 0.08);
+	for (let i = 0; i < 6; i++) {
+		const a = (i / 6) * Math.PI * 2 + rand();
+		k.ball('solid', 0xfffaf0, 0.045, Math.cos(a) * 0.27, 0.69, 0.08 + Math.sin(a) * 0.27, { sy: 0.4 });
+	}
+	for (let i = 0; i < 4; i++) k.ball('solid', pick([0xff8f9c, 0xffc27a, 0xb48cf0, 0x7fcf8f], rand()), 0.05, -0.2 + i * 0.13, 0.28, -0.04 + (rand() - 0.5) * 0.08);
+	k.box('solid', WOOD_DARK, 0.16, 0.12, 0.14, 0.22, 0, -0.3);
+	k.ball('solid', 0xffc27a, 0.045, 0.22, 0.15, -0.3);
+	k.ball('lamp', GOLD, 0.03, -0.3, 0.46, -0.12);
+	k.glow(-0.3, 0.46, -0.12, 0xffd27a, 0.8);
 }
 
+/** A thin tower grown from a twisted tree. Its horns hold a star. */
 function tower(k: Kit): void {
-	k.cyl('solid', 0xe9e4f4, 0.2, 0.27, 0.5, 8, 0, 0, 0);
-	k.cyl('solid', 0xf4f0fb, 0.15, 0.2, 0.5, 8, 0, 0.5, 0);
-	k.cyl('solid', 0xd9cff0, 0.25, 0.22, 0.05, 8, 0, 1.0, 0);
-	k.cyl('solid', 0xf4f0fb, 0.13, 0.15, 0.3, 8, 0, 1.05, 0);
-	k.cyl('solid', 0xb9a0e8, 0.015, 0.21, 0.42, 8, 0, 1.33, 0);
-	k.box('solid', 0xa87c5f, 0.12, 0.2, 0.04, 0, 0, -0.25);
-	for (let i = 0; i < 3; i++) {
-		const a = (i / 3) * Math.PI * 2;
-		k.box('glow', 0, 0.07, 0.11, 0.03, Math.sin(a) * 0.165, 0.68, -Math.cos(a) * 0.165, { ry: -a });
-		k.box('glow', 0, 0.06, 0.09, 0.03, Math.sin(a + 1) * 0.13, 1.14, -Math.cos(a + 1) * 0.13, { ry: -a - 1 });
+	for (let i = 0; i < 5; i++) {
+		const a = (i / 5) * Math.PI * 2;
+		k.cyl('solid', BARK_DARK, 0.03, 0.07, 0.28, 5, Math.cos(a) * 0.26, -0.03, Math.sin(a) * 0.26, { rz: Math.cos(a) * 0.8, rx: -Math.sin(a) * 0.8 });
 	}
-	k.glow(0, 1.9, 0, 0xfff0a0, 1.6);
+	k.cyl('solid', BARK, 0.18, 0.27, 0.55, 7, 0, 0, 0);
+	k.cyl('solid', BARK_LIGHT, 0.13, 0.18, 0.5, 7, 0, 0.55, 0, { ry: 0.4 });
+	k.cyl('solid', BARK, 0.09, 0.13, 0.45, 7, 0, 1.05, 0, { ry: 0.8 });
+	k.ball('solid', 0x3f9a6a, 0.3, 0, 0.58, 0, { sy: 0.3 });
+	k.ball('solid', 0x4fae78, 0.24, 0, 1.07, 0, { sy: 0.3 });
+	k.ball('solid', 0x6fc487, 0.18, 0, 1.5, 0, { sy: 0.35 });
+	for (const sx of [-1, 1]) {
+		k.cyl('solid', BARK_LIGHT, 0.012, 0.035, 0.34, 5, sx * 0.11, 1.5, 0, { rz: sx * -0.45 });
+		k.cyl('solid', BARK_LIGHT, 0.004, 0.012, 0.16, 5, sx * 0.17, 1.8, 0, { rz: sx * 0.35 });
+	}
+	k.cyl('solid', 0xe8c98a, 0.1, 0.1, 0.03, 9, 0, 0.1, -0.245, { rx: Math.PI / 2 });
+	k.cyl('solid', 0x6f4530, 0.08, 0.08, 0.04, 9, 0, 0.095, -0.255, { rx: Math.PI / 2 });
+	for (let i = 0; i < 3; i++) {
+		const a = (i / 3) * Math.PI * 2 + 0.5;
+		k.ball('glow', 0, 0.05, Math.sin(a) * 0.165, 0.78, -Math.cos(a) * 0.165);
+		k.ball('glow', 0, 0.04, Math.sin(a + 1) * 0.115, 1.25, -Math.cos(a + 1) * 0.115);
+	}
+	k.glow(0, 1.9, 0, 0xd9d0ff, 1.8);
 }
 
 function towerStar(): THREE.Group {
-	return new Kit().gem('lamp', 0xfff3a8, 0.085, 0, 0, 0, { sy: 1.3 }).build(false);
+	return new Kit().gem('lamp', 0xf0ecff, 0.085, 0, 0, 0, { sy: 1.3 }).build(false);
+}
+
+/** The Elder Tree: far bigger than any other piece. Its crown shades the cells around it. */
+function elder(k: Kit, ctx: Ctx): void {
+	const rand = rng(ctx.seed);
+	for (let i = 0; i < 7; i++) {
+		const a = (i / 7) * Math.PI * 2 + 0.2;
+		k.cyl('solid', BARK_DARK, 0.05, 0.13, 0.7, 5, Math.cos(a) * 0.46, -0.1, Math.sin(a) * 0.46, { rz: Math.cos(a) * 0.9, rx: -Math.sin(a) * 0.9 });
+	}
+	k.cyl('solid', BARK, 0.36, 0.48, 1.0, 9, 0, 0, 0);
+	k.cyl('solid', BARK_LIGHT, 0.3, 0.36, 0.9, 9, 0, 1.0, 0, { ry: 0.3 });
+	k.cyl('solid', BARK, 0.22, 0.3, 0.7, 9, 0, 1.9, 0, { ry: 0.6 });
+	// Great boughs reach out under the crown.
+	for (let i = 0; i < 5; i++) {
+		const a = (i / 5) * Math.PI * 2 + 0.9;
+		k.cyl('solid', BARK, 0.06, 0.13, 1.3, 6, Math.cos(a) * 0.55, 1.75, Math.sin(a) * 0.55, { rz: -Math.cos(a) * 0.95, rx: Math.sin(a) * 0.95 });
+	}
+	k.cyl('solid', 0xe8c98a, 0.2, 0.2, 0.04, 10, 0, 0.14, -0.44, { rx: Math.PI / 2 });
+	k.cyl('solid', 0x6f4530, 0.165, 0.165, 0.05, 10, 0, 0.13, -0.455, { rx: Math.PI / 2 });
+	for (let i = 0; i < 7; i++) {
+		const a = (i / 7) * Math.PI * 2 + 0.4;
+		const y = 0.6 + (i % 3) * 0.45;
+		const r = 0.4 - y * 0.05;
+		k.ball('glow', 0, 0.065, Math.sin(a) * r, y, -Math.cos(a) * r);
+	}
+	for (let i = 0; i < 5; i++) {
+		const a = (i / 5) * Math.PI * 2 + 1.3;
+		k.cyl('solid', i % 2 ? 0xf2d9b0 : 0xf7c9a8, 0.15, 0.1, 0.04, 7, Math.cos(a) * 0.46, 0.35 + i * 0.22, Math.sin(a) * 0.46);
+	}
+	// The crown: many great balls of leaves, with gold lights that hang below.
+	const greens = [0x2f8f6a, 0x3f9a6a, 0x4fae78, 0x2f9a58, 0x58b58a];
+	k.ball('solid', greens[0], 1.25, 0, 3.0, 0, { sy: 0.75 });
+	for (let i = 0; i < 9; i++) {
+		const a = (i / 9) * Math.PI * 2 + rand();
+		const rr = 0.9 + rand() * 0.6;
+		k.ball('solid', pick(greens, rand()), 0.6 + rand() * 0.35, Math.cos(a) * rr, 2.5 + rand() * 0.9, Math.sin(a) * rr, { sy: 0.8, ry: rand() * 3 });
+	}
+	k.ball('solid', greens[2], 0.7, 0.1, 3.8, -0.1, { sy: 0.8 });
+	for (let i = 0; i < 9; i++) {
+		const a = (i / 9) * Math.PI * 2 + rand();
+		const rr = 0.7 + rand() * 0.8;
+		const x = Math.cos(a) * rr;
+		const z = Math.sin(a) * rr;
+		const len = 0.25 + rand() * 0.5;
+		k.box('solid', MOSS, 0.012, len, 0.012, x, 2.15 - len, z);
+		k.ball('lamp', pick([GOLD, 0xfff1c4, 0xd9ffd0], rand()), 0.05, x, 2.12 - len, z);
+		if (i % 3 === 0) k.glow(x, 2.12 - len, z, 0xffd58a, 1.4);
+	}
+	k.glow(0, 0.4, -0.6, 0xffd58a, 1.6);
+	k.glow(0, 3, 0, 0xbfffd0, 5);
 }
 
 /** Builds the model of one piece. */
@@ -527,12 +661,12 @@ export function buildPiece(id: PieceId, ctx: Ctx): Model {
 			windmill(k, ctx);
 			const holder = new THREE.Group();
 			holder.rotation.y = yawOf(ctx.r);
-			const sails = windmillSails();
-			sails.position.set(0, 0.74, -0.33);
+			const sails = windmillSails(ctx.seed);
+			sails.position.set(0, 0.87, -0.19);
 			holder.add(sails);
 			extra.push(holder);
 			anims.push((_o, _t, dt) => {
-				sails.rotation.z += dt * 0.9;
+				sails.rotation.z += dt * 1.1;
 			});
 			break;
 		}
@@ -550,14 +684,17 @@ export function buildPiece(id: PieceId, ctx: Ctx): Model {
 			});
 			break;
 		}
+		case 'elder':
+			elder(k, ctx);
+			break;
 		case 'tower': {
 			tower(k);
 			const star = towerStar();
-			star.position.y = 1.88;
+			star.position.y = 1.92;
 			extra.push(star);
 			anims.push((_o, t) => {
 				star.rotation.y = t * 1.2;
-				star.position.y = 1.88 + Math.sin(t * 2) * 0.03;
+				star.position.y = 1.92 + Math.sin(t * 2) * 0.03;
 			});
 			break;
 		}

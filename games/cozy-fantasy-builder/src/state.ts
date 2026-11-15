@@ -1,6 +1,6 @@
 /** The state of the game: the pieces, the land, the rules of placing, undo and saving. */
 
-import { COMBOS, GOALS, ISLANDS, PIECE, PIECES, START_ISLANDS, TUNE, WORLD_RADIUS } from './content.ts';
+import { COMBOS, GOALS, ISLANDS, PIECE, PIECES, START_ISLANDS, TUNE, VILLAGER_NAMES, WORLD_RADIUS } from './content.ts';
 import type { ComboDef, GoalDef, PieceId } from './content.ts';
 import { DX, DZ, key, unkey } from './util.ts';
 
@@ -12,7 +12,7 @@ export interface Piece {
 	s: number;
 	/** Growth of a tree, 0..1. */
 	g?: number;
-	/** For a cottage: index of the villager name plus one, when a villager lives here. */
+	/** For a tree home: index of the elf name plus one, when an elf lives here. */
 	h?: number;
 }
 
@@ -24,8 +24,16 @@ export interface Settings {
 	quality: Quality;
 }
 
+/** What happened while the player was away. */
+export interface AwayReport {
+	seconds: number;
+	trees: number;
+	elves: string[];
+	gifts: number;
+}
+
 interface SaveData {
-	v: 1;
+	v: 2;
 	pieces: Record<string, Piece>;
 	lush: Record<string, number>;
 	islands: number;
@@ -35,9 +43,12 @@ interface SaveData {
 	clock: number;
 	tutorial: boolean;
 	names: number;
+	gifts: number;
+	/** When the game was last saved, in milliseconds. */
+	seen: number;
 }
 
-const SAVE_KEY = 'petalwisp-isles.save';
+const SAVE_KEY = 'petalwisp-isles.save2';
 const SETTINGS_KEY = 'petalwisp-isles.settings';
 
 type Change = { k: string; before: Piece | null; after: Piece | null };
@@ -45,9 +56,11 @@ type Change = { k: string; before: Piece | null; after: Piece | null };
 export const S = {
 	pieces: new Map<string, Piece>(),
 	lush: new Map<string, number>(),
-	/** Land cells, with the index of their island. */
+	/** Land cells of the open islands, with the index of their island. */
 	land: new Map<string, number>(),
+	/** The cells of every island, open or not. */
 	islandCells: [] as [number, number][][],
+	/** How many islands are open. */
 	islands: START_ISLANDS,
 	unlocked: new Set<PieceId>(),
 	combos: new Set<string>(),
@@ -55,8 +68,12 @@ export const S = {
 	/** Time of day, 0..1. */
 	clock: 0.12,
 	tutorial: false,
-	/** How many villager names were given out. */
+	/** How many elf names were given out. */
 	names: 0,
+	/** How many jelly gifts the player collected. */
+	gifts: 0,
+	/** Set by `load` when the player was away for a while. */
+	away: null as AwayReport | null,
 	settings: { music: 0.6, sound: 0.7, quality: 'medium' } as Settings,
 	undo: [] as Change[][],
 	redo: [] as Change[][],
@@ -67,8 +84,15 @@ export const S = {
 export const hooks = {
 	/** Cells whose piece changed. `placed` is the cell that the player just built on, if any. */
 	changed: [] as ((cells: string[], placed: string | null) => void)[],
-	islandAdded: [] as ((index: number) => void)[],
+	/** A new island opened. `cells` are the cells whose piece changed with it. */
+	islandAdded: [] as ((index: number, cells: string[]) => void)[],
 };
+
+/** How far the edge of an island is from its centre, in one direction. */
+export function edgeRadius(index: number, a: number): number {
+	const d = ISLANDS[index];
+	return d.r * (1 + 0.12 * Math.sin(3 * a + d.seed) + 0.06 * Math.sin(5 * a + d.seed * 1.7) + 0.03 * Math.sin(9 * a + d.seed * 0.6));
+}
 
 /** The cells of one island: a round shape with a wavy edge. */
 function cellsOfIsland(index: number): [number, number][] {
@@ -79,9 +103,7 @@ function cellsOfIsland(index: number): [number, number][] {
 		for (let z = d.cz - reach; z <= d.cz + reach; z++) {
 			const dx = x - d.cx;
 			const dz = z - d.cz;
-			const a = Math.atan2(dz, dx);
-			const edge = d.r * (1 + 0.13 * Math.sin(3 * a + d.seed) + 0.07 * Math.sin(5 * a + d.seed * 1.7));
-			if (Math.hypot(dx, dz) <= edge) out.push([x, z]);
+			if (Math.hypot(dx, dz) <= edgeRadius(index, Math.atan2(dz, dx))) out.push([x, z]);
 		}
 	}
 	return out;
@@ -89,12 +111,65 @@ function cellsOfIsland(index: number): [number, number][] {
 
 export function buildLand(): void {
 	S.land.clear();
-	S.islandCells = [];
-	for (let i = 0; i < S.islands; i++) {
-		const cells = cellsOfIsland(i);
-		S.islandCells.push(cells);
-		for (const [x, z] of cells) S.land.set(key(x, z), i);
+	if (!S.islandCells.length) S.islandCells = ISLANDS.map((_, i) => cellsOfIsland(i));
+	for (let i = 0; i < S.islands; i++) for (const [x, z] of S.islandCells[i]) S.land.set(key(x, z), i);
+}
+
+/** The air cells on the straight way between two islands. A walker can cross them one by one. */
+function bridgeCells(a: number, b: number): string[] {
+	const A = ISLANDS[a];
+	const B = ISLANDS[b];
+	const steps = Math.ceil(Math.hypot(B.cx - A.cx, B.cz - A.cz) * 4);
+	const line: [number, number][] = [];
+	for (let i = 0; i <= steps; i++) {
+		const x = Math.round(A.cx + ((B.cx - A.cx) * i) / steps);
+		const z = Math.round(A.cz + ((B.cz - A.cz) * i) / steps);
+		const last = line[line.length - 1];
+		if (last && last[0] === x && last[1] === z) continue;
+		// A diagonal step gets a cell in between, so the bridge has no gap.
+		if (last && last[0] !== x && last[1] !== z) line.push([x, last[1]]);
+		line.push([x, z]);
 	}
+	return line.filter(([x, z]) => !isLand(x, z)).map(([x, z]) => key(x, z));
+}
+
+/** Puts the fixed pieces and the bridge of an open island in place. Returns the cells that changed. */
+function settleIsland(index: number): string[] {
+	const d = ISLANDS[index];
+	const changed: string[] = [];
+	for (const f of d.fixed ?? []) {
+		const k = key(d.cx + f.dx, d.cz + f.dz);
+		if (S.pieces.get(k)?.t === f.t) continue;
+		S.pieces.set(k, { t: f.t, r: 2, s: d.seed });
+		changed.push(k);
+	}
+	if (index > 0) {
+		for (const k of bridgeCells(d.from, index)) {
+			if (S.pieces.has(k)) continue;
+			S.pieces.set(k, { t: 'bridge', r: 0, s: 1 });
+			changed.push(k);
+		}
+	}
+	return changed;
+}
+
+/** Opens the next island: the land appears and a bridge grows out to it. */
+export function unlockIsland(): boolean {
+	if (S.islands >= ISLANDS.length) return false;
+	const index = S.islands++;
+	buildLand();
+	const changed: string[] = [];
+	// A piece can stand in the air where the new island comes up. The island takes its place.
+	for (const [x, z] of S.islandCells[index]) {
+		const k = key(x, z);
+		if (S.pieces.delete(k)) changed.push(k);
+	}
+	changed.push(...settleIsland(index));
+	S.undo = [];
+	S.redo = [];
+	for (const h of hooks.islandAdded) h(index, changed);
+	saveSoon();
+	return true;
 }
 
 export function resetState(): void {
@@ -106,9 +181,20 @@ export function resetState(): void {
 	S.goals.clear();
 	S.clock = 0.12;
 	S.names = 0;
+	S.gifts = 0;
+	S.away = null;
 	S.undo = [];
 	S.redo = [];
 	buildLand();
+	for (let i = 0; i < S.islands; i++) settleIsland(i);
+}
+
+const everyLand = new Map<string, number>();
+
+/** The island that owns a cell, open or not. */
+export function islandAtCell(x: number, z: number): number | undefined {
+	if (!everyLand.size) S.islandCells.forEach((cells, i) => cells.forEach(([cx, cz]) => everyLand.set(key(cx, cz), i)));
+	return everyLand.get(key(x, z));
 }
 
 export const pieceAt = (x: number, z: number): Piece | undefined => S.pieces.get(key(x, z));
@@ -124,6 +210,7 @@ export function airSides(x: number, z: number): number[] {
 /** Why a piece cannot go on a cell, or null when it can. */
 export function placeProblem(id: PieceId, x: number, z: number): string | null {
 	const def = PIECE[id];
+	if (def.fixed) return 'This cannot be built.';
 	if (Math.hypot(x, z) > WORLD_RADIUS) return 'Too far out in the sky.';
 	if (S.pieces.has(key(x, z))) return 'Something is already here.';
 	const land = isLand(x, z);
@@ -170,10 +257,21 @@ export function place(id: PieceId, x: number, z: number, r: number): boolean {
 	return true;
 }
 
+/** Places one kind of piece on many cells as one step, for a road. Returns how many were built. */
+export function placeMany(id: PieceId, cells: [number, number][]): number {
+	const changes: Change[] = [];
+	for (const [x, z] of cells) {
+		if (placeProblem(id, x, z)) continue;
+		changes.push({ k: key(x, z), before: null, after: { t: id, r: 0, s: Math.floor(Math.random() * 100000) } });
+	}
+	if (changes.length) commit(changes, changes[changes.length - 1].k);
+	return changes.length;
+}
+
 export function erase(x: number, z: number): boolean {
 	const k = key(x, z);
 	const before = S.pieces.get(k);
-	if (!before) return false;
+	if (!before || PIECE[before.t].fixed) return false;
 	commit([{ k, before: { ...before }, after: null }], null);
 	return true;
 }
@@ -242,29 +340,6 @@ export function spillSides(x: number, z: number): number[] {
 	return airSides(x, z).filter((d) => !pieceAt(x + DX[d], z + DZ[d]));
 }
 
-/** How many sky islands a walker can reach from the main island. */
-export function linkedIslands(): number {
-	const seen = new Set<string>([key(0, 0)]);
-	const reached = new Set<number>();
-	const queue: [number, number][] = [[0, 0]];
-	while (queue.length) {
-		const [x, z] = queue.pop()!;
-		const island = S.land.get(key(x, z));
-		if (island !== undefined) reached.add(island);
-		for (let d = 0; d < 4; d++) {
-			const nx = x + DX[d];
-			const nz = z + DZ[d];
-			const k = key(nx, nz);
-			if (seen.has(k)) continue;
-			if (S.land.has(k) || S.pieces.get(k)?.t === 'bridge') {
-				seen.add(k);
-				queue.push([nx, nz]);
-			}
-		}
-	}
-	return reached.size - 1;
-}
-
 export function goalProgress(g: GoalDef): number {
 	let n = 0;
 	switch (g.kind) {
@@ -274,8 +349,8 @@ export function goalProgress(g: GoalDef): number {
 		case 'villagers':
 			for (const p of S.pieces.values()) if (p.t === 'cottage' && p.h) n++;
 			break;
-		case 'links':
-			n = linkedIslands();
+		case 'gifts':
+			n = S.gifts;
 			break;
 		case 'combos':
 			n = S.combos.size;
@@ -298,11 +373,7 @@ export function checkGoals(): GoalDef[] {
 		S.goals.add(g.id);
 		done.push(g);
 		if ('piece' in g.reward) S.unlocked.add(g.reward.piece);
-		if ('island' in g.reward && S.islands < ISLANDS.length) {
-			S.islands++;
-			buildLand();
-			for (const h of hooks.islandAdded) h(S.islands - 1);
-		}
+		if ('island' in g.reward) unlockIsland();
 	}
 	if (done.length) saveSoon();
 	return done;
@@ -325,7 +396,7 @@ export function saveNow(): void {
 	const lush: Record<string, number> = {};
 	for (const [k, v] of S.lush) if (v > 0.02) lush[k] = Math.round(v * 100) / 100;
 	const data: SaveData = {
-		v: 1,
+		v: 2,
 		pieces: Object.fromEntries(S.pieces),
 		lush,
 		islands: S.islands,
@@ -335,6 +406,8 @@ export function saveNow(): void {
 		clock: S.clock,
 		tutorial: S.tutorial,
 		names: S.names,
+		gifts: S.gifts,
+		seen: Date.now(),
 	};
 	try {
 		localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -370,7 +443,7 @@ export function load(): boolean {
 		const raw = localStorage.getItem(SAVE_KEY);
 		if (!raw) return false;
 		const data = JSON.parse(raw) as SaveData;
-		if (data.v !== 1) return false;
+		if (data.v !== 2) return false;
 		S.islands = Math.min(ISLANDS.length, Math.max(START_ISLANDS, data.islands));
 		buildLand();
 		for (const [k, p] of Object.entries(data.pieces)) if (PIECE[p.t]) S.pieces.set(k, p);
@@ -381,12 +454,36 @@ export function load(): boolean {
 		S.clock = data.clock ?? 0.12;
 		S.tutorial = !!data.tutorial;
 		S.names = data.names ?? 0;
-		S.hasSave = S.pieces.size > 0 || S.goals.size > 0;
+		S.gifts = data.gifts ?? 0;
+		for (let i = 0; i < S.islands; i++) settleIsland(i);
+		S.hasSave = [...S.pieces.values()].some((p) => !PIECE[p.t].fixed) || S.goals.size > 0;
+		if (S.hasSave && data.seen) catchUp((Date.now() - data.seen) / 1000);
 		return true;
 	} catch {
 		resetState();
 		return false;
 	}
+}
+
+/** Lets the world live on for the time the player was away. */
+function catchUp(seconds: number): void {
+	const time = Math.min(TUNE.awayCap, seconds);
+	if (time < 90) return;
+	const report: AwayReport = { seconds, trees: 0, elves: [], gifts: 0 };
+	for (const p of S.pieces.values()) {
+		if (p.t === 'tree' && (p.g ?? 1) < 1) {
+			p.g = Math.min(1, (p.g ?? 0) + time / TUNE.treeGrowTime);
+			if (p.g >= 1) report.trees++;
+		} else if (p.t === 'cottage' && !p.h) {
+			const index = S.names++;
+			p.h = index + 1;
+			report.elves.push(VILLAGER_NAMES[index % VILLAGER_NAMES.length]);
+		}
+	}
+	report.gifts = Math.min(3, Math.floor(time / 900));
+	S.gifts += report.gifts;
+	S.clock = (S.clock + time / TUNE.dayLength) % 1;
+	if (report.trees || report.elves.length || report.gifts) S.away = report;
 }
 
 export function wipeSave(): void {

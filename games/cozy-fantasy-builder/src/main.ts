@@ -3,17 +3,19 @@
 import * as THREE from 'three';
 import './style.css';
 import { applyVolume, pauseAudio, sfx, startAudio, updateAudio } from './audio.ts';
-import { COMBOS, GOALS, ISLANDS, PIECE, PIECES } from './content.ts';
+import { COMBOS, ISLANDS, PIECE, PIECES, TUNE } from './content.ts';
 import type { PieceId } from './content.ts';
 import { burst, fxBudget, particles, updateParticles } from './fx.ts';
-import { actions, camera, cameraYaw, camTarget, initInput, input, resetCamera, updateInput } from './input.ts';
+import { creatureEvents, initCreatures, resetCreatures, setGoldWhale, syncCreatures, tapCreature, updateCreatures } from './creatures.ts';
+import { actions, camera, cameraYaw, camTarget, flyTo, initInput, input, resetCamera, updateInput } from './input.ts';
 import { clearLife, initLife, lifeEvents, lifeReport, syncLife, updateLife } from './life.ts';
-import { env, initSky, startRain, sun, updateSky } from './sky.ts';
-import { buildLand, checkGoals, combosAt, erase, hooks, load, pieceAt, place, placeProblem, redo, rotateAt, S, saveNow, saveSoon, undo, wipeSave, loadSettings } from './state.ts';
-import { adjustFocus, closePanel, comboBanner, goalToast, goBack, initUI, islandName, moveFocus, openPanel, popGoal, pressFocus, renderPieces, setHint, setTool, showGame, showTitle, slots, toast, ui, uiActions, updateHud } from './ui.ts';
+import { road, roadCancel, roadCommit, roadDrop, roadStart, roadTo } from './road.ts';
+import { env, initSky, sun, updateSky } from './sky.ts';
+import { checkGoals, combosAt, erase, hooks, isLand, load, loadSettings, pieceAt, place, placeProblem, redo, rotateAt, S, saveNow, saveSoon, undo, unlockIsland, wipeSave } from './state.ts';
+import { adjustFocus, closePanel, comboBanner, goalOfIsland, goalToast, goBack, initUI, islandName, moveFocus, openPanel, popGoal, pressFocus, renderPieces, setHint, setTool, showGame, showRoadBar, showTitle, slots, toast, ui, uiActions, updateHud } from './ui.ts';
 import type { Tool } from './ui.ts';
 import { DX, DZ, key, unkey } from './util.ts';
-import { driftPollen, flashCursor, groundY, hideCursor, initView, islandSparkle, rebuildAll, refresh, renderIcons, showCursor, syncIslands, updateView } from './view.ts';
+import { blessLand, driftPollen, flashCursor, groundY, growIn, hideCursor, initView, islandSparkle, rebuildAll, rebuildPiece, refresh, renderIcons, showCursor, syncIslands, updateView } from './view.ts';
 
 const canvas = document.getElementById('stage') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
@@ -56,11 +58,41 @@ function resize(): void {
 
 /* Building */
 
+/** The island under a tap, with some room around it. Locked islands count too. */
+function islandNear(x: number, z: number): number {
+	return ISLANDS.findIndex((d) => Math.hypot(x - d.cx, z - d.cz) < d.r * 1.25);
+}
+
+function lookAtIsland(index: number): void {
+	const d = ISLANDS[index];
+	flyTo(d.cx, d.cz, Math.max(20, d.r * (camera.aspect < 1 ? 6 : 4.2)));
+	if (index >= S.islands) {
+		const g = goalOfIsland(index);
+		toast(`${d.name} still sleeps`, g ? `Goal: ${g.text}` : '', 'plain');
+	}
+}
+
 function tryPlace(x: number, z: number): void {
+	if (road.pending) return;
 	const tool = ui.tool;
+	// A tap on a far island flies the camera there.
+	const isle = islandNear(x, z);
+	if (isle >= 0 && !isLand(x, z) && isle >= S.islands) {
+		lookAtIsland(isle);
+		return;
+	}
+	if (isle >= 0 && !tool && Math.hypot(camTarget.x - ISLANDS[isle].cx, camTarget.z - ISLANDS[isle].cz) > ISLANDS[isle].r + 6) {
+		lookAtIsland(isle);
+		return;
+	}
 	if (tool === 'erase') {
 		const p = pieceAt(x, z);
 		if (!p) return;
+		if (PIECE[p.t].fixed) {
+			sfx.nope();
+			toast(`The ${PIECE[p.t].name} stays`, '', 'soft');
+			return;
+		}
 		erase(x, z);
 		sfx.erase();
 		burst(x, groundY(x, z) + 0.2, z, [0xffffff, 0xf0e6ff], 8, 0.7);
@@ -100,7 +132,20 @@ function rotateNow(): void {
 	if (input.mode === 'touch' && ui.tool && ui.tool !== 'erase' && PIECE[ui.tool].turns) toast('The next piece will face a new way', '', 'soft');
 }
 
+function endRoad(build: boolean): void {
+	if (!road.pending && !road.active) return;
+	if (build) {
+		const n = roadCommit();
+		if (n) sfx.place(PIECE.path.note);
+	} else {
+		roadCancel();
+		sfx.click();
+	}
+	showRoadBar(0);
+}
+
 function pickTool(tool: Tool): void {
+	endRoad(false);
 	setTool(tool);
 	sfx.click();
 }
@@ -134,41 +179,93 @@ function runGoals(): void {
 	for (const g of done) {
 		goalToast(g);
 		if ('piece' in g.reward) ui.fresh.add(g.reward.piece);
-		if ('gift' in g.reward) env.shootingStars = true;
 	}
+	applyGifts();
 	renderPieces();
 	setTool(ui.tool);
 	updateHud();
 	popGoal();
 }
 
+/** The late rewards: shooting stars and the golden whale. */
+function applyGifts(): void {
+	env.shootingStars = S.goals.has('gift8');
+	setGoldWhale(S.goals.has('vill30'));
+}
+
+/** A jelly gift: the land below turns lush, and saplings there shoot up. */
+function giveGift(x: number, z: number): void {
+	S.gifts++;
+	sfx.gift();
+	const n = TUNE.giftReach;
+	let trees = 0;
+	for (let dx = -n; dx <= n; dx++) for (let dz = -n; dz <= n; dz++) {
+		const k = key(x + dx, z + dz);
+		const p = S.pieces.get(k);
+		if (p?.t !== 'tree' || (p.g ?? 1) >= 1) continue;
+		p.g = Math.min(1, (p.g ?? 0) + 0.6);
+		rebuildPiece(k, true);
+		trees++;
+	}
+	const land = blessLand(x, z, n);
+	toast('A jelly gift!', trees ? 'Saplings shoot up' : land ? 'The grass grows lush here' : 'Sparkles fall into the clouds', 'goal');
+	saveSoon();
+	runGoals();
+	updateHud();
+}
+
 hooks.changed.push((cells, placed) => {
 	refresh(cells, placed);
 	syncLife(placed);
+	syncCreatures();
 	findCombos(cells);
 	runGoals();
 	updateHud();
 });
 
-hooks.islandAdded.push((index) => {
-	// A bridge can stand where the new island comes up. The island takes its place.
-	const gone: string[] = [];
-	for (const [x, z] of S.islandCells[index]) {
-		const k = key(x, z);
-		if (S.pieces.delete(k)) gone.push(k);
-	}
-	S.undo = [];
-	S.redo = [];
+hooks.islandAdded.push((index, cells) => {
+	endRoad(false);
 	syncIslands(true);
-	if (gone.length) refresh(gone, null);
+	refresh(cells, null);
+	// The bridge grows out cell by cell while the island rises.
+	growIn(cells.filter((k) => S.pieces.get(k)?.t === 'bridge'), 0.14, 1.2);
+	syncLife(null);
+	syncCreatures();
 	islandSparkle(index);
-	window.setTimeout(() => toast(`${islandName(index)} rises from the clouds`, 'A new sky island to build on', 'goal'), 900);
+	sfx.island();
+	const d = ISLANDS[index];
+	const from = ISLANDS[d.from];
+	flyTo((d.cx + from.cx) / 2, (d.cz + from.cz) / 2, camera.aspect < 1 ? 62 : 44);
+	window.setTimeout(() => toast(`${islandName(index)} wakes up`, 'A bridge grows out to it', 'goal'), 900);
 });
 
 /* Wiring of input and UI */
 
 actions.tap = tryPlace;
-actions.place = () => input.hasCell && tryPlace(input.cx, input.cz);
+actions.tapRay = (ray) => !road.pending && tapCreature(ray);
+actions.roadStart = (x, z) => {
+	if (ui.tool !== 'path') return false;
+	roadStart(x, z);
+	showRoadBar(0);
+	hideCursor();
+	return true;
+};
+actions.roadMove = (x, z) => {
+	roadTo(x, z);
+	setHint(road.fresh ? `<b>Moss path</b> ${road.fresh} new ${road.fresh === 1 ? 'stone' : 'stones'}. Let go to check it.` : '<b>Moss path</b> Drag to where the path should end.');
+};
+actions.roadEnd = (keep) => {
+	setTool(ui.tool);
+	if (!keep) roadCancel();
+	else if (roadDrop()) {
+		showRoadBar(road.fresh);
+		sfx.click();
+	}
+};
+actions.place = () => {
+	if (road.pending) endRoad(true);
+	else if (input.hasCell) tryPlace(input.cx, input.cz);
+};
 actions.eraseAtCursor = () => {
 	if (!input.hasCell || !pieceAt(input.cx, input.cz)) return;
 	erase(input.cx, input.cz);
@@ -182,7 +279,7 @@ actions.pickSlot = (i) => {
 	const id = slots()[i];
 	if (id) pickTool(ui.tool === id ? null : id);
 };
-actions.pause = () => openPanel('pause');
+actions.pause = () => (road.pending ? endRoad(false) : openPanel('pause'));
 actions.book = () => openPanel('book');
 actions.goals = () => openPanel('goals');
 actions.menuMove = moveFocus;
@@ -194,6 +291,9 @@ actions.modeChanged = () => {
 };
 
 uiActions.pickTool = pickTool;
+uiActions.roadYes = () => endRoad(true);
+uiActions.roadNo = () => endRoad(false);
+uiActions.flyToIsland = lookAtIsland;
 uiActions.undo = actions.undo;
 uiActions.redo = actions.redo;
 uiActions.rotate = rotateNow;
@@ -203,6 +303,7 @@ uiActions.settingsChanged = () => {
 	applyQuality();
 };
 uiActions.panelChanged = () => {
+	if (ui.panel || ui.screen !== 'play') endRoad(false);
 	input.active = ui.screen === 'play' && !ui.panel;
 	if (!input.active) hideCursor();
 };
@@ -218,6 +319,7 @@ uiActions.play = () => {
 	resetCamera();
 	if (!ui.tool) setTool(slots()[1] ?? null);
 	if (!S.tutorial) openPanel('tutorial');
+	else if (S.away) openPanel('away');
 };
 uiActions.toTitle = () => {
 	saveNow();
@@ -227,7 +329,8 @@ uiActions.newGame = () => {
 	wipeSave();
 	clearLife();
 	rebuildAll();
-	env.shootingStars = false;
+	resetCreatures();
+	applyGifts();
 	lastPlaced = null;
 	ui.fresh.clear();
 	setTool(null);
@@ -255,7 +358,8 @@ function trapBack(): void {
 	history.pushState({ petalwisp: true }, '');
 	window.addEventListener('popstate', () => {
 		history.pushState({ petalwisp: true }, '');
-		goBack();
+		if (road.pending) endRoad(false);
+		else goBack();
 	});
 }
 
@@ -274,12 +378,13 @@ function frame(now: number): void {
 	updateSky(dt, camera, camTarget, cameraYaw(), false);
 	updateView(dt);
 	updateLife(dt);
+	updateCreatures(dt, camTarget);
 	driftPollen(dt, camTarget);
 	updateParticles(dt, env.time, renderer.domElement.height / renderer.getPixelRatio(), camera.fov);
-	updateAudio(dt, env.night, env.rain, env.time);
+	updateAudio(dt, env.night, env.time);
 
 	// The cursor frame, for the mouse, the keys and the gamepad.
-	if (input.active && input.mode !== 'touch' && input.hasCell) {
+	if (input.active && input.mode !== 'touch' && input.hasCell && !road.active && !road.pending) {
 		const tool = ui.tool;
 		if (tool === 'erase') showCursor(input.cx, input.cz, pieceAt(input.cx, input.cz) ? 'erase' : 'plain', null, 0);
 		else if (tool) showCursor(input.cx, input.cz, placeProblem(tool, input.cx, input.cz) ? 'bad' : 'ok', tool, turn);
@@ -305,13 +410,28 @@ function start(): void {
 	initView(scene);
 	initLife();
 	scene.add(particles);
-	env.shootingStars = GOALS.some((g) => 'gift' in g.reward && S.goals.has(g.id));
+	try {
+		// The save of the first version does not fit the new islands.
+		localStorage.removeItem('petalwisp-isles.save');
+	} catch {
+		/* Storage is blocked. Nothing to clean up. */
+	}
 
 	ui.icons = renderIcons(renderer);
 	initUI();
 	initInput(canvas);
 	rebuildAll();
 	syncLife(null);
+	initCreatures();
+	syncCreatures();
+	applyGifts();
+	creatureEvents.gift = giveGift;
+	creatureEvents.whaleSong = () => sfx.whale();
+	creatureEvents.sneeze = () => sfx.sneeze();
+	creatureEvents.poke = (what) => {
+		sfx.poke();
+		if (what === 'jelly') toast('This jelly has no gift yet', 'A jelly that twinkles has one', 'soft');
+	};
 	applyQuality();
 	resetCamera();
 	showTitle();
@@ -341,15 +461,13 @@ function start(): void {
 					renderPieces();
 				},
 				islands: (n: number) => {
-					while (S.islands < Math.min(n, ISLANDS.length)) {
-						S.islands++;
-						buildLand();
-						for (const h of hooks.islandAdded) h(S.islands - 1);
-					}
+					while (S.islands < Math.min(n, ISLANDS.length)) unlockIsland();
 				},
+				gift: giveGift,
+				fly: flyTo,
+				road: { road, roadStart, roadTo, roadDrop, end: endRoad },
 				clock: (c: number) => (S.clock = c),
 				speed: (n: number) => (speed = n),
-				rain: startRain,
 				life: lifeReport,
 				combos: COMBOS,
 				tap: tryPlace,

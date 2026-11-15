@@ -1,4 +1,4 @@
-/** All sound is made in code: calm music, wind, birds, rain and the small sounds of building. */
+/** All sound is made in code: calm music, wind, birds, falling water and the small sounds of building. */
 
 import { S } from './state.ts';
 
@@ -7,7 +7,7 @@ let musicBus: GainNode;
 let soundBus: GainNode;
 let echo: ConvolverNode;
 let windGain: GainNode;
-let rainGain: GainNode;
+let fallsGain: GainNode;
 let nextBeat = 0;
 let beat = 0;
 let birdTimer = 3;
@@ -85,17 +85,19 @@ export function startAudio(): void {
 	wind.connect(windFilter).connect(windGain).connect(soundBus);
 	wind.start();
 
-	const rain = ctx.createBufferSource();
-	rain.buffer = noise;
-	rain.loop = true;
-	rain.playbackRate.value = 1.7;
-	const rainFilter = ctx.createBiquadFilter();
-	rainFilter.type = 'highpass';
-	rainFilter.frequency.value = 1800;
-	rainGain = ctx.createGain();
-	rainGain.gain.value = 0;
-	rain.connect(rainFilter).connect(rainGain).connect(soundBus);
-	rain.start();
+	// The waterfalls: a soft hush that is always there.
+	const falls = ctx.createBufferSource();
+	falls.buffer = noise;
+	falls.loop = true;
+	falls.playbackRate.value = 1.3;
+	const fallsFilter = ctx.createBiquadFilter();
+	fallsFilter.type = 'bandpass';
+	fallsFilter.frequency.value = 1300;
+	fallsFilter.Q.value = 0.5;
+	fallsGain = ctx.createGain();
+	fallsGain.gain.value = 0.018;
+	falls.connect(fallsFilter).connect(fallsGain).connect(soundBus);
+	falls.start();
 
 	nextBeat = ctx.currentTime + 0.3;
 	applyVolume();
@@ -155,11 +157,11 @@ function bell(step: number, at: number, gain: number, bus: GainNode = musicBus, 
 }
 
 /** Called each frame. It writes the next notes of the music a little ahead of time. */
-export function updateAudio(dt: number, night: number, rain: number, time: number): void {
+export function updateAudio(dt: number, night: number, time: number): void {
 	if (!ctx || ctx.state !== 'running') return;
 	const now = ctx.currentTime;
-	windGain.gain.setTargetAtTime(0.035 + (Math.sin(time * 0.21) * 0.5 + 0.5) * 0.05 + rain * 0.03, now, 0.4);
-	rainGain.gain.setTargetAtTime(rain * 0.11, now, 0.3);
+	windGain.gain.setTargetAtTime(0.035 + (Math.sin(time * 0.21) * 0.5 + 0.5) * 0.05, now, 0.4);
+	fallsGain.gain.setTargetAtTime(0.016 + (Math.sin(time * 0.13) * 0.5 + 0.5) * 0.008, now, 0.5);
 
 	if (nextBeat < now - 1) nextBeat = now + 0.1;
 	while (nextBeat < now + 0.25) {
@@ -181,7 +183,7 @@ export function updateAudio(dt: number, night: number, rain: number, time: numbe
 	birdTimer -= dt;
 	if (birdTimer <= 0) {
 		birdTimer = 2.5 + Math.random() * 7;
-		if (night < 0.4 && rain < 0.5) {
+		if (night < 0.4) {
 			const base = 2300 + Math.random() * 1500;
 			const n = 2 + Math.floor(Math.random() * 4);
 			for (let i = 0; i < n; i++) tone({ freq: base * (1 + Math.random() * 0.2), slideTo: base * (0.8 + Math.random() * 0.5), at: now + i * (0.09 + Math.random() * 0.05), len: 0.08, gain: 0.02 + Math.random() * 0.015, wet: 0.5 });
@@ -190,7 +192,7 @@ export function updateAudio(dt: number, night: number, rain: number, time: numbe
 	cricketTimer -= dt;
 	if (cricketTimer <= 0) {
 		cricketTimer = 0.9 + Math.random() * 1.6;
-		if (night > 0.7 && rain < 0.5) for (let i = 0; i < 3; i++) tone({ freq: 4300, at: now + i * 0.07, len: 0.04, gain: 0.006 });
+		if (night > 0.7) for (let i = 0; i < 3; i++) tone({ freq: 4300, at: now + i * 0.07, len: 0.04, gain: 0.006 });
 	}
 }
 
@@ -231,6 +233,31 @@ export const sfx = {
 	combo(): void {
 		if (!ctx) return;
 		[0, 4, 7, 12, 16, 19, 24].forEach((s, i) => bell(s + 12, ctx!.currentTime + i * 0.075, 0.1, soundBus, 1.8));
+	},
+	/** The sky whale: two long low notes that slide. */
+	whale(): void {
+		if (!ctx) return;
+		const now = ctx.currentTime;
+		tone({ freq: 150, slideTo: 235, at: now, len: 2.4, gain: 0.11, attack: 0.5, wet: 0.8 });
+		tone({ freq: 300, slideTo: 468, at: now, len: 2.4, gain: 0.03, attack: 0.6, wet: 0.8 });
+		tone({ freq: 240, slideTo: 130, at: now + 2.2, len: 3, gain: 0.1, attack: 0.6, wet: 0.8 });
+		tone({ freq: 480, slideTo: 262, at: now + 2.2, len: 3, gain: 0.025, attack: 0.7, wet: 0.8 });
+	},
+	gift(): void {
+		if (!ctx) return;
+		[12, 16, 19, 24, 28].forEach((s, i) => bell(s + 12, ctx!.currentTime + i * 0.06, 0.08, soundBus, 1.6));
+	},
+	sneeze(): void {
+		if (!ctx) return;
+		tone({ freq: 520, slideTo: 900, len: 0.16, gain: 0.05, type: 'triangle' });
+		tone({ freq: 1500, slideTo: 500, at: ctx.currentTime + 0.17, len: 0.12, gain: 0.07, type: 'triangle' });
+	},
+	poke(): void {
+		tone({ freq: 660, slideTo: 990, len: 0.12, gain: 0.05, wet: 0.4 });
+	},
+	island(): void {
+		if (!ctx) return;
+		[0, 4, 7, 12, 16, 19, 24, 28].forEach((s, i) => bell(s, ctx!.currentTime + i * 0.14, 0.11, soundBus, 2.6));
 	},
 	goal(): void {
 		if (!ctx) return;

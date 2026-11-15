@@ -1,8 +1,8 @@
-/** The sky: day and night, lights, clouds, stars, rain, the rainbow and the wish lanterns. */
+/** The sky: day and night, lights, clouds, stars and the wish lanterns. */
 
 import * as THREE from 'three';
 import { TUNE } from './content.ts';
-import { fxBudget, glowSprites, makeGlow, softTexture, spark } from './fx.ts';
+import { glowSprites, makeGlow, softTexture, spark } from './fx.ts';
 import { MAT } from './models.ts';
 import { S } from './state.ts';
 import { clamp, lerp, rng, smooth } from './util.ts';
@@ -11,9 +11,6 @@ import { clamp, lerp, rng, smooth } from './util.ts';
 export const env = {
 	/** 0 by day, 1 at night. */
 	night: 0,
-	/** 0 when dry, 1 in full rain. */
-	rain: 0,
-	rainbow: 0,
 	time: 0,
 	/** Shooting stars are a late reward. */
 	shootingStars: false,
@@ -30,9 +27,9 @@ interface Key {
 	night: number;
 }
 
-const DAY: Omit<Key, 'at'> = { top: 0x6fb6f0, horizon: 0xd3eefa, bottom: 0xa9d6f2, sun: 0xfff2dc, sunPower: 2.7, skyPower: 1.25, night: 0 };
-const DUSK: Omit<Key, 'at'> = { top: 0x7c80cc, horizon: 0xffc7ae, bottom: 0xf0aabd, sun: 0xffd0b0, sunPower: 2.0, skyPower: 1.3, night: 0.55 };
-const NIGHT: Omit<Key, 'at'> = { top: 0x1b2251, horizon: 0x4c5296, bottom: 0x2c3270, sun: 0xa9bcff, sunPower: 1.15, skyPower: 0.8, night: 1 };
+const DAY: Omit<Key, 'at'> = { top: 0x4f9fe6, horizon: 0xcdeaf5, bottom: 0x8fc6ec, sun: 0xfff0d2, sunPower: 2.7, skyPower: 1.2, night: 0 };
+const DUSK: Omit<Key, 'at'> = { top: 0x6a5fc0, horizon: 0xffb98f, bottom: 0xe88fb0, sun: 0xffc090, sunPower: 2.0, skyPower: 1.25, night: 0.55 };
+const NIGHT: Omit<Key, 'at'> = { top: 0x141a4a, horizon: 0x4a4a9c, bottom: 0x2a2a6c, sun: 0xa9b4ff, sunPower: 1.2, skyPower: 0.85, night: 1 };
 const DAWN: Omit<Key, 'at'> = { top: 0x8db1ea, horizon: 0xffdcc8, bottom: 0xf6c8d8, sun: 0xffd3b5, sunPower: 2.1, skyPower: 1.1, night: 0.45 };
 
 const KEYS: Key[] = [
@@ -48,7 +45,7 @@ const KEYS: Key[] = [
 const group = new THREE.Group();
 const hemi = new THREE.HemisphereLight(0xffffff, 0xd9c8e8, 1.5);
 export const sun = new THREE.DirectionalLight(0xffffff, 2);
-const fog = new THREE.Fog(0xdff3f8, 45, 170);
+const fog = new THREE.Fog(0xdff3f8, 70, 260);
 
 const dome = new THREE.Mesh(
 	new THREE.SphereGeometry(220, 24, 12),
@@ -78,8 +75,6 @@ sunDisc.renderOrder = moonDisc.renderOrder = -8;
 
 const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true, emissive: 0xbfd0ff, emissiveIntensity: 0.05 });
 const clouds: { mesh: THREE.Mesh; speed: number }[] = [];
-const rainbow = makeRainbow();
-const birds: { mesh: THREE.Mesh; r: number; h: number; a: number; speed: number }[] = [];
 
 interface WishLantern {
 	obj: THREE.Group;
@@ -91,9 +86,6 @@ interface WishLantern {
 }
 const wishes: WishLantern[] = [];
 let wishTimer = 2;
-let rainWait = lerp(TUNE.rainGap[0], TUNE.rainGap[1], Math.random()) * 0.6;
-let rainLeft = 0;
-let rainbowLeft = 0;
 let starTimer = 20;
 
 /** Where wish lanterns can start. The view fills this list. */
@@ -117,7 +109,8 @@ function makeStars(): THREE.Points {
 	return pts;
 }
 
-function makeCloud(rand: () => number): THREE.Mesh {
+/** A puffy low-poly cloud. The islands use it too, for the clouds at their base. */
+export function makeCloud(rand: () => number): THREE.Mesh {
 	const parts: THREE.BufferGeometry[] = [];
 	const n = 3 + Math.floor(rand() * 3);
 	for (let i = 0; i < n; i++) {
@@ -141,35 +134,17 @@ function makeCloud(rand: () => number): THREE.Mesh {
 	return new THREE.Mesh(geo, cloudMat);
 }
 
-function makeRainbow(): THREE.Group {
-	const g = new THREE.Group();
-	const bands = [0xff8f9c, 0xffc27a, 0xfff09a, 0x93e6a3, 0x8fc8ff, 0xc3a2ff];
-	bands.forEach((c, i) => {
-		const m = new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0, fog: false, depthWrite: false, side: THREE.DoubleSide });
-		g.add(new THREE.Mesh(new THREE.TorusGeometry(34 - i * 1.1, 0.55, 3, 40, Math.PI), m));
-	});
-	g.visible = false;
-	return g;
-}
-
-function makeBird(): THREE.Mesh {
-	const v = new Float32Array([0, 0, 0.12, -0.34, 0.06, -0.1, 0, 0, -0.06, 0, 0, 0.12, 0, 0, -0.06, 0.34, 0.06, -0.1]);
-	const g = new THREE.BufferGeometry();
-	g.setAttribute('position', new THREE.BufferAttribute(v, 3));
-	return new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xfffaf0, side: THREE.DoubleSide, transparent: true }));
-}
-
 export function initSky(scene: THREE.Scene): void {
 	scene.fog = fog;
 	scene.add(group, hemi, sun, sun.target);
-	group.add(dome, stars, sunDisc, moonDisc, rainbow);
+	group.add(dome, stars, sunDisc, moonDisc);
 
 	sun.shadow.mapSize.set(2048, 2048);
 	sun.shadow.camera.near = 1;
-	sun.shadow.camera.far = 90;
+	sun.shadow.camera.far = 110;
 	const sc = sun.shadow.camera;
-	sc.left = sc.bottom = -19;
-	sc.right = sc.top = 19;
+	sc.left = sc.bottom = -24;
+	sc.right = sc.top = 24;
 	sun.shadow.bias = -0.0006;
 	sun.shadow.normalBias = 0.03;
 
@@ -178,15 +153,10 @@ export function initSky(scene: THREE.Scene): void {
 		const mesh = makeCloud(rand);
 		const below = i < 17;
 		const a = rand() * Math.PI * 2;
-		const r = below ? 9 + rand() * 55 : 75 + rand() * 45;
-		mesh.position.set(Math.cos(a) * r, below ? -9 - rand() * 14 : 14 + rand() * 18, Math.sin(a) * r);
+		const r = below ? 14 + rand() * 70 : 85 + rand() * 50;
+		mesh.position.set(Math.cos(a) * r, below ? -24 - rand() * 14 : 16 + rand() * 20, Math.sin(a) * r);
 		mesh.scale.setScalar(below ? 0.7 + rand() * 1.1 : 2 + rand() * 1.6);
 		clouds.push({ mesh, speed: 0.25 + rand() * 0.45 });
-		group.add(mesh);
-	}
-	for (let i = 0; i < 6; i++) {
-		const mesh = makeBird();
-		birds.push({ mesh, r: 13 + rand() * 9, h: 4 + rand() * 5, a: rand() * 6.28, speed: (0.12 + rand() * 0.1) * (i % 2 ? 1 : -1) });
 		group.add(mesh);
 	}
 }
@@ -212,7 +182,6 @@ function sample(clock: number): Key {
 
 const _a = new THREE.Color();
 const _b = new THREE.Color();
-const _grey = new THREE.Color(0x9aa3b8);
 
 function launchWish(x: number, y: number, z: number): void {
 	let w = wishes.find((l) => l.life <= 0);
@@ -237,56 +206,23 @@ function launchWish(x: number, y: number, z: number): void {
 	w.phase = Math.random() * 6;
 }
 
-/** Starts rain now. Also used by the debug tools. */
-export function startRain(): void {
-	rainLeft = lerp(TUNE.rainLength[0], TUNE.rainLength[1], Math.random());
-}
-
 export function updateSky(dt: number, camera: THREE.PerspectiveCamera, target: THREE.Vector3, yaw: number, frozen: boolean): void {
 	env.time += dt;
 	if (!frozen) S.clock = (S.clock + dt / TUNE.dayLength) % 1;
 	const k = sample(S.clock);
 	env.night = k.night;
 
-	// Weather: rain comes now and then, and a rainbow follows it.
-	if (!frozen) {
-		if (rainLeft > 0) {
-			rainLeft -= dt;
-			if (rainLeft <= 0) {
-				rainWait = lerp(TUNE.rainGap[0], TUNE.rainGap[1], Math.random());
-				if (env.night < 0.5) {
-					rainbowLeft = TUNE.rainbowLength;
-					rainbow.position.set(target.x - Math.sin(yaw) * 62, -9, target.z - Math.cos(yaw) * 62);
-					rainbow.rotation.y = yaw;
-					rainbow.visible = true;
-				}
-			}
-		} else {
-			rainWait -= dt;
-			if (rainWait <= 0) startRain();
-		}
-	}
-	env.rain = clamp(env.rain + (rainLeft > 0 ? dt / 5 : -dt / 6), 0, 1);
-	if (rainbowLeft > 0) {
-		rainbowLeft -= dt;
-		const fade = Math.min(1, (TUNE.rainbowLength - rainbowLeft) / 6, rainbowLeft / 8);
-		env.rainbow = clamp(fade, 0, 1);
-		for (const m of rainbow.children) ((m as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = env.rainbow * 0.5;
-		if (rainbowLeft <= 0) rainbow.visible = false;
-	}
-
-	// Colours of the sky. Rain makes them a little grey.
+	// Colours of the sky.
 	const u = (dome.material as THREE.ShaderMaterial).uniforms;
-	const wet = env.rain * 0.45;
-	(u.top.value as THREE.Color).set(k.top).lerp(_grey, wet);
-	(u.horizon.value as THREE.Color).set(k.horizon).lerp(_grey, wet * 0.6);
-	(u.bottom.value as THREE.Color).set(k.bottom).lerp(_grey, wet * 0.6);
+	(u.top.value as THREE.Color).set(k.top);
+	(u.horizon.value as THREE.Color).set(k.horizon);
+	(u.bottom.value as THREE.Color).set(k.bottom);
 	fog.color.copy(u.horizon.value as THREE.Color);
 	hemi.color.set(k.top).lerp(_a.set(0xffffff), 0.6);
 	hemi.groundColor.set(k.bottom).lerp(_a.set(0xffffff), 0.3);
-	hemi.intensity = k.skyPower * (1 - wet * 0.25);
+	hemi.intensity = k.skyPower;
 	sun.color.set(k.sun);
-	sun.intensity = k.sunPower * (1 - wet * 0.6);
+	sun.intensity = k.sunPower;
 
 	// The light turns slowly around the islands. It never jumps.
 	const az = S.clock * Math.PI * 2 + 0.6;
@@ -300,9 +236,9 @@ export function updateSky(dt: number, camera: THREE.PerspectiveCamera, target: T
 	stars.position.copy(camera.position);
 	const dayT = S.clock / 0.64;
 	const nightT = (S.clock - 0.64) / 0.36;
-	placeDisc(sunDisc, dayT, camera, 1 - wet);
+	placeDisc(sunDisc, dayT, camera, 1);
 	placeDisc(moonDisc, nightT, camera, 1);
-	(stars.material as THREE.PointsMaterial).opacity = clamp((k.night - 0.5) * 2, 0, 1) * (1 - env.rain * 0.7);
+	(stars.material as THREE.PointsMaterial).opacity = clamp((k.night - 0.5) * 2, 0, 1);
 	stars.rotation.y = env.time * 0.004;
 
 	MAT.glow.emissiveIntensity = clamp((k.night - 0.3) * 2.2, 0, 1) * 1.25;
@@ -310,28 +246,12 @@ export function updateSky(dt: number, camera: THREE.PerspectiveCamera, target: T
 	for (const s of glowSprites) s.material.opacity = glow;
 
 	for (const c of clouds) {
-		c.mesh.position.x += c.speed * dt * (1 + env.rain);
-		if (c.mesh.position.x > 120) c.mesh.position.x = -120;
-	}
-	for (const b of birds) {
-		b.a += b.speed * dt;
-		b.mesh.position.set(Math.cos(b.a) * b.r, b.h + Math.sin(env.time * 0.5 + b.r) * 0.6, Math.sin(b.a) * b.r);
-		b.mesh.rotation.y = -b.a + (b.speed > 0 ? Math.PI : 0);
-		b.mesh.scale.y = 1 + Math.sin(env.time * 9 + b.r) * 2.2;
-		(b.mesh.material as THREE.MeshBasicMaterial).opacity = clamp(1 - k.night * 2 - env.rain, 0, 1);
-		b.mesh.visible = k.night < 0.5 && env.rain < 0.9;
-	}
-
-	// Rain drops fall around the place the camera looks at.
-	if (env.rain > 0.05) {
-		const n = Math.round(env.rain * 9 * fxBudget.amount);
-		for (let i = 0; i < n; i++) {
-			spark({ x: target.x + (Math.random() - 0.5) * 30, y: 9 + Math.random() * 3, z: target.z + (Math.random() - 0.5) * 30, vy: -11, vx: 0.8, life: 1.3, size: 0.07, color: 0xdcecff, alpha: 0.75 });
-		}
+		c.mesh.position.x += c.speed * dt;
+		if (c.mesh.position.x > 140) c.mesh.position.x = -140;
 	}
 
 	// Wish lanterns rise at night.
-	if (k.night > 0.75 && env.rain < 0.3) {
+	if (k.night > 0.75) {
 		wishTimer -= dt;
 		if (wishTimer <= 0) {
 			const strong = wishSources.filter((s) => s.strong);

@@ -5,7 +5,7 @@ import type { ComboDef, GoalDef, PieceId } from './content.ts';
 import { goalProgress, nextGoal, S, saveSettings } from './state.ts';
 import type { Quality } from './state.ts';
 
-export type Panel = 'pause' | 'settings' | 'book' | 'goals' | 'help' | 'tutorial' | 'confirm';
+export type Panel = 'pause' | 'settings' | 'book' | 'goals' | 'isles' | 'away' | 'help' | 'tutorial' | 'confirm';
 export type Tool = PieceId | 'erase' | null;
 
 export const ui = {
@@ -31,6 +31,11 @@ export const uiActions = {
 	/** Called when a panel opens or closes. */
 	panelChanged: () => {},
 	tutorialDone: () => {},
+	/** The player says yes or no to a road. */
+	roadYes: () => {},
+	roadNo: () => {},
+	/** The player wants to look at an island. */
+	flyToIsland: (_index: number) => {},
 };
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
@@ -39,6 +44,8 @@ const el = {
 	dock: $('dock'),
 	pieces: $('pieces'),
 	hint: $('hint'),
+	roadbar: $('roadbar'),
+	roadbarText: $('roadbar-text'),
 	title: $('title'),
 	modal: $('modal'),
 	sheet: document.querySelector<HTMLElement>('.sheet')!,
@@ -94,11 +101,11 @@ export function showGame(): void {
 /* Toolbar */
 
 /** The unlocked pieces, in toolbar order. Number keys pick from this list. */
-export const slots = (): PieceId[] => PIECES.filter((p) => S.unlocked.has(p.id)).map((p) => p.id);
+export const slots = (): PieceId[] => PIECES.filter((p) => S.unlocked.has(p.id) && !p.fixed).map((p) => p.id);
 
 export function renderPieces(): void {
 	const open = slots();
-	const locked = PIECES.filter((p) => !S.unlocked.has(p.id));
+	const locked = PIECES.filter((p) => !S.unlocked.has(p.id) && !p.fixed);
 	el.pieces.replaceChildren(
 		...open.map((id, i) => {
 			const b = document.createElement('button');
@@ -135,17 +142,33 @@ export function setTool(tool: Tool): void {
 	}
 	el.erase.setAttribute('aria-pressed', String(tool === 'erase'));
 	if (tool === 'erase') setHint('<b>Remove</b> Tap a piece to take it away.');
+	else if (tool === 'path') setHint(`<b>Moss path</b> Drag to draw a path. ${isTouch() ? 'Two fingers move the view.' : 'Right-drag turns the view.'}`);
 	else if (tool) setHint(`<b>${PIECE[tool].name}</b> ${PIECE[tool].blurb}`);
-	else setHint('Pick a piece to build.');
+	else setHint('Pick a piece to build. Tap a jelly for a gift.');
 }
 
 export function setHint(html: string): void {
 	el.hint.innerHTML = html;
 }
 
+/** Shows the bar that asks before a road is built. `count` is 0 to hide it. */
+export function showRoadBar(count: number): void {
+	el.roadbar.hidden = count === 0;
+	el.hint.hidden = count > 0;
+	if (count) el.roadbarText.textContent = count === 1 ? 'Build 1 moss path?' : `Build ${count} moss paths?`;
+}
+
+/** The goal that opens an island, or undefined for the home island. */
+export function goalOfIsland(index: number): GoalDef | undefined {
+	return GOALS.filter((g) => 'island' in g.reward)[index - 1];
+}
+
 function rewardText(g: GoalDef): string {
 	if ('piece' in g.reward) return `New piece: ${PIECE[g.reward.piece].name}`;
-	if ('island' in g.reward) return 'A new sky island';
+	if ('island' in g.reward) {
+		const index = GOALS.filter((o) => 'island' in o.reward).indexOf(g) + 1;
+		return `New island: ${ISLANDS[index]?.name ?? 'a sky island'}`;
+	}
 	return g.reward.gift;
 }
 
@@ -216,7 +239,11 @@ function controlsHtml(kind: 'touch' | 'mouse' | 'pad'): string {
 		touch: [
 			['Tap', 'Place a piece'],
 			['Drag', 'Move the view'],
+			['Drag with Moss path', 'Draw a path. Check it, then tap Build'],
+			['Two fingers', 'Move the view while you draw paths'],
 			['Pinch', 'Zoom'],
+			['Tap a jelly', 'Take its gift'],
+			['Islands button', 'Jump to another island'],
 			['Twist', 'Turn the view with two fingers'],
 			['Turn button', 'Turn the piece you just placed'],
 			['Bin button', 'Then tap a piece to remove it'],
@@ -225,6 +252,8 @@ function controlsHtml(kind: 'touch' | 'mouse' | 'pad'): string {
 		mouse: [
 			['Click', 'Place a piece'],
 			['Drag', 'Move the view'],
+			['Drag with Moss path', 'Draw a path. Enter builds it, Esc cancels'],
+			['Click a jelly', 'Take its gift'],
 			['Scroll', 'Zoom'],
 			['Right-drag', 'Turn the view'],
 			['R', 'Turn a piece'],
@@ -259,13 +288,13 @@ function allControlsHtml(): string {
 const TUTORIAL: { title: string; html: () => string }[] = [
 	{
 		title: `Welcome to ${GAME_NAME}`,
-		html: () => `<p>These little islands float high above the clouds. Make them a home.</p><p>There is no score and no timer. Build what feels nice, and come back any time. Your islands save by themselves.</p>`,
+		html: () => `<p>The tree elves have found a rock that floats high above the clouds. Help them make it a home.</p><p>There is no score and no timer. Build what feels nice, and come back any time. Your islands save by themselves.</p>`,
 	},
 	{ title: 'How to build', html: () => `<p>Pick a piece at the bottom of the screen. Then:</p>${allControlsHtml()}` },
 	{
 		title: 'Watch it come alive',
 		html: () =>
-			`<p><b>Pieces join up.</b> Paths connect, cottages share roofs, and ponds flow together.</p><p><b>Life moves in.</b> Villagers come to live in cottages. Grass grows near water. Saplings grow into trees.</p><p><b>Magic links.</b> Some pieces spark when they stand side by side. The book keeps what you find.</p><p><b>Goals</b> unlock new pieces and new sky islands.</p>`,
+			`<p><b>Pieces join up.</b> Paths connect, tree homes link their branches, and pools flow together.</p><p><b>Elves move in.</b> Each tree home gets an elf. Grass grows near water. Saplings grow tall.</p><p><b>The sky is alive.</b> Whales, jellies and dragons fly by day. Shy creatures come out at night. Tap a jelly for a gift.</p><p><b>Magic links.</b> Some pieces spark when they stand side by side. The book keeps what you find.</p><p><b>Goals</b> unlock new pieces. Big goals grow a bridge to a new island.</p>`,
 	},
 ];
 
@@ -279,6 +308,7 @@ function panelHtml(p: Panel): { title: string; html: string; wide?: boolean } {
 					<div class="row">
 						<button class="btn" data-open="goals" type="button">Goals</button>
 						<button class="btn" data-open="book" type="button">Book</button>
+						<button class="btn" data-open="isles" type="button">Islands</button>
 					</div>
 					<div class="row">
 						<button class="btn" data-open="settings" type="button">Settings</button>
@@ -309,6 +339,23 @@ function panelHtml(p: Panel): { title: string; html: string; wide?: boolean } {
 					return `<li class="entry${done ? ' entry--done' : ''}"><span class="entry__mark">${done ? '✓' : ''}</span><span><b>${g.text}</b><small>${rewardText(g)}</small></span><span class="entry__side">${done ? 'Done' : `${goalProgress(g)}/${g.n}`}</span></li>`;
 				}).join('')}</ul>`,
 			};
+		case 'isles':
+			return {
+				title: 'Islands',
+				html: `<ul class="list">${ISLANDS.map((d, i) => {
+					const open = i < S.islands;
+					const g = goalOfIsland(i);
+					return `<li class="entry${open ? ' entry--done' : ' entry--locked'}"><span class="entry__mark">${open ? '✓' : '?'}</span><span><b>${d.name}</b><small>${open ? d.blurb : g ? `Goal: ${g.text} (${goalProgress(g)}/${g.n})` : d.blurb}</small></span><button class="btn" data-fly="${i}" type="button">${open ? 'Go' : 'Look'}</button></li>`;
+				}).join('')}</ul>`,
+			};
+		case 'away': {
+			const a = S.away;
+			const rows: string[] = [];
+			if (a?.elves.length) rows.push(`<li class="entry entry--done"><span class="entry__mark">✦</span><span><b>${a.elves.length === 1 ? `${a.elves[0]} moved in` : `${a.elves.length} elves moved in`}</b><small>${a.elves.length > 1 ? a.elves.join(', ') : 'A new friend in the grove'}</small></span><span></span></li>`);
+			if (a?.trees) rows.push(`<li class="entry entry--done"><span class="entry__mark">✦</span><span><b>${a.trees === 1 ? 'A sapling grew tall' : `${a.trees} saplings grew tall`}</b><small>The grove is greener now</small></span><span></span></li>`);
+			if (a?.gifts) rows.push(`<li class="entry entry--magic"><span class="entry__mark">✦</span><span><b>${a.gifts === 1 ? 'The jellies left a gift' : `The jellies left ${a.gifts} gifts`}</b><small>They count for your goals</small></span><span></span></li>`);
+			return { title: 'While you were away', html: `<ul class="list">${rows.join('')}</ul><div class="row"><button class="btn btn--big" data-act="close" type="button">Lovely</button></div>` };
+		}
 		case 'book':
 			return {
 				title: `Book of magic links  ${S.combos.size}/${COMBOS.length}`,
@@ -331,7 +378,7 @@ function panelHtml(p: Panel): { title: string; html: string; wide?: boolean } {
 		}
 		case 'confirm':
 			return {
-				title: 'Start new islands?',
+				title: 'Start a new grove?',
 				html: `<p>Your islands, goals and book will be cleared. This cannot be undone.</p><div class="row"><button class="btn" data-act="close" type="button">Keep my islands</button><button class="btn btn--danger" data-act="wipe" type="button">Start new</button></div>`,
 			};
 	}
@@ -359,6 +406,7 @@ export function closePanel(): void {
 		openPanel(back);
 		return;
 	}
+	if (ui.panel === 'away') S.away = null;
 	ui.panel = null;
 	el.modal.hidden = true;
 	uiActions.panelChanged();
@@ -408,6 +456,9 @@ export function initUI(): void {
 	$('btn-title-settings').addEventListener('click', () => openPanel('settings'));
 	$('btn-pause').addEventListener('click', () => openPanel('pause'));
 	$('btn-book').addEventListener('click', () => openPanel('book'));
+	$('btn-isles').addEventListener('click', () => openPanel('isles'));
+	$('road-yes').addEventListener('click', () => uiActions.roadYes());
+	$('road-no').addEventListener('click', () => uiActions.roadNo());
 	el.goal.addEventListener('click', () => openPanel('goals'));
 	$('modal-close').addEventListener('click', closePanel);
 	el.undo.addEventListener('click', () => uiActions.undo());
@@ -438,10 +489,14 @@ export function initUI(): void {
 			closePanel();
 			return;
 		}
-		const b = t.closest<HTMLElement>('[data-act], [data-open], [data-quality]');
+		const b = t.closest<HTMLElement>('[data-act], [data-open], [data-quality], [data-fly]');
 		if (!b) return;
 		uiActions.click();
-		if (b.dataset.open) openPanel(b.dataset.open as Panel, ui.panel);
+		if (b.dataset.fly) {
+			parent = null;
+			closePanel();
+			uiActions.flyToIsland(Number(b.dataset.fly));
+		} else if (b.dataset.open) openPanel(b.dataset.open as Panel, ui.panel);
 		else if (b.dataset.quality) {
 			S.settings.quality = b.dataset.quality as Quality;
 			saveSettings();

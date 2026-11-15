@@ -1,16 +1,16 @@
 /* Petalwisp Isles: the HUD, the toolbar and the menus that sit on top of the canvas. */
 
 :root {
-	--cream: #fffaf1;
-	--cream-deep: #f6ecdc;
-	--ink: #5a4a66;
-	--ink-soft: #8a7b96;
-	--rose: #f58fb0;
-	--rose-deep: #e56f97;
-	--mint: #8fd8b0;
-	--sky: #bfe3f5;
+	--cream: #fffaf0;
+	--cream-deep: #f1ead8;
+	--ink: #33443c;
+	--ink-soft: #6f8177;
+	--rose: #3fa878;
+	--rose-deep: #25855c;
+	--mint: #d9a441;
+	--sky: #8fc6ec;
 	--gold: #ffc94d;
-	--shadow: 0 0.25rem 0 rgb(90 74 102 / 0.14), 0 0.5rem 1.25rem rgb(90 74 102 / 0.16);
+	--shadow: 0 0.25rem 0 rgb(40 60 50 / 0.14), 0 0.5rem 1.25rem rgb(40 60 50 / 0.16);
 
 	--text-small: 0.8125rem;
 	--text-body: 1rem;
@@ -333,7 +333,7 @@ svg {
 
 .piece[aria-pressed='true'] {
 	background: #fff;
-	box-shadow: 0 0 0 0.1875rem var(--rose), 0 0.375rem 0.75rem rgb(229 111 151 / 0.35);
+	box-shadow: 0 0 0 0.1875rem var(--rose), 0 0.375rem 0.75rem rgb(37 133 92 / 0.35);
 	transform: translateY(-0.25rem);
 }
 
@@ -488,7 +488,7 @@ svg {
 	letter-spacing: 0.2em;
 	text-transform: uppercase;
 	color: #fff;
-	text-shadow: 0 0.125rem 0.5rem rgb(90 74 102 / 0.45);
+	text-shadow: 0 0.125rem 0.5rem rgb(40 60 50 / 0.45);
 }
 
 .title h1 {
@@ -498,7 +498,7 @@ svg {
 	line-height: 0.95;
 	letter-spacing: -0.02em;
 	color: #fff;
-	text-shadow: 0 0.25rem 0 var(--rose), 0 0.5rem 0 var(--rose-deep), 0 0.75rem 1.5rem rgb(90 74 102 / 0.35);
+	text-shadow: 0 0.25rem 0 var(--rose), 0 0.5rem 0 var(--rose-deep), 0 0.75rem 1.5rem rgb(40 60 50 / 0.35);
 }
 
 .title h1 em {
@@ -506,7 +506,7 @@ svg {
 	font-style: normal;
 	font-size: 0.72em;
 	color: #fff6c9;
-	text-shadow: 0 0.2rem 0 #f5b84a, 0 0.4rem 0 #e09a2e, 0 0.75rem 1.5rem rgb(90 74 102 / 0.35);
+	text-shadow: 0 0.2rem 0 #f5b84a, 0 0.4rem 0 #e09a2e, 0 0.75rem 1.5rem rgb(40 60 50 / 0.35);
 }
 
 .title__buttons {
@@ -572,7 +572,7 @@ svg {
 	background: var(--rose);
 	color: #fff;
 	font-size: var(--text-large);
-	box-shadow: 0 0.3125rem 0 var(--rose-deep), 0 0.75rem 1.5rem rgb(229 111 151 / 0.4);
+	box-shadow: 0 0.3125rem 0 var(--rose-deep), 0 0.75rem 1.5rem rgb(37 133 92 / 0.4);
 }
 
 .btn--ghost {
@@ -593,7 +593,7 @@ svg {
 	display: grid;
 	place-items: center;
 	padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
-	background: rgb(90 74 102 / 0.32);
+	background: rgb(40 60 50 / 0.32);
 	backdrop-filter: blur(3px);
 	animation: fade 0.2s;
 }
@@ -690,7 +690,7 @@ svg {
 
 .choices button[aria-pressed='true'] {
 	background: #fff;
-	box-shadow: 0 0.125rem 0.375rem rgb(90 74 102 / 0.18);
+	box-shadow: 0 0.125rem 0.375rem rgb(40 60 50 / 0.18);
 	color: var(--rose-deep);
 }
 
@@ -868,4 +868,57 @@ svg {
 
 .sheet__body b {
 	font-weight: 800;
+}
+
+/* The bar that asks before a road is built */
+
+.roadbar {
+	grid-area: hint;
+	justify-self: center;
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	max-width: 100%;
+	padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+	border-radius: var(--corner-round);
+	background: var(--cream);
+	box-shadow: var(--shadow);
+	animation: pop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.roadbar__text {
+	font-weight: 800;
+	line-height: 1.2;
+}
+
+.roadbar .btn {
+	min-height: var(--tap);
+	padding-block: var(--space-2);
+	white-space: nowrap;
+}
+
+.entry .btn {
+	min-height: 2.5rem;
+	padding: var(--space-1) var(--space-3);
+	font-size: var(--text-small);
+}
+
+.entry--locked {
+	opacity: 0.75;
+}
+
+.goal {
+	flex: 0 1 auto;
+}
+
+@media (max-width: 30rem) {
+	.goal {
+		flex: 1;
+		padding-inline: var(--space-3);
+		font-size: 0.9375rem;
+	}
+
+	.goal__label {
+		display: none;
+	}
 }

@@ -27,6 +27,13 @@ export const input = {
 /** What the game does with input. The shell sets these. */
 export const actions = {
 	tap: (_x: number, _z: number) => {},
+	/** A tap, as a line from the eye into the world. Returns true when a creature took the tap. */
+	tapRay: (_ray: THREE.Ray): boolean => false,
+	/** A drag begins on a cell. Returns true when it draws a road. Then the view does not move. */
+	roadStart: (_x: number, _z: number): boolean => false,
+	roadMove: (_x: number, _z: number) => {},
+	/** The drag is over. `keep` is false when a second finger broke it off. */
+	roadEnd: (_keep: boolean) => {},
 	place: () => {},
 	eraseAtCursor: () => {},
 	rotate: () => {},
@@ -46,7 +53,7 @@ export const actions = {
 };
 
 const MIN_DIST = 5;
-const MAX_DIST = 46;
+const MAX_DIST = 78;
 const ray = new THREE.Raycaster();
 const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const _hit = new THREE.Vector3();
@@ -83,7 +90,7 @@ function clampGoal(): void {
 		goal.z *= WORLD_RADIUS / d;
 	}
 	goal.dist = clamp(goal.dist, MIN_DIST, MAX_DIST);
-	goal.pitch = clamp(goal.pitch, 0.38, 1.35);
+	goal.pitch = clamp(goal.pitch, 0.2, 1.35);
 }
 
 function panBy(dx: number, dz: number): void {
@@ -106,11 +113,19 @@ function placeCamera(): void {
 
 export const cameraYaw = (): number => view.yaw;
 
-/** Resets the camera to look at the main island. A tall screen starts farther back. */
+/** Resets the camera to look at the home island. A tall screen starts farther back. */
 export function resetCamera(): void {
 	const tall = camera.aspect < 1;
-	Object.assign(goal, { x: 1.5, z: 0, yaw: 0.65, pitch: 0.68, dist: tall ? 30 : 20 });
+	Object.assign(goal, { x: 0.5, z: 0, yaw: 0.65, pitch: 0.54, dist: tall ? 52 : 36 });
 	Object.assign(view, goal, { dist: goal.dist + 10, yaw: goal.yaw - 0.5 });
+}
+
+/** Glides the camera to look at a place, for a jump to another island. */
+export function flyTo(x: number, z: number, dist?: number): void {
+	goal.x = x;
+	goal.z = z;
+	if (dist) goal.dist = dist;
+	clampGoal();
 }
 
 /* Pointers: touch and mouse */
@@ -123,6 +138,8 @@ interface Pointer {
 	button: number;
 	moved: boolean;
 	touch: boolean;
+	/** This drag draws a road. */
+	road: boolean;
 }
 const pointers = new Map<number, Pointer>();
 let pinch: { dist: number; angle: number; midX: number; midY: number } | null = null;
@@ -138,10 +155,15 @@ function onDown(e: PointerEvent): void {
 	canvas.setPointerCapture(e.pointerId);
 	const touch = e.pointerType !== 'mouse';
 	setMode(touch ? 'touch' : 'mouse');
-	pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY, button: e.button, moved: false, touch });
+	pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY, button: e.button, moved: false, touch, road: false });
 	if (pointers.size === 2) {
 		pinch = pinchState();
 		multi = true;
+		// A second finger ends a road drag. Two fingers always move the view.
+		for (const o of pointers.values()) {
+			if (o.road) actions.roadEnd(false);
+			o.road = false;
+		}
 	}
 }
 
@@ -156,7 +178,21 @@ function onMove(e: PointerEvent): void {
 	}
 	const dx = e.clientX - p.x;
 	const dy = e.clientY - p.y;
-	if (!p.moved && Math.hypot(e.clientX - p.startX, e.clientY - p.startY) > (p.touch ? 10 : 5)) p.moved = true;
+	if (!p.moved && Math.hypot(e.clientX - p.startX, e.clientY - p.startY) > (p.touch ? 10 : 5)) {
+		p.moved = true;
+		if (p.button === 0 && !multi && pointers.size === 1) {
+			const from = groundAt(p.startX, p.startY);
+			if (from) p.road = actions.roadStart(Math.round(from.x), Math.round(from.z));
+		}
+	}
+	if (p.road) {
+		const hit = groundAt(e.clientX, e.clientY);
+		if (hit) actions.roadMove(Math.round(hit.x), Math.round(hit.z));
+		p.x = e.clientX;
+		p.y = e.clientY;
+		if (!p.touch) hover(e.clientX, e.clientY);
+		return;
+	}
 
 	if (pointers.size >= 2 && pinch) {
 		// Two fingers: pinch to zoom, twist to turn, slide to move.
@@ -202,8 +238,13 @@ function onUp(e: PointerEvent): void {
 	if (pointers.size < 2) pinch = null;
 	const wasMulti = multi;
 	if (pointers.size === 0) multi = false;
+	if (p.road) {
+		actions.roadEnd(e.type !== 'pointercancel');
+		return;
+	}
 	if (e.type === 'pointercancel' || p.moved || wasMulti || p.button !== 0 || !input.active) return;
 	const hit = groundAt(e.clientX, e.clientY);
+	if (actions.tapRay(ray.ray)) return;
 	if (hit) actions.tap(Math.round(hit.x), Math.round(hit.z));
 }
 
