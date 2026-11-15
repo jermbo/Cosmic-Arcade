@@ -15,7 +15,9 @@ const LIGHT_COLOURS: Record<LightColor, number> = { green: 0x4dff88, amber: 0xff
 
 interface Body {
 	entity: Entity;
-	mesh: THREE.Mesh;
+	mesh: THREE.Object3D;
+	/** Each material of the model with its colour at full light. */
+	paints: { material: THREE.MeshLambertMaterial; base: THREE.Color }[];
 	shade: number;
 }
 
@@ -90,7 +92,14 @@ export class View {
 		for (const entity of sim.entities) {
 			const mesh = makeModel(entity.kind, entity.paint);
 			this.level.add(mesh);
-			this.bodies.push({ entity, mesh, shade: 1 });
+			const paints: Body['paints'] = [];
+			mesh.traverse((object) => {
+				const part = object as THREE.Mesh;
+				if (!part.isMesh) return;
+				const material = part.material as THREE.MeshLambertMaterial;
+				paints.push({ material, base: material.color.clone() });
+			});
+			this.bodies.push({ entity, mesh, paints, shade: 1 });
 		}
 		this.sync(1);
 	}
@@ -116,13 +125,13 @@ export class View {
 			const target = e.exploded ? 0.28 : e.state === 'wrecked' ? 0.72 : 1;
 			if (body.shade !== target) {
 				body.shade = target;
-				(mesh.material as THREE.MeshLambertMaterial).color.setScalar(target);
+				for (const paint of body.paints) paint.material.color.copy(paint.base).multiplyScalar(target);
 			}
 		}
 	}
 
 	/** The place of an entity as the view shows it now. */
-	meshOf(entity: Entity): THREE.Mesh {
+	meshOf(entity: Entity): THREE.Object3D {
 		return this.bodies[entity.id].mesh;
 	}
 

@@ -1,11 +1,14 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import muscleCarUrl from '../../3d-assets/muscle-car.glb?url';
 import { CONFIG } from '../config.ts';
 import type { EntityKind } from '../sim/sim.ts';
 
 /**
  * Low-poly models made from boxes and cylinders, with one flat colour for each part.
  * Each model is one mesh. Its centre is the centre of its physics box, and it points to +z.
+ * The player car is the exception: a group of parts loaded from `3d-assets/muscle-car.glb`.
  */
 
 const PAINTS = [0xe9c46a, 0x2a9d8f, 0xe76f51, 0xf4f1de, 0x8ecae6, 0xb56576, 0x7a6fa8, 0x9db17c, 0xf7f7f2, 0x4f7cac];
@@ -151,8 +154,70 @@ function barrelParts(): THREE.BufferGeometry[] {
 	];
 }
 
-/** Makes the mesh of one entity. Each mesh has its own material, so a wreck can turn dark. */
-export function makeModel(kind: EntityKind, paint: number): THREE.Mesh {
+let playerTemplate: THREE.Group | null = null;
+
+/**
+ * Loads the player car from the .glb file. Call it once before the first level.
+ * If the file cannot load, the player gets the old box car.
+ */
+export async function loadModels(): Promise<void> {
+	try {
+		const gltf = await new GLTFLoader().loadAsync(muscleCarUrl);
+		playerTemplate = fitPlayer(gltf.scene);
+	} catch (error) {
+		console.warn('The player car model did not load. The box car is used.', error);
+	}
+}
+
+/** Scales the car to the length of the player box, puts it on the floor of the box, and turns it to +z. */
+function fitPlayer(scene: THREE.Group): THREE.Group {
+	const [, h, l] = CONFIG.player.size;
+	const car = new THREE.Group();
+	scene.rotation.y = Math.PI; // Blender's front (+y) becomes -z in glTF.
+	car.add(scene);
+	const bounds = new THREE.Box3().setFromObject(car);
+	const size = bounds.getSize(new THREE.Vector3());
+	const scale = l / size.z;
+	scene.scale.setScalar(scale);
+	bounds.setFromObject(car);
+	const centre = bounds.getCenter(new THREE.Vector3());
+	scene.position.set(-centre.x, -h / 2 - bounds.min.y, -centre.z);
+
+	scene.traverse((object) => {
+		const mesh = object as THREE.Mesh;
+		if (!mesh.isMesh) return;
+		const source = mesh.material as THREE.MeshStandardMaterial;
+		if (source.map) source.map.magFilter = THREE.NearestFilter;
+		// Lambert like the rest of the scene. Metal without an environment map would look black.
+		mesh.material = new THREE.MeshLambertMaterial({
+			name: source.name,
+			color: source.color,
+			map: source.map,
+			emissive: source.emissive,
+			emissiveIntensity: source.emissiveIntensity,
+		});
+		source.dispose();
+		mesh.castShadow = true;
+		mesh.receiveShadow = true;
+	});
+	return car;
+}
+
+/** A copy of the player car with its own geometry and materials, so a level can dispose of it. */
+function clonePlayer(template: THREE.Group): THREE.Group {
+	const car = template.clone(true);
+	car.traverse((object) => {
+		const mesh = object as THREE.Mesh;
+		if (!mesh.isMesh) return;
+		mesh.geometry = mesh.geometry.clone();
+		mesh.material = (mesh.material as THREE.Material).clone();
+	});
+	return car;
+}
+
+/** Makes the model of one entity. Each model has its own materials, so a wreck can turn dark. */
+export function makeModel(kind: EntityKind, paint: number): THREE.Object3D {
+	if (kind === 'player' && playerTemplate) return clonePlayer(playerTemplate);
 	let parts: THREE.BufferGeometry[];
 	if (kind === 'barrel') {
 		parts = barrelParts();

@@ -1,11 +1,12 @@
 import './style.css';
 import { Game } from './game.ts';
+import { loadModels } from './render/models.ts';
 import { initPhysics } from './sim/sim.ts';
 
 const canvas = document.getElementById('stage') as HTMLCanvasElement;
 const loading = document.getElementById('loading');
 
-initPhysics()
+Promise.all([initPhysics(), loadModels()])
 	.then(() => {
 		const game = new Game(canvas);
 		game.start();
