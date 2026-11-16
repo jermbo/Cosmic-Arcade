@@ -2,9 +2,10 @@
 
 import * as THREE from 'three';
 import './style.css';
-import { applyVolume, pauseAudio, sfx, startAudio, updateAudio } from './audio.ts';
+import { applyVolume, pauseAudio, setFestive, sfx, startAudio, updateAudio } from './audio.ts';
 import { COMBOS, ISLANDS, PIECE, PIECES, TUNE } from './content.ts';
 import type { PieceId } from './content.ts';
+import { festEvents, forceFestival, initFestival, resetFestival, syncFestival, updateFestival } from './festival.ts';
 import { burst, fxBudget, particles, updateParticles } from './fx.ts';
 import { creatureEvents, initCreatures, resetCreatures, setGoldWhale, syncCreatures, tapCreature, updateCreatures } from './creatures.ts';
 import { actions, camera, cameraYaw, camTarget, flyTo, initInput, input, resetCamera, updateInput } from './input.ts';
@@ -12,7 +13,7 @@ import { clearLife, initLife, lifeEvents, lifeReport, syncLife, updateLife } fro
 import { road, roadCancel, roadCommit, roadDrop, roadStart, roadTo } from './road.ts';
 import { env, initSky, sun, updateSky } from './sky.ts';
 import { checkGoals, combosAt, erase, hooks, isLand, load, loadSettings, pieceAt, place, placeProblem, redo, rotateAt, S, saveNow, saveSoon, undo, unlockIsland, wipeSave } from './state.ts';
-import { adjustFocus, closePanel, comboBanner, goalOfIsland, goalToast, goBack, initUI, islandName, moveFocus, openPanel, popGoal, pressFocus, renderPieces, setHint, setTool, showGame, showRoadBar, showTitle, slots, toast, ui, uiActions, updateHud } from './ui.ts';
+import { adjustFocus, closePanel, comboBanner, goalOfIsland, goalToast, goBack, initUI, islandName, moveFocus, openPanel, pickGroup, popGoal, pressFocus, renderPieces, setHint, setTool, showGame, showRoadBar, showTitle, slots, toast, ui, uiActions, updateHud } from './ui.ts';
 import type { Tool } from './ui.ts';
 import { DX, DZ, key, unkey } from './util.ts';
 import { blessLand, driftPollen, flashCursor, groundY, growIn, hideCursor, initView, islandSparkle, rebuildAll, rebuildPiece, refresh, renderIcons, showCursor, syncIslands, updateView } from './view.ts';
@@ -136,7 +137,7 @@ function endRoad(build: boolean): void {
 	if (!road.pending && !road.active) return;
 	if (build) {
 		const n = roadCommit();
-		if (n) sfx.place(PIECE.path.note);
+		if (n) sfx.place(PIECE[road.tool].note);
 	} else {
 		roadCancel();
 		sfx.click();
@@ -218,6 +219,7 @@ hooks.changed.push((cells, placed) => {
 	refresh(cells, placed);
 	syncLife(placed);
 	syncCreatures();
+	syncFestival(placed);
 	findCombos(cells);
 	runGoals();
 	updateHud();
@@ -244,21 +246,24 @@ hooks.islandAdded.push((index, cells) => {
 actions.tap = tryPlace;
 actions.tapRay = (ray) => !road.pending && tapCreature(ray);
 actions.roadStart = (x, z) => {
-	if (ui.tool !== 'path') return false;
-	roadStart(x, z);
+	const tool = ui.tool;
+	if (!tool || tool === 'erase' || !PIECE[tool].draw) return false;
+	roadStart(x, z, tool);
 	showRoadBar(0);
 	hideCursor();
 	return true;
 };
 actions.roadMove = (x, z) => {
 	roadTo(x, z);
-	setHint(road.fresh ? `<b>Moss path</b> ${road.fresh} new ${road.fresh === 1 ? 'stone' : 'stones'}. Let go to check it.` : '<b>Moss path</b> Drag to where the path should end.');
+	const river = road.tool === 'pond';
+	const unit = river ? 'pool' : 'stone';
+	setHint(road.fresh ? `<b>${PIECE[road.tool].name}</b> ${road.fresh} new ${road.fresh === 1 ? unit : `${unit}s`}. Let go to check it.` : `<b>${PIECE[road.tool].name}</b> Drag to where the ${river ? 'river' : 'path'} should end.`);
 };
 actions.roadEnd = (keep) => {
 	setTool(ui.tool);
 	if (!keep) roadCancel();
 	else if (roadDrop()) {
-		showRoadBar(road.fresh);
+		showRoadBar(road.fresh, road.tool);
 		sfx.click();
 	}
 };
@@ -275,10 +280,7 @@ actions.rotate = rotateNow;
 actions.undo = () => (undo() ? sfx.undo() : sfx.nope());
 actions.redo = () => (redo() ? sfx.undo() : sfx.nope());
 actions.cyclePiece = cyclePiece;
-actions.pickSlot = (i) => {
-	const id = slots()[i];
-	if (id) pickTool(ui.tool === id ? null : id);
-};
+actions.pickSlot = pickGroup;
 actions.pause = () => (road.pending ? endRoad(false) : openPanel('pause'));
 actions.book = () => openPanel('book');
 actions.goals = () => openPanel('goals');
@@ -330,6 +332,7 @@ uiActions.newGame = () => {
 	clearLife();
 	rebuildAll();
 	resetCreatures();
+	resetFestival();
 	applyGifts();
 	lastPlaced = null;
 	ui.fresh.clear();
@@ -349,6 +352,23 @@ lifeEvents.treeGrew = () => {
 	sfx.grow();
 	runGoals();
 };
+
+festEvents.began = (x, z, first) => {
+	setFestive(true);
+	sfx.festival();
+	toast('The night festival begins!', 'The elves gather at the town tree', 'goal');
+	// The first festival is a thing to see.
+	if (first && ui.screen === 'play' && !road.active && !road.pending) flyTo(x, z, camera.aspect < 1 ? 24 : 17);
+};
+festEvents.ended = (whole) => {
+	setFestive(false);
+	if (!whole) return;
+	toast('The festival is over', 'The elves go home happy', 'plain');
+	runGoals();
+	updateHud();
+};
+festEvents.planned = () => toast('The elves plan a festival', 'It starts when the night falls', 'goal');
+festEvents.pop = () => sfx.pop();
 
 /** Keeps the back gesture of a phone inside the game. */
 let trapped = false;
@@ -378,6 +398,7 @@ function frame(now: number): void {
 	updateSky(dt, camera, camTarget, cameraYaw(), false);
 	updateView(dt);
 	updateLife(dt);
+	updateFestival(dt, env.time);
 	updateCreatures(dt, camTarget);
 	driftPollen(dt, camTarget);
 	updateParticles(dt, env.time, renderer.domElement.height / renderer.getPixelRatio(), camera.fov);
@@ -409,6 +430,7 @@ function start(): void {
 	initSky(scene);
 	initView(scene);
 	initLife();
+	initFestival();
 	scene.add(particles);
 	try {
 		// The save of the first version does not fit the new islands.
@@ -464,6 +486,7 @@ function start(): void {
 					while (S.islands < Math.min(n, ISLANDS.length)) unlockIsland();
 				},
 				gift: giveGift,
+				festival: forceFestival,
 				fly: flyTo,
 				road: { road, roadStart, roadTo, roadDrop, end: endRoad },
 				clock: (c: number) => (S.clock = c),

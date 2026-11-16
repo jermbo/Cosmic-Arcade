@@ -660,7 +660,11 @@ function afterChange(): void {
 		for (const c of combosAt(x, z)) if (p.t === c[c.host]) emitters.push({ x, z, def: c });
 		if (p.t === 'waterfall') for (const d of spillSides(x, z)) spills.push({ x, z, d });
 		if (PIECE[p.t].lanterns) wishSources.push({ x, y: 2, z, strong: true });
-		else if (p.t === 'lantern') wishSources.push({ x: x + 0.16, y: 0.6, z, strong: false });
+		else if (p.t === 'lantern') {
+			// The pod hangs on the side that the vine leans to.
+			const a = ((p.r - 2) * Math.PI) / 2;
+			wishSources.push({ x: x + Math.cos(a) * 0.16, y: 0.6, z: z + Math.sin(a) * 0.16, strong: false });
+		}
 	}
 	findWetCells();
 	for (const v of islands) v.dirtyDecor = true;
@@ -883,6 +887,7 @@ export function renderIcons(renderer: THREE.WebGLRenderer): Record<string, strin
 		if (def.id === 'bridge') ctx.sides = ['land', null, 'land', null];
 		if (def.id === 'path') ctx.sides = ['path', 'land', 'path', 'path'];
 		if (def.id === 'tree') ctx.growth = 0.2;
+		if (def.id === 'crossing') ctx.sides = ['path', 'pond', 'path', 'pond'];
 		const model = buildPiece(def.id, ctx).group;
 		const box = new THREE.Box3().setFromObject(model);
 		const mid = box.getCenter(new THREE.Vector3());
@@ -910,15 +915,15 @@ route.count = 0;
 route.renderOrder = 4;
 route.frustumCulled = false;
 
-/** Shows the cells of a road that is not built yet. `fresh` marks the cells that get a new path. */
-export function showRoute(cells: { x: number; z: number; fresh: boolean }[]): void {
+/** Shows the cells of a road that is not built yet. `fresh` marks the cells that get a new piece. */
+export function showRoute(cells: { x: number; z: number; fresh: boolean }[], water = false): void {
 	route.count = Math.min(ROUTE_MAX, cells.length);
 	for (let i = 0; i < route.count; i++) {
 		const c = cells[i];
 		const s = c.fresh ? 1 : 0.4;
 		_m.compose(_v.set(c.x, groundY(c.x, c.z) + 0.1, c.z), _q.identity(), _s.set(s, 1, s));
 		route.setMatrixAt(i, _m);
-		route.setColorAt(i, _c.set(i === route.count - 1 ? 0xffffff : c.fresh ? 0xffd24a : 0xbff5d0));
+		route.setColorAt(i, _c.set(i === route.count - 1 ? 0xffffff : c.fresh ? (water ? 0x7fd8ff : 0xffd24a) : 0xbff5d0));
 	}
 	route.instanceMatrix.needsUpdate = true;
 	if (route.instanceColor) route.instanceColor.needsUpdate = true;

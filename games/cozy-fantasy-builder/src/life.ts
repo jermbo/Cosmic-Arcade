@@ -11,13 +11,15 @@ import { DX, DZ, key, pick, rng, turnToward, unkey } from './util.ts';
 import { groundY, isWet, rebuildPiece, scalePiece, world } from './view.ts';
 
 type Emote = 'heart' | 'note' | 'zzz' | 'star' | 'bloom' | 'hi';
-type Act = Visit | 'stroll' | 'home';
+type Act = Visit | 'stroll' | 'home' | 'dance';
 
 interface Villager {
 	home: string;
 	name: string;
 	obj: THREE.Group;
 	arm: THREE.Object3D;
+	/** A bun that it carries to a picnic table on a festival night. */
+	treat: THREE.Object3D;
 	emote: THREE.Sprite;
 	emoteLeft: number;
 	x: number;
@@ -59,6 +61,16 @@ export const lifeEvents = {
 	treeGrew: () => {},
 };
 
+/** The night festival. The festival module sets this, and the elves follow it. */
+export const fest = {
+	on: false,
+	/** The cell of the town tree. */
+	x: 0,
+	z: 0,
+	/** The eight cells around the tree are free, so the elves can dance in a ring. */
+	ring: false,
+};
+
 export function initLife(): void {
 	world.add(layer);
 }
@@ -70,7 +82,7 @@ const HAIR = [0xf2e2b0, 0xe8a85a, 0xb86a3c, 0xd9d9e8, 0x7a5a44, 0xf2c2d0];
 const SKIN = [0xfff0e0, 0xf2d2b4, 0xd9a98a, 0xffe6d6];
 
 /** A small elf: a cloak, pointed ears and a leaf cap. */
-function makeVillager(seed: number): { obj: THREE.Group; arm: THREE.Object3D } {
+function makeVillager(seed: number): { obj: THREE.Group; arm: THREE.Object3D; treat: THREE.Object3D } {
 	const rand = rng(seed + 1);
 	const cloak = pick(CLOAKS, rand());
 	const hair = pick(HAIR, rand());
@@ -100,7 +112,11 @@ function makeVillager(seed: number): { obj: THREE.Group; arm: THREE.Object3D } {
 	const arm = armKit.build();
 	arm.position.set(0.1, 0.12, 0);
 	obj.add(arm);
-	return { obj, arm };
+	const treat = new Kit().ball('solid', 0xffc27a, 0.045, 0, 0, 0, { sy: 0.7 }).ball('solid', 0xfff4e2, 0.02, 0, 0.03, 0).build();
+	treat.position.set(0, 0.17, -0.11);
+	treat.visible = false;
+	obj.add(treat);
+	return { obj, arm, treat };
 }
 
 function makeCritter(seed: number): THREE.Group {
@@ -209,7 +225,7 @@ function showEmote(v: Villager, kind: Emote, time = 2.2): void {
 /* Walking */
 
 /** Can a walker stand on this cell? */
-function canWalk(x: number, z: number): boolean {
+export function canWalk(x: number, z: number): boolean {
 	const p = pieceAt(x, z);
 	if (p) return !!PIECE[p.t].walk;
 	return isLand(x, z);
@@ -265,7 +281,7 @@ function doorCell(home: string): [number, number] | null {
 	return null;
 }
 
-const EMOTE_OF: Record<Act, Emote> = { rest: 'heart', sit: 'note', gather: 'star', shop: 'heart', sniff: 'bloom', wish: 'star', gaze: 'note', stroll: 'note', home: 'zzz' };
+const EMOTE_OF: Record<Act, Emote> = { rest: 'heart', sit: 'note', gather: 'star', shop: 'heart', sniff: 'bloom', wish: 'star', gaze: 'note', feast: 'heart', stroll: 'note', home: 'zzz', dance: 'note' };
 
 /** Picks a place to go and the way to it. Returns false when there is nowhere to go. */
 function planTrip(v: Villager, from: [number, number]): boolean {
@@ -276,7 +292,9 @@ function planTrip(v: Villager, from: [number, number]): boolean {
 		const def = PIECE[p.t];
 		const [x, z] = unkey(k);
 		if (def.visit) {
-			const weight = def.visit === 'gather' ? (dusk ? 6 : 1) : 2;
+			let weight = def.visit === 'gather' ? (dusk ? 6 : 1) : 2;
+			// On a festival night the elves eat, shop and stay near the town tree.
+			if (fest.on) weight = def.visit === 'feast' ? 7 : def.visit === 'shop' ? 5 : Math.hypot(x - fest.x, z - fest.z) < 5 ? weight : weight * 0.3;
 			if (def.walk) {
 				if (reach.has(k)) options.push({ k, act: def.visit, look: [x + DX[p.r], z + DZ[p.r]], weight });
 				continue;
@@ -287,6 +305,13 @@ function planTrip(v: Villager, from: [number, number]): boolean {
 			}
 		} else if (def.walk && reach.has(k) && reach.get(k)!.cost > 2) {
 			options.push({ k, act: 'stroll', look: null, weight: 0.35 });
+		}
+	}
+	// The dance: a place in the ring around the town tree.
+	if (fest.on) {
+		for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+			const k = key(fest.x + dx, fest.z + dz);
+			if ((dx || dz) && reach.has(k)) options.push({ k, act: 'dance', look: [fest.x, fest.z], weight: 3.5 });
 		}
 	}
 	// A short walk on the grass is always possible.
@@ -334,7 +359,7 @@ function poof(v: Villager): void {
 
 function addVillager(home: string, nameIndex: number): Villager {
 	const [x, z] = unkey(home);
-	const { obj, arm } = makeVillager(nameIndex * 7 + (S.pieces.get(home)?.s ?? 0));
+	const { obj, arm, treat } = makeVillager(nameIndex * 7 + (S.pieces.get(home)?.s ?? 0));
 	const emote = new THREE.Sprite(new THREE.SpriteMaterial({ map: emoteTexture('heart'), transparent: true, depthWrite: false, fog: false }));
 	emote.scale.setScalar(0.3);
 	emote.position.y = 0.72;
@@ -342,7 +367,7 @@ function addVillager(home: string, nameIndex: number): Villager {
 	obj.add(emote);
 	obj.visible = false;
 	layer.add(obj);
-	const v: Villager = { home, name: VILLAGER_NAMES[nameIndex % VILLAGER_NAMES.length], obj, arm, emote, emoteLeft: 0, x, z, yaw: 0, state: 'inside', path: [], wait: 1 + Math.random() * 3, act: 'home', look: null, wave: 0, step: Math.random() * 6 };
+	const v: Villager = { home, name: VILLAGER_NAMES[nameIndex % VILLAGER_NAMES.length], obj, arm, treat, emote, emoteLeft: 0, x, z, yaw: 0, state: 'inside', path: [], wait: 1 + Math.random() * 3, act: 'home', look: null, wave: 0, step: Math.random() * 6 };
 	villagers.push(v);
 	return v;
 }
@@ -357,15 +382,15 @@ function removeVillager(v: Villager): void {
 export function syncLife(placed: string | null): void {
 	for (const v of [...villagers]) {
 		const p = S.pieces.get(v.home);
-		if (!p || p.t !== 'cottage' || !p.h) removeVillager(v);
+		if (!p || !PIECE[p.t].home || !p.h) removeVillager(v);
 	}
 	for (const [k, p] of S.pieces) {
-		if (p.t !== 'cottage') continue;
+		if (!PIECE[p.t].home) continue;
 		if (p.h) {
 			if (!villagers.some((v) => v.home === k)) addVillager(k, p.h - 1);
 		} else if (!moveIn.has(k)) moveIn.set(k, TUNE.moveInDelay + Math.random() * 2);
 	}
-	for (const k of [...moveIn.keys()]) if (S.pieces.get(k)?.t !== 'cottage') moveIn.delete(k);
+	for (const k of [...moveIn.keys()]) if (!PIECE[S.pieces.get(k)?.t ?? 'path'].home) moveIn.delete(k);
 
 	// A walker whose cell or way is now blocked finds a new plan.
 	for (const v of villagers) {
@@ -399,6 +424,14 @@ export function syncLife(placed: string | null): void {
 		}
 		if (any) lifeEvents.hello();
 		for (const c of critters) if (Math.hypot(c.x - px, c.z - pz) < 2.5 && c.hop >= 1) startHop(c, c.x, c.z);
+	}
+}
+
+/** The festival begins: the elves at home wake up and come out soon. */
+export function wakeElves(): void {
+	for (const v of villagers) {
+		if (v.state === 'inside') v.wait = Math.min(v.wait, 0.5 + Math.random() * 6);
+		else if (v.state === 'stay') v.wait = Math.min(v.wait, Math.random() * 3);
 	}
 }
 
@@ -493,7 +526,7 @@ function updateCritters(dt: number): void {
 
 export function updateLife(dt: number): void {
 	const t = env.time;
-	const bedtime = env.night > 0.72;
+	const bedtime = env.night > 0.72 && !fest.on;
 
 	for (const [k, left] of moveIn) {
 		if (left - dt > 0) {
@@ -502,7 +535,7 @@ export function updateLife(dt: number): void {
 		}
 		moveIn.delete(k);
 		const p = S.pieces.get(k);
-		if (!p || p.t !== 'cottage' || p.h) continue;
+		if (!p || !PIECE[p.t].home || p.h) continue;
 		const index = S.names++;
 		touch(k, { h: index + 1 });
 		rebuildPiece(k, true);
@@ -547,7 +580,7 @@ export function updateLife(dt: number): void {
 			const dx = next[0] - v.x;
 			const dz = next[1] - v.z;
 			const dist = Math.hypot(dx, dz);
-			const speed = (bedtime ? 1.1 : 0.62) * dt;
+			const speed = (bedtime ? 1.1 : fest.on ? 0.85 : 0.62) * dt;
 			if (dist <= speed) {
 				v.x = next[0];
 				v.z = next[1];
@@ -559,9 +592,21 @@ export function updateLife(dt: number): void {
 			}
 			v.step += dt * 11;
 		} else {
-			v.wait -= dt;
+			const dances = v.act === 'dance' && fest.on;
+			if (dances) {
+				// The dance lasts as long as the festival. With room, the elves go round the tree.
+				v.step += dt * 9;
+				if (fest.ring) {
+					const a = Math.atan2(v.z - fest.z, v.x - fest.x) + dt * 0.4;
+					const r = Math.hypot(v.x - fest.x, v.z - fest.z);
+					const rr = r + (1.15 - r) * Math.min(1, dt * 2);
+					v.x = fest.x + Math.cos(a) * rr;
+					v.z = fest.z + Math.sin(a) * rr;
+				}
+				if (Math.random() < dt * 0.18) showEmote(v, pick(['note', 'heart', 'star', 'note'] as const, Math.random()), 1.6);
+			} else v.wait -= dt;
 			if (v.look) v.yaw = Math.atan2(-(v.look[0] - v.x), -(v.look[1] - v.z));
-			if (v.wait <= 0 || (bedtime && v.wait > 1)) {
+			if (!dances && (v.wait <= 0 || (bedtime && v.wait > 1))) {
 				const here: [number, number] = [Math.round(v.x), Math.round(v.z)];
 				if (!bedtime && Math.random() < 0.45 && planTrip(v, here)) v.state = 'walk';
 				else goHome(v);
@@ -571,13 +616,15 @@ export function updateLife(dt: number): void {
 		// A branch above can send the villager inside.
 		if ((v.state as string) === 'inside') continue;
 		const walking = v.state === 'walk' && v.wave <= 0;
-		const sitting = v.state === 'stay' && (v.act === 'sit' || v.act === 'rest');
+		const sitting = v.state === 'stay' && (v.act === 'sit' || v.act === 'rest' || v.act === 'feast');
+		const dancing = v.state === 'stay' && v.act === 'dance' && fest.on && v.wave <= 0;
+		v.treat.visible = fest.on && v.act === 'feast';
 		const s = Math.min(1, v.obj.scale.x + dt * 4);
 		v.obj.scale.setScalar(s);
-		v.obj.position.set(v.x, groundY(v.x, v.z) + (walking ? Math.abs(Math.sin(v.step)) * 0.035 : 0) - (sitting ? 0.03 : 0), v.z);
+		v.obj.position.set(v.x, groundY(v.x, v.z) + (walking ? Math.abs(Math.sin(v.step)) * 0.035 : dancing ? Math.abs(Math.sin(v.step * 0.5)) * 0.1 : 0) - (sitting ? 0.03 : 0), v.z);
 		v.obj.rotation.y = turnToward(v.obj.rotation.y, v.yaw, Math.min(1, dt * 8));
-		v.obj.rotation.z = walking ? Math.sin(v.step) * 0.09 : 0;
-		v.arm.rotation.z = v.wave > 0 ? -2.3 + Math.sin(t * 16) * 0.5 : walking ? Math.sin(v.step) * 0.4 : 0;
+		v.obj.rotation.z = walking ? Math.sin(v.step) * 0.09 : dancing ? Math.sin(v.step * 0.5) * 0.14 : 0;
+		v.arm.rotation.z = v.wave > 0 ? -2.3 + Math.sin(t * 16) * 0.5 : dancing ? -2.1 + Math.sin(v.step) * 0.5 : walking ? Math.sin(v.step) * 0.4 : 0;
 		if (v.emoteLeft > 0) {
 			v.emoteLeft -= dt;
 			v.emote.position.y = 0.72 + Math.sin(t * 4) * 0.02;

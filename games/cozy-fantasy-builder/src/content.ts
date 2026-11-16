@@ -18,10 +18,22 @@ export type PieceId =
 	| 'dock'
 	| 'market'
 	| 'tower'
-	| 'elder';
+	| 'elder'
+	| 'crossing'
+	| 'shroomhouse'
+	| 'stonehut'
+	| 'nest'
+	| 'stonebench'
+	| 'swing'
+	| 'picnic'
+	| 'bakery'
+	| 'teahouse'
+	| 'well'
+	| 'board'
+	| 'towntree';
 
 /** What an elf does when it visits a piece. */
-export type Visit = 'rest' | 'sit' | 'gather' | 'shop' | 'sniff' | 'wish' | 'gaze';
+export type Visit = 'rest' | 'sit' | 'gather' | 'shop' | 'sniff' | 'wish' | 'gaze' | 'feast';
 
 export interface PieceDef {
 	id: PieceId;
@@ -45,30 +57,67 @@ export interface PieceDef {
 	lanterns?: boolean;
 	/** It is part of an island. The player cannot build or remove it. */
 	fixed?: boolean;
+	/** The player draws it with a drag, cell after cell. */
+	draw?: boolean;
+	/** An elf lives in it. */
+	home?: boolean;
+	/** It has a door. A path joins it on the side that it faces. */
+	door?: boolean;
+	/** The game builds it by itself. It is not in the toolbar. */
+	hidden?: boolean;
 	/** The pitch of its placing sound, as a step of the scale. */
 	note: number;
 }
 
 export const PIECES: PieceDef[] = [
-	{ id: 'path', name: 'Moss path', blurb: 'Drag to draw a path. Elves love to walk on it.', on: 'land', walk: true, starter: true, note: 0 },
-	{ id: 'cottage', name: 'Tree home', blurb: 'A home for one elf. Homes side by side link their branches.', on: 'land', turns: true, starter: true, note: 2 },
+	{ id: 'path', name: 'Moss path', blurb: 'Drag to draw a path. Elves love to walk on it.', on: 'land', walk: true, draw: true, starter: true, note: 0 },
+	{ id: 'cottage', name: 'Tree home', blurb: 'A home for one elf. Homes side by side link their branches.', on: 'land', turns: true, home: true, door: true, starter: true, note: 2 },
+	{ id: 'shroomhouse', name: 'Mushroom house', blurb: 'A snug home for one elf, under a big cap.', on: 'land', turns: true, home: true, door: true, note: 3 },
+	{ id: 'stonehut', name: 'Stone hut', blurb: 'A round stone home for one elf, with a moss roof.', on: 'land', turns: true, home: true, door: true, note: 1 },
+	{ id: 'nest', name: 'Nest house', blurb: 'A home for one elf, high up in a tree.', on: 'land', turns: true, home: true, door: true, note: 5 },
 	{ id: 'tree', name: 'Sapling', blurb: 'Starts small and grows tall. Faster near water.', on: 'land', nature: true, starter: true, note: 4 },
 	{ id: 'flower', name: 'Flower bed', blurb: 'A patch of wild blooms.', on: 'land', nature: true, starter: true, visit: 'sniff', note: 5 },
-	{ id: 'pond', name: 'Spring pool', blurb: 'Pools side by side join. Grass grows lush near water.', on: 'land', water: true, starter: true, visit: 'rest', note: 1 },
-	{ id: 'lantern', name: 'Lantern vine', blurb: 'A warm light. Elves and moon moths gather here.', on: 'land', starter: true, visit: 'gather', note: 6 },
+	{ id: 'pond', name: 'River pool', blurb: 'Drag to draw a river. A path crosses it on a little bridge.', on: 'land', water: true, draw: true, starter: true, visit: 'rest', note: 1 },
+	{ id: 'lantern', name: 'Lantern vine', blurb: 'A warm light. Elves and moon moths gather here.', on: 'land', turns: true, starter: true, visit: 'gather', note: 6 },
 	{ id: 'bench', name: 'Log seat', blurb: 'A seat with a view.', on: 'land', turns: true, visit: 'sit', note: 2 },
+	{ id: 'stonebench', name: 'Stone bench', blurb: 'A cool stone seat with moss on it.', on: 'land', turns: true, visit: 'sit', note: 0 },
+	{ id: 'swing', name: 'Swing', blurb: 'It sways in the sky wind. Elves love a ride.', on: 'land', turns: true, visit: 'sit', note: 4 },
+	{ id: 'picnic', name: 'Picnic table', blurb: 'Elves bring treats here on festival nights.', on: 'land', turns: true, visit: 'feast', note: 5 },
 	{ id: 'crystal', name: 'Crystal', blurb: 'A humming sky crystal. It likes company.', on: 'land', note: 7 },
 	{ id: 'waterfall', name: 'Spring rock', blurb: 'Next to a pool on an island edge, it spills into the sky.', on: 'land', water: true, note: 1 },
+	{ id: 'well', name: 'Wishing well', blurb: 'Cool water from deep in the rock. Grass grows lush around it.', on: 'land', water: true, visit: 'rest', note: 3 },
 	{ id: 'mushroom', name: 'Mushroom ring', blurb: 'Critters meet here.', on: 'land', nature: true, note: 5 },
 	{ id: 'windmill', name: 'Wind bloom', blurb: 'Its petals turn in the sky wind.', on: 'land', turns: true, note: 4 },
 	{ id: 'bridge', name: 'Rope bridge', blurb: 'Build it in the air, out from an island edge.', on: 'air', walk: true, note: 3 },
 	{ id: 'dock', name: 'Sky dock', blurb: 'A pier for a little leaf boat. Needs an island edge.', on: 'edge', turns: true, walk: true, visit: 'gaze', note: 3 },
-	{ id: 'market', name: 'Cap stall', blurb: 'Fresh sky fruit under a mushroom cap.', on: 'land', turns: true, visit: 'shop', note: 6 },
+	{ id: 'market', name: 'Cap stall', blurb: 'Fresh sky fruit under a mushroom cap.', on: 'land', turns: true, door: true, visit: 'shop', note: 6 },
+	{ id: 'bakery', name: 'Bakery', blurb: 'Warm buns under a roof like a loaf of bread.', on: 'land', turns: true, door: true, visit: 'shop', note: 7 },
+	{ id: 'teahouse', name: 'Tea house', blurb: 'Petal tea and soft cushions.', on: 'land', turns: true, door: true, visit: 'shop', note: 8 },
+	{ id: 'board', name: 'Notice board', blurb: 'Elves stop here to read the news of the isles.', on: 'land', turns: true, visit: 'gaze', note: 2 },
+	{ id: 'towntree', name: 'Town tree', blurb: 'The heart of a town. Elves hold a night festival around it.', on: 'land', lanterns: true, visit: 'gather', note: 8 },
 	{ id: 'tower', name: 'Moon spire', blurb: 'Sends wish lanterns up at night.', on: 'land', lanterns: true, visit: 'wish', note: 8 },
 	{ id: 'elder', name: 'Elder Tree', blurb: 'The oldest tree in the sky. Elves come here to wish.', on: 'land', fixed: true, lanterns: true, visit: 'wish', note: 8 },
+	{ id: 'crossing', name: 'Little bridge', blurb: 'A path that crosses a river. Remove it to get the river back.', on: 'land', walk: true, water: true, hidden: true, note: 3 },
 ];
 
 export const PIECE = Object.fromEntries(PIECES.map((p) => [p.id, p])) as Record<PieceId, PieceDef>;
+
+/** The toolbar shows one button for each group. A flyout menu holds the pieces of the group. */
+export interface GroupDef {
+	id: string;
+	name: string;
+	pieces: PieceId[];
+}
+
+export const GROUPS: GroupDef[] = [
+	{ id: 'ways', name: 'Paths', pieces: ['path', 'bridge', 'dock'] },
+	{ id: 'homes', name: 'Homes', pieces: ['cottage', 'shroomhouse', 'stonehut', 'nest'] },
+	{ id: 'nature', name: 'Nature', pieces: ['tree', 'flower', 'mushroom', 'windmill'] },
+	{ id: 'water', name: 'Water', pieces: ['pond', 'waterfall', 'well'] },
+	{ id: 'lights', name: 'Lights', pieces: ['lantern', 'crystal', 'tower'] },
+	{ id: 'seats', name: 'Seats', pieces: ['bench', 'stonebench', 'swing', 'picnic'] },
+	{ id: 'town', name: 'Town', pieces: ['market', 'bakery', 'towntree', 'teahouse', 'board'] },
+];
 
 export interface IslandDef {
 	name: string;
@@ -135,7 +184,7 @@ export const COMBOS: ComboDef[] = [
 	{ id: 'rainbow', name: 'Rainbow Falls', a: 'crystal', b: 'waterfall', host: 'b', text: 'Light splits in the spray. A small rainbow stays.', hint: 'Falling water can split the light.', colors: [0xff9aa2, 0xffe08a, 0x9be7a5, 0x9fd0ff, 0xc9a8ff], motion: 'rise' },
 ];
 
-export type GoalKind = 'place' | 'villagers' | 'combos' | 'trees' | 'spill' | 'gifts';
+export type GoalKind = 'place' | 'villagers' | 'combos' | 'trees' | 'spill' | 'gifts' | 'festivals';
 
 export interface GoalDef {
 	id: string;
@@ -151,16 +200,27 @@ export interface GoalDef {
 /** The milestones, in the order that the tracker shows them. */
 export const GOALS: GoalDef[] = [
 	{ id: 'home1', text: 'Grow a tree home', kind: 'place', piece: 'cottage', n: 1, reward: { piece: 'bench' } },
+	{ id: 'home2', text: 'Grow 2 tree homes', kind: 'place', piece: 'cottage', n: 2, reward: { piece: 'shroomhouse' } },
 	{ id: 'paths', text: 'Lay 8 moss paths', kind: 'place', piece: 'path', n: 8, reward: { piece: 'crystal' } },
+	{ id: 'seat1', text: 'Set down a log seat', kind: 'place', piece: 'bench', n: 1, reward: { piece: 'stonebench' } },
 	{ id: 'vill3', text: 'House 3 elves', kind: 'villagers', n: 3, reward: { piece: 'waterfall' } },
+	{ id: 'river', text: 'Draw a river of 5 pools', kind: 'place', piece: 'pond', n: 5, reward: { piece: 'well' } },
 	{ id: 'combo1', text: 'Discover a magic link', kind: 'combos', n: 1, reward: { piece: 'mushroom' } },
 	{ id: 'vill6', text: 'House 6 elves', kind: 'villagers', n: 6, reward: { island: true } },
+	{ id: 'cross', text: 'Cross a river with a path', kind: 'place', piece: 'crossing', n: 1, reward: { piece: 'swing' } },
 	{ id: 'trees', text: 'Grow 4 tall trees', kind: 'trees', n: 4, reward: { piece: 'windmill' } },
+	{ id: 'vill9', text: 'House 9 elves', kind: 'villagers', n: 9, reward: { piece: 'stonehut' } },
 	{ id: 'gift1', text: 'Tap a lantern jelly for a gift', kind: 'gifts', n: 1, reward: { piece: 'bridge' } },
 	{ id: 'lanterns', text: 'Hang 5 lantern vines', kind: 'place', piece: 'lantern', n: 5, reward: { piece: 'dock' } },
 	{ id: 'vill12', text: 'House 12 elves', kind: 'villagers', n: 12, reward: { island: true } },
 	{ id: 'spill', text: 'Make a spring rock spill off an edge', kind: 'spill', n: 1, reward: { piece: 'market' } },
+	{ id: 'stall', text: 'Open a cap stall', kind: 'place', piece: 'market', n: 1, reward: { piece: 'bakery' } },
+	{ id: 'bake', text: 'Open a bakery', kind: 'place', piece: 'bakery', n: 1, reward: { piece: 'towntree' } },
+	{ id: 'heart', text: 'Plant a town tree', kind: 'place', piece: 'towntree', n: 1, reward: { piece: 'picnic' } },
 	{ id: 'combo4', text: 'Discover 4 magic links', kind: 'combos', n: 4, reward: { piece: 'tower' } },
+	{ id: 'fest1', text: 'Hold a night festival', kind: 'festivals', n: 1, reward: { piece: 'teahouse' } },
+	{ id: 'vill16', text: 'House 16 elves', kind: 'villagers', n: 16, reward: { piece: 'nest' } },
+	{ id: 'tea', text: 'Open a tea house', kind: 'place', piece: 'teahouse', n: 1, reward: { piece: 'board' } },
 	{ id: 'vill20', text: 'House 20 elves', kind: 'villagers', n: 20, reward: { island: true } },
 	{ id: 'gift8', text: 'Collect 8 jelly gifts', kind: 'gifts', n: 8, reward: { gift: 'Shooting stars at night' } },
 	{ id: 'vill30', text: 'House 30 elves', kind: 'villagers', n: 30, reward: { gift: 'A golden sky whale' } },
@@ -183,5 +243,12 @@ export const TUNE = {
 	/** Time away from the game that counts, at most. */
 	awayCap: 3600,
 	maxCritters: 6,
+	/** The festival starts and ends at these times of the day, 0..1. */
+	festStart: 0.66,
+	festEnd: 0.9,
+	/** Nights of rest between two festivals. */
+	festRest: 1,
+	/** Lights and guests come from this many cells around the town tree. */
+	festReach: 7,
 	undoDepth: 200,
 };

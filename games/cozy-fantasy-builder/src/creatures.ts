@@ -24,6 +24,7 @@ const layer = new THREE.Group();
 const glowTex = softTexture('rgba(255,255,255,0.9)');
 const _v = new THREE.Vector3();
 const _w = new THREE.Vector3();
+const _u = new THREE.Vector3();
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
 const _s = new THREE.Vector3();
@@ -126,6 +127,10 @@ export function setGoldWhale(on: boolean): void {
 	}
 }
 
+/** On a festival night the whale comes down and circles the town tree. */
+export const whaleShow = { on: false, x: 0, z: 0 };
+let showF = 0;
+
 const whaleAt = (a: number, out: THREE.Vector3): THREE.Vector3 => {
 	const r = 25 + 9 * Math.sin(a * 2 + 1);
 	return out.set(Math.cos(a) * r, 9.5 + Math.sin(a * 1.3) * 2, Math.sin(a) * r);
@@ -133,13 +138,20 @@ const whaleAt = (a: number, out: THREE.Vector3): THREE.Vector3 => {
 
 function updateWhale(dt: number, t: number, target: THREE.Vector3): void {
 	const w = whale!;
-	w.obj.visible = dayF > 0.01;
+	showF = Math.max(0, Math.min(1, showF + (whaleShow.on ? dt / 9 : -dt / 9)));
+	w.obj.visible = dayF > 0.01 || showF > 0;
 	if (!w.obj.visible) return;
 	w.a += dt * 0.032;
 	whaleAt(w.a, _v);
 	whaleAt(w.a + 0.02, _w);
+	_v.y += (1 - dayF) * 40;
+	if (showF > 0) {
+		const e = showF * showF * (3 - 2 * showF);
+		const a = w.a * 3.2;
+		_v.lerp(_u.set(whaleShow.x + Math.cos(a) * 12, 6.5 + Math.sin(t * 0.3), whaleShow.z + Math.sin(a) * 12), e);
+		_w.lerp(_u.set(whaleShow.x + Math.cos(a + 0.03) * 12, 6.5, whaleShow.z + Math.sin(a + 0.03) * 12), e);
+	}
 	w.obj.position.copy(_v);
-	w.obj.position.y += (1 - dayF) * 40;
 	w.obj.rotation.y = yawTo(_w.x - _v.x, _w.z - _v.z);
 	w.obj.rotation.x = Math.sin(t * 0.45) * 0.05;
 	w.obj.rotation.z = Math.sin(t * 0.3) * 0.04;

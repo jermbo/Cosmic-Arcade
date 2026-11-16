@@ -12,6 +12,12 @@ let nextBeat = 0;
 let beat = 0;
 let birdTimer = 3;
 let cricketTimer = 1;
+/** On a festival night the music is quicker and brighter. */
+let festive = false;
+
+export function setFestive(on: boolean): void {
+	festive = on;
+}
 
 /** Notes of a soft scale: C major pentatonic, as steps above C4. */
 const SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];
@@ -173,7 +179,15 @@ export function updateAudio(dt: number, night: number, time: number): void {
 			for (const step of chord.slice(0, 3)) tone({ freq: hz(step - 12), at: nextBeat, len: BEAT * 8.5, gain: 0.05, type: 'triangle', attack: 1.8, wet: 0.4, bus: musicBus });
 			tone({ freq: hz(chord[0] - 24), at: nextBeat, len: BEAT * 7, gain: 0.11, attack: 0.4, bus: musicBus });
 		}
-		if (Math.random() < (inBar % 2 === 0 ? 0.8 : 0.3) * calm) bell(chord[Math.floor(Math.random() * chord.length)] + (Math.random() < 0.3 ? 12 : 0), nextBeat, 0.075);
+		if (festive) {
+			// A dance tune: a skipping melody on the chord, a soft drum and a shaker.
+			const tune = [0, 2, 1, 3, 2, 1, 3, 2];
+			bell(chord[tune[inBar]] + 12, nextBeat, 0.07, musicBus, 0.9);
+			bell(chord[tune[(inBar + 3) % 8]] + (inBar % 4 === 3 ? 24 : 12), nextBeat + BEAT / 2, 0.05, musicBus, 0.7);
+			tone({ freq: 120, slideTo: 60, at: nextBeat, len: 0.16, gain: 0.09, bus: musicBus });
+			tone({ freq: 5200, at: nextBeat + BEAT / 2, len: 0.03, gain: 0.008, bus: musicBus });
+			tone({ freq: 5200, at: nextBeat + BEAT * 0.75, len: 0.03, gain: 0.005, bus: musicBus });
+		} else if (Math.random() < (inBar % 2 === 0 ? 0.8 : 0.3) * calm) bell(chord[Math.floor(Math.random() * chord.length)] + (Math.random() < 0.3 ? 12 : 0), nextBeat, 0.075);
 		if (inBar % 4 === 2 && Math.random() < 0.5 * calm) bell(SCALE[5 + Math.floor(Math.random() * 6)], nextBeat + BEAT / 2, 0.05);
 		nextBeat += BEAT;
 		beat++;
@@ -258,6 +272,15 @@ export const sfx = {
 	island(): void {
 		if (!ctx) return;
 		[0, 4, 7, 12, 16, 19, 24, 28].forEach((s, i) => bell(s, ctx!.currentTime + i * 0.14, 0.11, soundBus, 2.6));
+	},
+	festival(): void {
+		if (!ctx) return;
+		[0, 4, 7, 12, 7, 12, 16, 24].forEach((s, i) => bell(s + 12, ctx!.currentTime + i * 0.1, 0.1, soundBus, 1.6));
+	},
+	/** A star puff over the festival. */
+	pop(): void {
+		if (!ctx) return;
+		tone({ freq: 900 + Math.random() * 500, slideTo: 300, len: 0.3, gain: 0.02, wet: 0.7 });
 	},
 	goal(): void {
 		if (!ctx) return;

@@ -1,7 +1,7 @@
 /** The HTML side of the game: title, HUD, toolbar, toasts and the menu panels. */
 
-import { COMBOS, GAME_NAME, GOALS, ISLANDS, PIECE, PIECES } from './content.ts';
-import type { ComboDef, GoalDef, PieceId } from './content.ts';
+import { COMBOS, GAME_NAME, GOALS, GROUPS, ISLANDS, PIECE } from './content.ts';
+import type { ComboDef, GoalDef, GroupDef, PieceId } from './content.ts';
 import { goalProgress, nextGoal, S, saveSettings } from './state.ts';
 import type { Quality } from './state.ts';
 
@@ -15,6 +15,10 @@ export const ui = {
 	icons: {} as Record<string, string>,
 	/** Pieces that were just unlocked and not picked yet. */
 	fresh: new Set<PieceId>(),
+	/** The group whose flyout menu is open. */
+	group: null as string | null,
+	/** The piece that was last picked in each group. Its button shows this piece. */
+	last: {} as Record<string, PieceId>,
 };
 
 /** What the shell does when the player uses the UI. */
@@ -43,6 +47,7 @@ const el = {
 	hud: $('hud'),
 	dock: $('dock'),
 	pieces: $('pieces'),
+	flyout: $('flyout'),
 	hint: $('hint'),
 	roadbar: $('roadbar'),
 	roadbarText: $('roadbar-text'),
@@ -100,49 +105,105 @@ export function showGame(): void {
 
 /* Toolbar */
 
-/** The unlocked pieces, in toolbar order. Number keys pick from this list. */
-export const slots = (): PieceId[] => PIECES.filter((p) => S.unlocked.has(p.id) && !p.fixed).map((p) => p.id);
+/** The unlocked pieces, in toolbar order. */
+export const slots = (): PieceId[] => GROUPS.flatMap((g) => g.pieces).filter((id) => S.unlocked.has(id));
+
+/** The piece that the button of a group shows and picks. */
+function faceOf(g: GroupDef): PieceId {
+	if (ui.tool && ui.tool !== 'erase' && g.pieces.includes(ui.tool)) return ui.tool;
+	const last = ui.last[g.id];
+	if (last && S.unlocked.has(last)) return last;
+	return g.pieces.find((id) => S.unlocked.has(id)) ?? g.pieces[0];
+}
+
+function pieceButton(id: PieceId, extra: string): HTMLButtonElement {
+	const b = document.createElement('button');
+	b.type = 'button';
+	b.className = `piece${S.unlocked.has(id) ? '' : ' piece--locked'}${extra}`;
+	b.setAttribute('aria-pressed', String(ui.tool === id));
+	return b;
+}
 
 export function renderPieces(): void {
-	const open = slots();
-	const locked = PIECES.filter((p) => !S.unlocked.has(p.id) && !p.fixed);
 	el.pieces.replaceChildren(
-		...open.map((id, i) => {
-			const b = document.createElement('button');
-			b.type = 'button';
-			b.className = 'piece' + (ui.fresh.has(id) ? ' piece--new' : '');
-			b.dataset.piece = id;
-			b.setAttribute('aria-label', PIECE[id].name);
-			b.setAttribute('aria-pressed', String(ui.tool === id));
-			b.innerHTML = `<img src="${ui.icons[id]}" alt="" />${i < 10 ? `<span class="piece__key">${(i + 1) % 10}</span>` : ''}`;
-			return b;
-		}),
-		...locked.map((p) => {
-			const b = document.createElement('button');
-			b.type = 'button';
-			b.className = 'piece piece--locked';
-			b.dataset.locked = p.id;
-			b.setAttribute('aria-label', `${p.name} (locked)`);
-			b.innerHTML = `<img src="${ui.icons[p.id]}" alt="" />`;
+		...GROUPS.map((g, i) => {
+			const face = faceOf(g);
+			const b = pieceButton(face, g.pieces.some((id) => ui.fresh.has(id)) ? ' piece--new' : '');
+			b.dataset.group = g.id;
+			b.setAttribute('aria-label', `${g.name}: ${PIECE[face].name}`);
+			b.setAttribute('aria-expanded', String(ui.group === g.id));
+			b.innerHTML = `<img src="${ui.icons[face]}" alt="" /><span class="piece__key">${i + 1}</span><span class="piece__more"></span>`;
 			return b;
 		}),
 	);
+	renderFlyout();
+}
+
+/** The menu above a group button, with every type of the group. */
+function renderFlyout(): void {
+	const g = GROUPS.find((o) => o.id === ui.group);
+	el.flyout.hidden = !g;
+	if (!g) return;
+	el.flyout.setAttribute('aria-label', g.name);
+	el.flyout.replaceChildren(
+		...g.pieces.map((id) => {
+			const b = pieceButton(id, ` piece--tile${ui.fresh.has(id) ? ' piece--new' : ''}`);
+			b.dataset.piece = id;
+			b.setAttribute('aria-label', S.unlocked.has(id) ? PIECE[id].name : `${PIECE[id].name} (locked)`);
+			b.innerHTML = `<img src="${ui.icons[id]}" alt="" /><span class="piece__name">${PIECE[id].name}</span>`;
+			return b;
+		}),
+	);
+	// It sits over its button, and it stays on the screen.
+	const dock = el.dock.getBoundingClientRect();
+	const bar = el.pieces.getBoundingClientRect();
+	const button = el.pieces.querySelector<HTMLElement>(`[data-group="${g.id}"]`)?.getBoundingClientRect() ?? bar;
+	const width = el.flyout.offsetWidth;
+	const left = Math.max(0, Math.min(dock.width - width, button.left + button.width / 2 - width / 2 - dock.left));
+	el.flyout.style.left = `${left}px`;
+	el.flyout.style.bottom = `${dock.bottom - bar.top + 8}px`;
+}
+
+export function closeFlyout(): void {
+	if (!ui.group) return;
+	ui.group = null;
+	renderPieces();
+}
+
+/** A tap on a group: it picks the piece on the button, and it opens the menu with the other types. */
+export function pickGroup(index: number): void {
+	const g = GROUPS[index];
+	if (!g) return;
+	if (ui.group === g.id) {
+		closeFlyout();
+		return;
+	}
+	const face = faceOf(g);
+	ui.group = g.id;
+	if (S.unlocked.has(face) && ui.tool !== face) uiActions.pickTool(face);
+	else {
+		uiActions.click();
+		renderPieces();
+	}
+}
+
+function lockedToast(id: PieceId): void {
+	const g = GOALS.find((goal) => 'piece' in goal.reward && goal.reward.piece === id);
+	toast(`${PIECE[id].name} is locked`, g ? `Goal: ${g.text}` : '', 'plain');
 }
 
 export function setTool(tool: Tool): void {
 	ui.tool = tool;
-	if (tool && tool !== 'erase') ui.fresh.delete(tool);
-	for (const b of el.pieces.querySelectorAll<HTMLButtonElement>('.piece')) {
-		const on = b.dataset.piece === tool;
-		b.setAttribute('aria-pressed', String(on));
-		if (on) {
-			b.classList.remove('piece--new');
-			b.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
-		}
+	if (tool && tool !== 'erase') {
+		ui.fresh.delete(tool);
+		const g = GROUPS.find((o) => o.pieces.includes(tool));
+		if (g) ui.last[g.id] = tool;
 	}
+	renderPieces();
+	el.pieces.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
 	el.erase.setAttribute('aria-pressed', String(tool === 'erase'));
 	if (tool === 'erase') setHint('<b>Remove</b> Tap a piece to take it away.');
-	else if (tool === 'path') setHint(`<b>Moss path</b> Drag to draw a path. ${isTouch() ? 'Two fingers move the view.' : 'Right-drag turns the view.'}`);
+	else if (tool && PIECE[tool].draw) setHint(`<b>${PIECE[tool].name}</b> ${PIECE[tool].blurb} ${isTouch() ? 'Two fingers move the view.' : 'Right-drag turns the view.'}`);
 	else if (tool) setHint(`<b>${PIECE[tool].name}</b> ${PIECE[tool].blurb}`);
 	else setHint('Pick a piece to build. Tap a jelly for a gift.');
 }
@@ -151,11 +212,12 @@ export function setHint(html: string): void {
 	el.hint.innerHTML = html;
 }
 
-/** Shows the bar that asks before a road is built. `count` is 0 to hide it. */
-export function showRoadBar(count: number): void {
+/** Shows the bar that asks before a road or a river is built. `count` is 0 to hide it. */
+export function showRoadBar(count: number, tool: PieceId = 'path'): void {
 	el.roadbar.hidden = count === 0;
 	el.hint.hidden = count > 0;
-	if (count) el.roadbarText.textContent = count === 1 ? 'Build 1 moss path?' : `Build ${count} moss paths?`;
+	const name = PIECE[tool].name.toLowerCase();
+	if (count) el.roadbarText.textContent = count === 1 ? `Build 1 ${name}?` : `Build ${count} ${name}s?`;
 }
 
 /** The goal that opens an island, or undefined for the home island. */
@@ -239,8 +301,9 @@ function controlsHtml(kind: 'touch' | 'mouse' | 'pad'): string {
 		touch: [
 			['Tap', 'Place a piece'],
 			['Drag', 'Move the view'],
-			['Drag with Moss path', 'Draw a path. Check it, then tap Build'],
-			['Two fingers', 'Move the view while you draw paths'],
+			['Tap a group', 'Pick a piece. A menu shows its other types'],
+			['Drag with a path or a river', 'Draw it. Check it, then tap Build'],
+			['Two fingers', 'Move the view while you draw'],
 			['Pinch', 'Zoom'],
 			['Tap a jelly', 'Take its gift'],
 			['Islands button', 'Jump to another island'],
@@ -252,7 +315,8 @@ function controlsHtml(kind: 'touch' | 'mouse' | 'pad'): string {
 		mouse: [
 			['Click', 'Place a piece'],
 			['Drag', 'Move the view'],
-			['Drag with Moss path', 'Draw a path. Enter builds it, Esc cancels'],
+			['Click a group', 'Pick a piece. A menu shows its other types'],
+			['Drag with a path or a river', 'Draw it. Enter builds it, Esc cancels'],
 			['Click a jelly', 'Take its gift'],
 			['Scroll', 'Zoom'],
 			['Right-drag', 'Turn the view'],
@@ -260,7 +324,7 @@ function controlsHtml(kind: 'touch' | 'mouse' | 'pad'): string {
 			['X', 'Remove the piece under the cursor'],
 			['Ctrl+Z / Ctrl+Y', 'Undo and redo'],
 			['Arrows / WASD', 'Move a cursor, Enter to place'],
-			['1–9, [ ]', 'Pick a piece'],
+			['1–7, [ ]', 'Pick a group, or step through the pieces'],
 			['Q / E, + / −', 'Turn and zoom with keys'],
 			['B, G, Esc', 'Book, goals, pause'],
 		],
@@ -294,7 +358,7 @@ const TUTORIAL: { title: string; html: () => string }[] = [
 	{
 		title: 'Watch it come alive',
 		html: () =>
-			`<p><b>Pieces join up.</b> Paths connect, tree homes link their branches, and pools flow together.</p><p><b>Elves move in.</b> Each tree home gets an elf. Grass grows near water. Saplings grow tall.</p><p><b>The sky is alive.</b> Whales, jellies and dragons fly by day. Shy creatures come out at night. Tap a jelly for a gift.</p><p><b>Magic links.</b> Some pieces spark when they stand side by side. The book keeps what you find.</p><p><b>Goals</b> unlock new pieces. Big goals grow a bridge to a new island.</p>`,
+			`<p><b>Pieces join up.</b> Paths connect, tree homes link their branches, and pools flow into rivers. A path crosses a river on a little bridge.</p><p><b>Elves move in.</b> Each tree home gets an elf. Grass grows near water. Saplings grow tall.</p><p><b>The sky is alive.</b> Whales, jellies and dragons fly by day. Shy creatures come out at night. Tap a jelly for a gift.</p><p><b>Magic links.</b> Some pieces spark when they stand side by side. The book keeps what you find.</p><p><b>Goals</b> unlock new pieces. Big goals grow a bridge to a new island.</p><p><b>The town tree.</b> Plant one, and the elves hold a night festival around it.</p>`,
 	},
 ];
 
@@ -385,6 +449,7 @@ function panelHtml(p: Panel): { title: string; html: string; wide?: boolean } {
 }
 
 export function openPanel(p: Panel, from: Panel | null = null): void {
+	closeFlyout();
 	if (p === 'tutorial' && ui.panel !== 'tutorial') tutorialStep = 0;
 	parent = from;
 	ui.panel = p;
@@ -415,7 +480,8 @@ export function closePanel(): void {
 
 /** The back gesture, Escape or B: one step back, and never out of the game. */
 export function goBack(): void {
-	if (ui.panel) closePanel();
+	if (ui.group) closeFlyout();
+	else if (ui.panel) closePanel();
 	else if (ui.screen === 'play') openPanel('pause');
 }
 
@@ -468,16 +534,24 @@ export function initUI(): void {
 
 	el.pieces.addEventListener('click', (e) => {
 		const b = (e.target as HTMLElement).closest<HTMLElement>('.piece');
+		if (b) pickGroup(GROUPS.findIndex((g) => g.id === b.dataset.group));
+	});
+	el.flyout.addEventListener('click', (e) => {
+		const b = (e.target as HTMLElement).closest<HTMLElement>('.piece');
 		if (!b) return;
-		if (b.dataset.locked) {
-			const id = b.dataset.locked as PieceId;
-			const g = GOALS.find((goal) => 'piece' in goal.reward && goal.reward.piece === id);
-			toast(`${PIECE[id].name} is locked`, g ? `Goal: ${g.text}` : '', 'plain');
+		const id = b.dataset.piece as PieceId;
+		if (!S.unlocked.has(id)) {
+			lockedToast(id);
 			return;
 		}
-		const id = b.dataset.piece as PieceId;
+		ui.group = null;
 		uiActions.pickTool(ui.tool === id ? null : id);
 	});
+	// A tap anywhere else closes the menu.
+	document.addEventListener('pointerdown', (e) => {
+		if (ui.group && !(e.target as HTMLElement).closest('#flyout, #pieces')) closeFlyout();
+	}, true);
+	window.addEventListener('resize', () => ui.group && renderPieces());
 	// A mouse wheel over the toolbar scrolls it sideways.
 	el.pieces.addEventListener('wheel', (e) => {
 		if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) el.pieces.scrollLeft += e.deltaY;

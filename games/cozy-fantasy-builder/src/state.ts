@@ -44,6 +44,8 @@ interface SaveData {
 	tutorial: boolean;
 	names: number;
 	gifts: number;
+	festivals?: number;
+	festDue?: number;
 	/** When the game was last saved, in milliseconds. */
 	seen: number;
 }
@@ -72,6 +74,10 @@ export const S = {
 	names: 0,
 	/** How many jelly gifts the player collected. */
 	gifts: 0,
+	/** How many night festivals the elves held. */
+	festivals: 0,
+	/** Nights to wait before the next festival. */
+	festDue: 0,
 	/** Set by `load` when the player was away for a while. */
 	away: null as AwayReport | null,
 	settings: { music: 0.6, sound: 0.7, quality: 'medium' } as Settings,
@@ -182,6 +188,8 @@ export function resetState(): void {
 	S.clock = 0.12;
 	S.names = 0;
 	S.gifts = 0;
+	S.festivals = 0;
+	S.festDue = 0;
 	S.away = null;
 	S.undo = [];
 	S.redo = [];
@@ -198,6 +206,14 @@ export function islandAtCell(x: number, z: number): number | undefined {
 }
 
 export const pieceAt = (x: number, z: number): Piece | undefined => S.pieces.get(key(x, z));
+
+/** River water: a pool, or a pool with a little bridge over it. */
+export const isRiver = (t: PieceId | undefined): boolean => t === 'pond' || t === 'crossing';
+
+/** A path on a pool, or a pool on a path, makes a little bridge. */
+function crosses(id: PieceId, under: PieceId | undefined): boolean {
+	return (id === 'path' && under === 'pond') || (id === 'pond' && under === 'path');
+}
 export const isLand = (x: number, z: number): boolean => S.land.has(key(x, z));
 
 /** Directions from a land cell that look out into the open sky. */
@@ -212,7 +228,8 @@ export function placeProblem(id: PieceId, x: number, z: number): string | null {
 	const def = PIECE[id];
 	if (def.fixed) return 'This cannot be built.';
 	if (Math.hypot(x, z) > WORLD_RADIUS) return 'Too far out in the sky.';
-	if (S.pieces.has(key(x, z))) return 'Something is already here.';
+	const under = pieceAt(x, z);
+	if (under && !crosses(id, under.t)) return 'Something is already here.';
 	const land = isLand(x, z);
 	if (def.on === 'air') {
 		if (land) return 'Bridges go in the air, next to an edge.';
@@ -247,6 +264,11 @@ function commit(changes: Change[], placed: string | null): void {
 
 export function place(id: PieceId, x: number, z: number, r: number): boolean {
 	if (placeProblem(id, x, z)) return false;
+	const under = pieceAt(x, z);
+	if (under) {
+		commit([{ k: key(x, z), before: { ...under }, after: { t: 'crossing', r: 0, s: under.s } }], key(x, z));
+		return true;
+	}
 	const piece: Piece = { t: id, r, s: Math.floor(Math.random() * 100000) };
 	if (id === 'tree') piece.g = 0;
 	if (PIECE[id].on === 'edge') {
@@ -262,7 +284,9 @@ export function placeMany(id: PieceId, cells: [number, number][]): number {
 	const changes: Change[] = [];
 	for (const [x, z] of cells) {
 		if (placeProblem(id, x, z)) continue;
-		changes.push({ k: key(x, z), before: null, after: { t: id, r: 0, s: Math.floor(Math.random() * 100000) } });
+		const under = pieceAt(x, z);
+		if (under) changes.push({ k: key(x, z), before: { ...under }, after: { t: 'crossing', r: 0, s: under.s } });
+		else changes.push({ k: key(x, z), before: null, after: { t: id, r: 0, s: Math.floor(Math.random() * 100000) } });
 	}
 	if (changes.length) commit(changes, changes[changes.length - 1].k);
 	return changes.length;
@@ -272,7 +296,8 @@ export function erase(x: number, z: number): boolean {
 	const k = key(x, z);
 	const before = S.pieces.get(k);
 	if (!before || PIECE[before.t].fixed) return false;
-	commit([{ k, before: { ...before }, after: null }], null);
+	// A little bridge goes away, and the river stays.
+	commit([{ k, before: { ...before }, after: before.t === 'crossing' ? { t: 'pond', r: 0, s: before.s } : null }], null);
 	return true;
 }
 
@@ -330,7 +355,7 @@ export function combosAt(x: number, z: number): ComboDef[] {
 
 /** True when a waterfall rock has a pond next to it. Then its water runs. */
 export function waterfallRuns(x: number, z: number): boolean {
-	for (let d = 0; d < 4; d++) if (pieceAt(x + DX[d], z + DZ[d])?.t === 'pond') return true;
+	for (let d = 0; d < 4; d++) if (isRiver(pieceAt(x + DX[d], z + DZ[d])?.t)) return true;
 	return false;
 }
 
@@ -344,10 +369,14 @@ export function goalProgress(g: GoalDef): number {
 	let n = 0;
 	switch (g.kind) {
 		case 'place':
-			for (const p of S.pieces.values()) if (p.t === g.piece) n++;
+			// A little bridge is a path and a pool at once.
+			for (const p of S.pieces.values()) if (p.t === g.piece || (p.t === 'crossing' && (g.piece === 'path' || g.piece === 'pond'))) n++;
 			break;
 		case 'villagers':
-			for (const p of S.pieces.values()) if (p.t === 'cottage' && p.h) n++;
+			for (const p of S.pieces.values()) if (PIECE[p.t].home && p.h) n++;
+			break;
+		case 'festivals':
+			n = S.festivals;
 			break;
 		case 'gifts':
 			n = S.gifts;
@@ -407,6 +436,8 @@ export function saveNow(): void {
 		tutorial: S.tutorial,
 		names: S.names,
 		gifts: S.gifts,
+		festivals: S.festivals,
+		festDue: S.festDue,
 		seen: Date.now(),
 	};
 	try {
@@ -455,6 +486,8 @@ export function load(): boolean {
 		S.tutorial = !!data.tutorial;
 		S.names = data.names ?? 0;
 		S.gifts = data.gifts ?? 0;
+		S.festivals = data.festivals ?? 0;
+		S.festDue = data.festDue ?? 0;
 		for (let i = 0; i < S.islands; i++) settleIsland(i);
 		S.hasSave = [...S.pieces.values()].some((p) => !PIECE[p.t].fixed) || S.goals.size > 0;
 		if (S.hasSave && data.seen) catchUp((Date.now() - data.seen) / 1000);
@@ -474,7 +507,7 @@ function catchUp(seconds: number): void {
 		if (p.t === 'tree' && (p.g ?? 1) < 1) {
 			p.g = Math.min(1, (p.g ?? 0) + time / TUNE.treeGrowTime);
 			if (p.g >= 1) report.trees++;
-		} else if (p.t === 'cottage' && !p.h) {
+		} else if (PIECE[p.t].home && !p.h) {
 			const index = S.names++;
 			p.h = index + 1;
 			report.elves.push(VILLAGER_NAMES[index % VILLAGER_NAMES.length]);

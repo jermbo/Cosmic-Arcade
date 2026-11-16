@@ -1,7 +1,8 @@
 /** Drawing a road: the player drags from one cell to another, sees the way, then says yes or no. */
 
 import { PIECE, WORLD_RADIUS } from './content.ts';
-import { isLand, pieceAt, placeMany, placeProblem } from './state.ts';
+import type { PieceId } from './content.ts';
+import { isLand, isRiver, pieceAt, placeMany, placeProblem } from './state.ts';
 import { DX, DZ, key } from './util.ts';
 import { showRoute } from './view.ts';
 
@@ -18,15 +19,17 @@ export const road = {
 	/** The drag is over and the road waits for a yes or a no. */
 	pending: false,
 	cells: [] as RouteCell[],
-	/** How many new paths the road needs. */
+	/** How many new pieces the road needs. */
 	fresh: 0,
+	/** What the drag draws: a path or a river. */
+	tool: 'path' as PieceId,
 };
 
 let startX = 0;
 let startZ = 0;
 let endKey = '';
 
-/** Finds the best way between two cells. It goes around buildings and likes straight lines and old paths. */
+/** Finds the best way between two cells. It goes around buildings and likes straight lines and old roads. */
 function findRoute(sx: number, sz: number, tx: number, tz: number): RouteCell[] {
 	const pad = 7;
 	const x0 = Math.min(sx, tx) - pad;
@@ -37,8 +40,19 @@ function findRoute(sx: number, sz: number, tx: number, tz: number): RouteCell[] 
 	const open = (x: number, z: number): boolean => {
 		if (x < x0 || x > x1 || z < z0 || z > z1 || Math.hypot(x, z) > WORLD_RADIUS) return false;
 		const p = pieceAt(x, z);
-		if (p) return !!PIECE[p.t].walk || ends.has(key(x, z));
-		return isLand(x, z);
+		if (!p) return isLand(x, z);
+		if (ends.has(key(x, z))) return true;
+		// A path can cross a river, and a river can cross a path.
+		if (road.tool === 'pond') return isRiver(p.t) || p.t === 'path' || p.t === 'waterfall';
+		return !!PIECE[p.t].walk || p.t === 'pond';
+	};
+	/** An old road of the same kind is cheap. A crossing costs more, so the road crosses the short way. */
+	const stepCost = (x: number, z: number): number => {
+		const p = pieceAt(x, z);
+		if (!p) return 1;
+		if (p.t === 'crossing') return 0.35;
+		const same = road.tool === 'pond' ? p.t !== 'path' : p.t !== 'pond';
+		return same ? 0.35 : 1.6;
 	};
 	if (!open(sx, sz) || !open(tx, tz)) return [];
 
@@ -69,7 +83,7 @@ function findRoute(sx: number, sz: number, tx: number, tz: number): RouteCell[] 
 			const nx = x + DX[d];
 			const nz = z + DZ[d];
 			if (!open(nx, nz)) continue;
-			const step = (pieceAt(nx, nz) ? 0.35 : 1) + (d === dir || (x === sx && z === sz) ? 0 : 0.15);
+			const step = stepCost(nx, nz) + (d === dir || (x === sx && z === sz) ? 0 : 0.15);
 			const n = id(nx, nz, d);
 			const c = cost.get(cur)! + step;
 			const old = cost.get(n);
@@ -83,7 +97,7 @@ function findRoute(sx: number, sz: number, tx: number, tz: number): RouteCell[] 
 	const out: RouteCell[] = [];
 	for (let k = goal; k; k = prev.get(k) ?? null) {
 		const [x, z] = at.get(k)!;
-		out.unshift({ x, z, fresh: placeProblem('path', x, z) === null });
+		out.unshift({ x, z, fresh: placeProblem(road.tool, x, z) === null });
 	}
 	return out;
 }
@@ -91,10 +105,11 @@ function findRoute(sx: number, sz: number, tx: number, tz: number): RouteCell[] 
 function set(cells: RouteCell[]): void {
 	road.cells = cells;
 	road.fresh = cells.filter((c) => c.fresh).length;
-	showRoute(cells);
+	showRoute(cells, road.tool === 'pond');
 }
 
-export function roadStart(x: number, z: number): void {
+export function roadStart(x: number, z: number, tool: PieceId = 'path'): void {
+	road.tool = tool;
 	road.active = true;
 	road.pending = false;
 	startX = x;
@@ -129,5 +144,5 @@ export function roadCancel(): void {
 export function roadCommit(): number {
 	const cells = road.cells.filter((c) => c.fresh).map((c): [number, number] => [c.x, c.z]);
 	roadCancel();
-	return placeMany('path', cells);
+	return placeMany(road.tool, cells);
 }
