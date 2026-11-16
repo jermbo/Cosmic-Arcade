@@ -30,10 +30,15 @@ export type PieceId =
 	| 'teahouse'
 	| 'well'
 	| 'board'
-	| 'towntree';
+	| 'towntree'
+	| 'garden'
+	| 'workshop'
+	| 'library'
+	| 'timberhouse'
+	| 'towerhouse';
 
 /** What an elf does when it visits a piece. */
-export type Visit = 'rest' | 'sit' | 'gather' | 'shop' | 'sniff' | 'wish' | 'gaze' | 'feast';
+export type Visit = 'rest' | 'sit' | 'gather' | 'shop' | 'sniff' | 'wish' | 'gaze' | 'feast' | 'read';
 
 export interface PieceDef {
 	id: PieceId;
@@ -59,8 +64,14 @@ export interface PieceDef {
 	fixed?: boolean;
 	/** The player draws it with a drag, cell after cell. */
 	draw?: boolean;
-	/** An elf lives in it. */
+	/** Elves live in it. */
 	home?: boolean;
+	/** For a home: how many elves live in it. */
+	beds?: number;
+	/** For a home: how many floors it has inside. */
+	floors?: number;
+	/** Elves work here at this job. */
+	work?: JobId;
 	/** It has a door. A path joins it on the side that it faces. */
 	door?: boolean;
 	/** The game builds it by itself. It is not in the toolbar. */
@@ -71,10 +82,12 @@ export interface PieceDef {
 
 export const PIECES: PieceDef[] = [
 	{ id: 'path', name: 'Moss path', blurb: 'Drag to draw a path. Elves love to walk on it.', on: 'land', walk: true, draw: true, starter: true, note: 0 },
-	{ id: 'cottage', name: 'Tree home', blurb: 'A home for one elf. Homes side by side link their branches.', on: 'land', turns: true, home: true, door: true, starter: true, note: 2 },
-	{ id: 'shroomhouse', name: 'Mushroom house', blurb: 'A snug home for one elf, under a big cap.', on: 'land', turns: true, home: true, door: true, note: 3 },
-	{ id: 'stonehut', name: 'Stone hut', blurb: 'A round stone home for one elf, with a moss roof.', on: 'land', turns: true, home: true, door: true, note: 1 },
-	{ id: 'nest', name: 'Nest house', blurb: 'A home for one elf, high up in a tree.', on: 'land', turns: true, home: true, door: true, note: 5 },
+	{ id: 'cottage', name: 'Tree home', blurb: 'Two floors, two elves. Homes side by side link their branches.', on: 'land', turns: true, home: true, beds: 2, floors: 2, door: true, starter: true, note: 2 },
+	{ id: 'shroomhouse', name: 'Mushroom house', blurb: 'A snug one-floor home for one elf, under a big cap.', on: 'land', turns: true, home: true, beds: 1, floors: 1, door: true, note: 3 },
+	{ id: 'stonehut', name: 'Stone hut', blurb: 'A round one-floor home for one elf, with a moss roof.', on: 'land', turns: true, home: true, beds: 1, floors: 1, door: true, note: 1 },
+	{ id: 'nest', name: 'Nest house', blurb: 'Two floors high up in a tree, for two elves.', on: 'land', turns: true, home: true, beds: 2, floors: 2, door: true, note: 5 },
+	{ id: 'timberhouse', name: 'Timber house', blurb: 'Two floors of warm wood and a flower box, for two elves.', on: 'land', turns: true, home: true, beds: 2, floors: 2, door: true, note: 4 },
+	{ id: 'towerhouse', name: 'Tower house', blurb: 'Three floors under a pointy roof, for three elves.', on: 'land', turns: true, home: true, beds: 3, floors: 3, door: true, note: 6 },
 	{ id: 'tree', name: 'Sapling', blurb: 'Starts small and grows tall. Faster near water.', on: 'land', nature: true, starter: true, note: 4 },
 	{ id: 'flower', name: 'Flower bed', blurb: 'A patch of wild blooms.', on: 'land', nature: true, starter: true, visit: 'sniff', note: 5 },
 	{ id: 'pond', name: 'River pool', blurb: 'Drag to draw a river. A path crosses it on a little bridge.', on: 'land', water: true, draw: true, starter: true, visit: 'rest', note: 1 },
@@ -89,10 +102,13 @@ export const PIECES: PieceDef[] = [
 	{ id: 'mushroom', name: 'Mushroom ring', blurb: 'Critters meet here.', on: 'land', nature: true, note: 5 },
 	{ id: 'windmill', name: 'Wind bloom', blurb: 'Its petals turn in the sky wind.', on: 'land', turns: true, note: 4 },
 	{ id: 'bridge', name: 'Rope bridge', blurb: 'Build it in the air, out from an island edge.', on: 'air', walk: true, note: 3 },
-	{ id: 'dock', name: 'Sky dock', blurb: 'A pier for a little leaf boat. Needs an island edge.', on: 'edge', turns: true, walk: true, visit: 'gaze', note: 3 },
-	{ id: 'market', name: 'Cap stall', blurb: 'Fresh sky fruit under a mushroom cap.', on: 'land', turns: true, door: true, visit: 'shop', note: 6 },
-	{ id: 'bakery', name: 'Bakery', blurb: 'Warm buns under a roof like a loaf of bread.', on: 'land', turns: true, door: true, visit: 'shop', note: 7 },
-	{ id: 'teahouse', name: 'Tea house', blurb: 'Petal tea and soft cushions.', on: 'land', turns: true, door: true, visit: 'shop', note: 8 },
+	{ id: 'dock', name: 'Sky dock', blurb: 'A pier for a little leaf boat. A sky fisher works here.', on: 'edge', turns: true, walk: true, visit: 'gaze', work: 'fisher', note: 3 },
+	{ id: 'market', name: 'Cap stall', blurb: 'Fresh sky fruit under a mushroom cap. A grocer works here.', on: 'land', turns: true, door: true, visit: 'shop', work: 'grocer', note: 6 },
+	{ id: 'bakery', name: 'Bakery', blurb: 'Warm buns under a roof like a loaf of bread. Two bakers work here.', on: 'land', turns: true, door: true, visit: 'shop', work: 'baker', note: 7 },
+	{ id: 'teahouse', name: 'Tea house', blurb: 'Petal tea and soft cushions. Two tea keepers work here.', on: 'land', turns: true, door: true, visit: 'shop', work: 'tea', note: 8 },
+	{ id: 'garden', name: 'Garden plot', blurb: 'Rows of sky greens. Two gardeners work here.', on: 'land', turns: true, nature: true, visit: 'sniff', work: 'gardener', starter: true, note: 4 },
+	{ id: 'workshop', name: 'Workshop', blurb: 'Saws, shavings and a warm stove. Two crafters work here.', on: 'land', turns: true, door: true, work: 'crafter', note: 2 },
+	{ id: 'library', name: 'Library', blurb: 'Old books of the sky. Two scholars work here, and elves come to read.', on: 'land', turns: true, door: true, visit: 'read', work: 'scholar', note: 7 },
 	{ id: 'board', name: 'Notice board', blurb: 'Elves stop here to read the news of the isles.', on: 'land', turns: true, visit: 'gaze', note: 2 },
 	{ id: 'towntree', name: 'Town tree', blurb: 'The heart of a town. Elves hold a night festival around it.', on: 'land', lanterns: true, visit: 'gather', note: 8 },
 	{ id: 'tower', name: 'Moon spire', blurb: 'Sends wish lanterns up at night.', on: 'land', lanterns: true, visit: 'wish', note: 8 },
@@ -111,11 +127,12 @@ export interface GroupDef {
 
 export const GROUPS: GroupDef[] = [
 	{ id: 'ways', name: 'Paths', pieces: ['path', 'bridge', 'dock'] },
-	{ id: 'homes', name: 'Homes', pieces: ['cottage', 'shroomhouse', 'stonehut', 'nest'] },
+	{ id: 'homes', name: 'Homes', pieces: ['cottage', 'shroomhouse', 'stonehut', 'nest', 'timberhouse', 'towerhouse'] },
 	{ id: 'nature', name: 'Nature', pieces: ['tree', 'flower', 'mushroom', 'windmill'] },
 	{ id: 'water', name: 'Water', pieces: ['pond', 'waterfall', 'well'] },
 	{ id: 'lights', name: 'Lights', pieces: ['lantern', 'crystal', 'tower'] },
 	{ id: 'seats', name: 'Seats', pieces: ['bench', 'stonebench', 'swing', 'picnic'] },
+	{ id: 'work', name: 'Work', pieces: ['garden', 'workshop', 'library'] },
 	{ id: 'town', name: 'Town', pieces: ['market', 'bakery', 'towntree', 'teahouse', 'board'] },
 ];
 
@@ -184,7 +201,7 @@ export const COMBOS: ComboDef[] = [
 	{ id: 'rainbow', name: 'Rainbow Falls', a: 'crystal', b: 'waterfall', host: 'b', text: 'Light splits in the spray. A small rainbow stays.', hint: 'Falling water can split the light.', colors: [0xff9aa2, 0xffe08a, 0x9be7a5, 0x9fd0ff, 0xc9a8ff], motion: 'rise' },
 ];
 
-export type GoalKind = 'place' | 'villagers' | 'combos' | 'trees' | 'spill' | 'gifts' | 'festivals';
+export type GoalKind = 'place' | 'villagers' | 'jobs' | 'combos' | 'trees' | 'spill' | 'gifts' | 'festivals';
 
 export interface GoalDef {
 	id: string;
@@ -201,15 +218,19 @@ export interface GoalDef {
 export const GOALS: GoalDef[] = [
 	{ id: 'home1', text: 'Grow a tree home', kind: 'place', piece: 'cottage', n: 1, reward: { piece: 'bench' } },
 	{ id: 'home2', text: 'Grow 2 tree homes', kind: 'place', piece: 'cottage', n: 2, reward: { piece: 'shroomhouse' } },
+	{ id: 'garden1', text: 'Dig a garden plot', kind: 'place', piece: 'garden', n: 1, reward: { piece: 'workshop' } },
 	{ id: 'paths', text: 'Lay 8 moss paths', kind: 'place', piece: 'path', n: 8, reward: { piece: 'crystal' } },
 	{ id: 'seat1', text: 'Set down a log seat', kind: 'place', piece: 'bench', n: 1, reward: { piece: 'stonebench' } },
 	{ id: 'vill3', text: 'House 3 elves', kind: 'villagers', n: 3, reward: { piece: 'waterfall' } },
+	{ id: 'jobs3', text: 'Give 3 elves a job', kind: 'jobs', n: 3, reward: { piece: 'timberhouse' } },
 	{ id: 'river', text: 'Draw a river of 5 pools', kind: 'place', piece: 'pond', n: 5, reward: { piece: 'well' } },
 	{ id: 'combo1', text: 'Discover a magic link', kind: 'combos', n: 1, reward: { piece: 'mushroom' } },
+	{ id: 'craft', text: 'Build a workshop', kind: 'place', piece: 'workshop', n: 1, reward: { piece: 'library' } },
 	{ id: 'vill6', text: 'House 6 elves', kind: 'villagers', n: 6, reward: { island: true } },
 	{ id: 'cross', text: 'Cross a river with a path', kind: 'place', piece: 'crossing', n: 1, reward: { piece: 'swing' } },
 	{ id: 'trees', text: 'Grow 4 tall trees', kind: 'trees', n: 4, reward: { piece: 'windmill' } },
 	{ id: 'vill9', text: 'House 9 elves', kind: 'villagers', n: 9, reward: { piece: 'stonehut' } },
+	{ id: 'jobs8', text: 'Give 8 elves a job', kind: 'jobs', n: 8, reward: { piece: 'towerhouse' } },
 	{ id: 'gift1', text: 'Tap a lantern jelly for a gift', kind: 'gifts', n: 1, reward: { piece: 'bridge' } },
 	{ id: 'lanterns', text: 'Hang 5 lantern vines', kind: 'place', piece: 'lantern', n: 5, reward: { piece: 'dock' } },
 	{ id: 'vill12', text: 'House 12 elves', kind: 'villagers', n: 12, reward: { island: true } },
@@ -227,6 +248,79 @@ export const GOALS: GoalDef[] = [
 ];
 
 export const VILLAGER_NAMES = ['Pip', 'Mallow', 'Fen', 'Juno', 'Tansy', 'Bram', 'Wren', 'Olli', 'Nim', 'Posy', 'Dabble', 'Suki', 'Thistle', 'Moss', 'Lumi', 'Quill', 'Aelin', 'Sorrel', 'Fael', 'Ivy', 'Rowan', 'Elowen', 'Briar', 'Lark', 'Yarrow', 'Sylvi', 'Alder', 'Nettle', 'Clove', 'Finch', 'Linden', 'Hazel', 'Ash', 'Dew', 'Fern', 'Tamsin'];
+
+/* Jobs, traits and the day */
+
+export type JobId = 'none' | 'tea' | 'baker' | 'grocer' | 'gardener' | 'crafter' | 'scholar' | 'fisher' | 'lamplighter';
+
+export type TraitId = 'early' | 'owl' | 'social' | 'shy' | 'sweet' | 'green' | 'bookish' | 'dreamer' | 'handy';
+
+export interface JobDef {
+	id: JobId;
+	name: string;
+	/** What the elf does at work, for the villager card. */
+	verb: string;
+	/** Elves per workplace. */
+	slots: number;
+	/** Other pieces the elf walks round to during work. */
+	tour?: PieceId[];
+	/** Working hours, as times of the day 0..1. Two spans: before and after lunch. */
+	shift: [number, number][];
+	/** Elves with this trait like the job best. */
+	trait?: TraitId;
+	/** A job with no workplace: how many elves can have it, for each piece of the tour. */
+	perTour?: number;
+	color: number;
+}
+
+export const DAY = {
+	/** Elves wake up, start work, eat, stop work and go to bed at these times. */
+	wake: 0.03,
+	work: 0.06,
+	lunch: 0.26,
+	back: 0.33,
+	done: 0.52,
+	bed: 0.72,
+};
+
+const WORK_HOURS: [number, number][] = [
+	[DAY.work, DAY.lunch],
+	[DAY.back, DAY.done],
+];
+
+export const JOBS: JobDef[] = [
+	{ id: 'none', name: 'Free elf', verb: 'Wandering', slots: 0, shift: [], color: 0xb9b8c8 },
+	{ id: 'gardener', name: 'Gardener', verb: 'Tending the garden', slots: 2, tour: ['flower', 'tree', 'mushroom'], shift: WORK_HOURS, trait: 'green', color: 0x5fae6e },
+	{ id: 'baker', name: 'Baker', verb: 'Baking buns', slots: 2, shift: [[0.02, DAY.lunch], [DAY.back, 0.46]], trait: 'sweet', color: 0xd9a441 },
+	{ id: 'tea', name: 'Tea keeper', verb: 'Brewing petal tea', slots: 2, shift: WORK_HOURS, trait: 'social', color: 0x4fb0a8 },
+	{ id: 'grocer', name: 'Grocer', verb: 'Selling sky fruit', slots: 1, shift: WORK_HOURS, trait: 'social', color: 0xc8664a },
+	{ id: 'crafter', name: 'Crafter', verb: 'Making things of wood', slots: 2, tour: ['bench', 'swing', 'bridge'], shift: WORK_HOURS, trait: 'handy', color: 0x9a7450 },
+	{ id: 'scholar', name: 'Scholar', verb: 'Reading old books', slots: 2, tour: ['board', 'crystal'], shift: WORK_HOURS, trait: 'bookish', color: 0x8a6fc8 },
+	{ id: 'fisher', name: 'Sky fisher', verb: 'Fishing for star fish', slots: 1, shift: [[0.0, DAY.lunch], [DAY.back, 0.45]], trait: 'dreamer', color: 0x5f8fd0 },
+	{ id: 'lamplighter', name: 'Lamplighter', verb: 'Lighting the lamps', slots: 0, tour: ['lantern', 'tower', 'towntree'], perTour: 0.25, shift: [[0.54, DAY.bed]], trait: 'owl', color: 0xffc94d },
+];
+
+export const JOB = Object.fromEntries(JOBS.map((j) => [j.id, j])) as Record<JobId, JobDef>;
+
+export interface TraitDef {
+	id: TraitId;
+	name: string;
+	blurb: string;
+}
+
+export const TRAITS: TraitDef[] = [
+	{ id: 'early', name: 'Early bird', blurb: 'Up before the sun, in bed early.' },
+	{ id: 'owl', name: 'Night owl', blurb: 'Sleeps in and stays up late.' },
+	{ id: 'social', name: 'Chatty', blurb: 'Loves busy places and company.' },
+	{ id: 'shy', name: 'Shy', blurb: 'Likes quiet seats away from the crowd.' },
+	{ id: 'sweet', name: 'Sweet tooth', blurb: 'Always finds a reason to visit the bakery.' },
+	{ id: 'green', name: 'Green thumb', blurb: 'Happiest near plants and flowers.' },
+	{ id: 'bookish', name: 'Bookish', blurb: 'Reads whenever there is time.' },
+	{ id: 'dreamer', name: 'Dreamer', blurb: 'Gazes at the sky and makes wishes.' },
+	{ id: 'handy', name: 'Handy', blurb: 'Likes to fix and build things.' },
+];
+
+export const TRAIT = Object.fromEntries(TRAITS.map((t) => [t.id, t])) as Record<TraitId, TraitDef>;
 
 /** Balance numbers. Times are in seconds. */
 export const TUNE = {

@@ -947,6 +947,191 @@ function towntree(k: Kit, ctx: Ctx): void {
 }
 
 /** Builds the model of one piece. */
+/** A roof with two slopes. Its ridge runs from front to back. `w` is the width, `h` the height. */
+function gable(k: Kit, color: number, w: number, d: number, y: number, h: number, x = 0, z = 0): void {
+	const r = w / 1.732;
+	const s = h / (1.5 * r);
+	k.add('solid', new THREE.CylinderGeometry(r, r, d, 3), color, x, y + 0.5 * r * s, z, { rx: -Math.PI / 2, sz: s });
+}
+
+/** A square door with a frame, on the front at -z. */
+function plankDoor(k: Kit, x: number, z: number, h = 0.26): void {
+	k.box('solid', 0xe8c98a, 0.17, h + 0.02, 0.03, x, 0, z);
+	k.box('solid', 0x6f4530, 0.13, h, 0.04, x, 0, z - 0.008);
+	k.ball('solid', GOLD, 0.013, x + 0.04, h * 0.5, z - 0.035);
+}
+
+/** Rows of sky greens in two raised beds. */
+function garden(k: Kit, ctx: Ctx): void {
+	const rand = rng(ctx.seed);
+	k.yaw(yawOf(ctx.r));
+	k.box('solid', 0x7a5a44, 0.88, 0.04, 0.88, 0, 0, 0);
+	const crops = ['cabbage', 'carrot', 'pumpkin', 'berry', 'bloom'];
+	for (const sx of [-1, 1]) {
+		k.box('solid', WOOD_DARK, 0.34, 0.09, 0.72, sx * 0.2, 0.02, 0.04);
+		k.box('solid', 0x5c4030, 0.29, 0.1, 0.67, sx * 0.2, 0.02, 0.04);
+		const crop = pick(crops, rand());
+		for (let i = 0; i < 4; i++) {
+			const z = -0.2 + i * 0.16;
+			for (const dx of [-0.07, 0.07]) {
+				const x = sx * 0.2 + dx;
+				const y = 0.12;
+				if (crop === 'cabbage') {
+					k.ball('solid', 0x8fd38a, 0.055, x, y + 0.03, z, { sy: 0.8, ry: rand() });
+					k.ball('solid', 0xc5efb0, 0.03, x, y + 0.06, z);
+				} else if (crop === 'carrot') {
+					for (const a of [-0.4, 0, 0.4]) k.cyl('solid', 0x5fae6e, 0.003, 0.012, 0.09, 4, x, y, z, { rz: a });
+					k.ball('solid', 0xf2a03c, 0.02, x, y + 0.005, z);
+				} else if (crop === 'pumpkin') {
+					if ((i + (dx > 0 ? 1 : 0)) % 2) k.ball('solid', 0x6fa84a, 0.04, x, y + 0.02, z, { sy: 0.5 });
+					else {
+						k.ball('solid', 0xf2a03c, 0.055, x, y + 0.035, z, { sy: 0.75 });
+						k.cyl('solid', 0x6e4f3a, 0.006, 0.008, 0.03, 4, x, y + 0.07, z);
+					}
+				} else if (crop === 'berry') {
+					k.ball('solid', 0x4fae78, 0.06, x, y + 0.04, z, { ry: rand() });
+					for (let b = 0; b < 3; b++) k.ball('solid', 0xff6f9c, 0.014, x + (rand() - 0.5) * 0.08, y + 0.05 + rand() * 0.04, z + (rand() - 0.5) * 0.08);
+				} else {
+					k.cyl('solid', 0x5fae6e, 0.004, 0.006, 0.1, 4, x, y, z);
+					k.ball('solid', pick(BLOOMS, rand()), 0.026, x, y + 0.1, z);
+				}
+			}
+		}
+	}
+	// A little fence at the back, a watering can and a scarecrow.
+	for (let i = 0; i < 5; i++) k.box('solid', WOOD, 0.03, 0.18, 0.02, -0.4 + i * 0.2, 0, 0.44);
+	k.box('solid', WOOD, 0.84, 0.025, 0.015, 0, 0.12, 0.445);
+	k.cyl('solid', 0x8fb7c9, 0.035, 0.04, 0.06, 7, 0.38, 0.03, -0.38);
+	k.cyl('solid', 0x8fb7c9, 0.006, 0.01, 0.07, 4, 0.33, 0.07, -0.38, { rz: 0.9 });
+	k.box('solid', WOOD_DARK, 0.02, 0.42, 0.02, 0, 0.03, 0.3);
+	k.box('solid', WOOD_DARK, 0.2, 0.02, 0.02, 0, 0.3, 0.3);
+	k.box('solid', pick([0xc8664a, 0x5f8fd0, 0xb86fa8], rand()), 0.1, 0.12, 0.06, 0, 0.22, 0.3);
+	k.ball('solid', 0xf2d9a0, 0.05, 0, 0.42, 0.3);
+	k.cyl('solid', 0xd9a441, 0.02, 0.08, 0.05, 7, 0, 0.45, 0.3);
+}
+
+/** A wood shed with an open front, a work bench and a stove. */
+function workshop(k: Kit, ctx: Ctx): void {
+	const rand = rng(ctx.seed);
+	const roof = pick([0x8a5a44, 0x5f8fd0, 0x4fa068, 0xb5523c], rand());
+	k.yaw(yawOf(ctx.r));
+	k.box('solid', WOOD_DARK, 0.84, 0.04, 0.8, 0, 0, 0.02);
+	k.box('solid', WOOD, 0.78, 0.5, 0.06, 0, 0.04, 0.36);
+	for (const sx of [-1, 1]) {
+		k.box('solid', WOOD, 0.06, 0.5, 0.72, sx * 0.37, 0.04, 0.02);
+		k.box('solid', WOOD_DARK, 0.07, 0.6, 0.07, sx * 0.37, 0.04, -0.33);
+		k.ball('glow', 0, 0.045, sx * 0.4, 0.32, 0.08);
+	}
+	k.box('solid', roof, 0.96, 0.05, 0.94, 0, 0.6, 0.0, { rx: -0.22 });
+	k.box('solid', lighter(roof, 0.2), 0.98, 0.03, 0.06, 0, 0.67, -0.45, { rx: -0.22 });
+	// The bench, with a plank and a saw.
+	k.box('solid', WOOD, 0.46, 0.035, 0.2, 0, 0.2, 0.12);
+	for (const sx of [-1, 1]) k.box('solid', WOOD_DARK, 0.03, 0.2, 0.16, sx * 0.2, 0.04, 0.12);
+	k.box('solid', 0xf2d9b0, 0.3, 0.02, 0.06, -0.02, 0.235, 0.1, { ry: 0.2 });
+	k.box('solid', 0xc8d0dc, 0.12, 0.05, 0.005, 0.12, 0.25, 0.16);
+	k.box('solid', 0xb5523c, 0.04, 0.025, 0.02, 0.19, 0.26, 0.16);
+	// Tools on the back wall.
+	k.box('solid', 0xc8d0dc, 0.03, 0.12, 0.01, -0.2, 0.36, 0.325);
+	k.box('solid', WOOD_DARK, 0.1, 0.02, 0.01, 0.0, 0.42, 0.325);
+	k.box('solid', 0x8a8a9a, 0.04, 0.04, 0.02, 0.05, 0.4, 0.325);
+	// A stone stove with a chimney, and its glow.
+	k.box('solid', STONE, 0.14, 0.24, 0.14, -0.26, 0.04, 0.22);
+	k.box('glow', 0, 0.08, 0.06, 0.02, -0.26, 0.08, 0.145);
+	k.box('solid', 0xa9a8ba, 0.08, 0.5, 0.08, -0.26, 0.28, 0.26);
+	// Logs by the side.
+	for (let i = 0; i < 3; i++) k.cyl('solid', i === 1 ? BARK_LIGHT : BARK, 0.045, 0.045, 0.3, 6, 0.42 + (i === 2 ? 0.045 : 0), 0.045 + (i === 2 ? 0.075 : 0) + 0.0, -0.05 + i * 0.09 - (i === 2 ? 0.135 : 0), { rx: Math.PI / 2 });
+	k.box('solid', 0xc9cdb6, 0.24, 0.025, 0.1, 0, 0, -0.44);
+	k.ball('lamp', GOLD, 0.035, 0.3, 0.5, -0.36);
+	k.glow(0.3, 0.5, -0.36, 0xffd27a, 0.8);
+}
+
+/** A stone hall of books, with a round window and a blue roof. */
+function library(k: Kit, ctx: Ctx): void {
+	const rand = rng(ctx.seed);
+	const roof = pick([0x4a5ea8, 0x5f8fd0, 0x6a5fc0, 0x3f9f9a], rand());
+	k.yaw(yawOf(ctx.r));
+	k.box('solid', 0xa9a8ba, 0.8, 0.06, 0.74, 0, 0, 0.04);
+	k.box('solid', 0xe6e2d6, 0.72, 0.5, 0.64, 0, 0.06, 0.06);
+	for (const sx of [-1, 1]) for (const sz of [-1, 1]) k.box('solid', STONE, 0.08, 0.56, 0.08, sx * 0.36, 0.04, 0.06 + sz * 0.32);
+	gable(k, roof, 0.86, 0.78, 0.56, 0.36, 0, 0.06);
+	k.box('solid', lighter(roof, 0.2), 0.08, 0.05, 0.8, 0, 0.92, 0.06);
+	// A round window in the gable and tall windows on the sides.
+	k.cyl('solid', 0xe8c98a, 0.1, 0.1, 0.03, 10, 0, 0.66, -0.26, { rx: Math.PI / 2 });
+	k.cyl('glow', 0, 0.075, 0.075, 0.03, 10, 0, 0.66, -0.27, { rx: Math.PI / 2 });
+	for (const sx of [-1, 1]) for (const sz of [-0.12, 0.2]) k.box('glow', 0, 0.02, 0.2, 0.1, sx * 0.365, 0.22, sz);
+	// An arched door with steps.
+	k.box('solid', 0xe8c98a, 0.2, 0.3, 0.03, 0, 0.06, -0.265);
+	k.box('solid', 0x4a3a56, 0.15, 0.27, 0.04, 0, 0.06, -0.272);
+	k.cyl('solid', 0x4a3a56, 0.075, 0.075, 0.04, 8, 0, 0.33, -0.272, { rx: Math.PI / 2 });
+	k.box('solid', 0xc9cdb6, 0.28, 0.03, 0.12, 0, 0, -0.35);
+	// A stack of books and a reading lamp by the door.
+	for (let i = 0; i < 3; i++) k.box('solid', pick([0xb5523c, 0x5f8fd0, 0xd9a441, 0x4fa068], rand()), 0.1, 0.025, 0.07, 0.25, 0.06 + i * 0.026, -0.32, { ry: rand() - 0.5 });
+	k.box('solid', BARK_DARK, 0.015, 0.3, 0.015, -0.26, 0.06, -0.33);
+	k.ball('lamp', 0xd6f0ff, 0.04, -0.26, 0.38, -0.33);
+	k.glow(-0.26, 0.38, -0.33, 0x9fd0ff, 0.8);
+}
+
+/** Two floors of timber frame, with a flower box and a chimney. */
+function timberhouse(k: Kit, ctx: Ctx): void {
+	const rand = rng(ctx.seed);
+	const roof = pick([0xb5523c, 0x5f8fd0, 0x4fa068, 0x8a6fc8, 0xd9604a], rand());
+	const wall = pick([0xfff4e2, 0xf7e6cc, 0xf2e2d0, 0xe6f0e0], rand());
+	k.yaw(yawOf(ctx.r));
+	k.box('solid', STONE, 0.66, 0.08, 0.6, 0, 0, 0.04);
+	k.box('solid', wall, 0.6, 0.34, 0.54, 0, 0.08, 0.04);
+	k.box('solid', wall, 0.68, 0.32, 0.62, 0, 0.42, 0.04);
+	// Dark beams on the walls.
+	for (const y of [0.08, 0.41, 0.73]) k.box('solid', BARK_DARK, y > 0.4 ? 0.7 : 0.62, 0.03, y > 0.4 ? 0.64 : 0.56, 0, y, 0.04);
+	for (const sx of [-1, 1]) {
+		k.box('solid', BARK_DARK, 0.03, 0.34, 0.03, sx * 0.3, 0.08, -0.235);
+		k.box('solid', BARK_DARK, 0.03, 0.32, 0.03, sx * 0.34, 0.42, -0.275);
+		k.box('solid', BARK_DARK, 0.025, 0.36, 0.025, sx * 0.17, 0.43, -0.276, { rz: sx * 0.6 });
+	}
+	gable(k, roof, 0.82, 0.74, 0.74, 0.42, 0, 0.04);
+	k.box('solid', 0xa9a8ba, 0.1, 0.4, 0.1, 0.2, 0.8, 0.22);
+	plankDoor(k, -0.12, -0.24);
+	k.box('glow', 0, 0.12, 0.12, 0.02, 0.14, 0.18, -0.24);
+	k.box('glow', 0, 0.14, 0.12, 0.02, -0.14, 0.52, -0.28);
+	k.box('glow', 0, 0.14, 0.12, 0.02, 0.14, 0.52, -0.28);
+	k.ball('glow', 0, 0.04, 0, 0.9, -0.33);
+	// A flower box under the upper windows.
+	k.box('solid', WOOD, 0.44, 0.05, 0.06, 0, 0.47, -0.32);
+	for (let i = 0; i < 6; i++) k.ball('solid', pick(BLOOMS, rand()), 0.025, -0.18 + i * 0.072, 0.53, -0.32);
+	k.box('solid', 0xc9cdb6, 0.2, 0.025, 0.1, -0.12, 0, -0.32);
+	if (ctx.homed) doorLamp(k, 0.02, 0.32, -0.27);
+}
+
+/** A round tower of three floors under a pointed roof. */
+function towerhouse(k: Kit, ctx: Ctx): void {
+	const rand = rng(ctx.seed);
+	const roof = pick([0x6a5fc0, 0xb86fa8, 0x4fb0a8, 0xd9604a, 0x5f8fd0], rand());
+	k.yaw(yawOf(ctx.r));
+	k.cyl('solid', STONE, 0.3, 0.34, 0.44, 9, 0, 0, 0);
+	k.cyl('solid', 0xe3c79c, 0.29, 0.3, 0.38, 9, 0, 0.44, 0);
+	k.cyl('solid', 0xfff4e2, 0.3, 0.29, 0.36, 9, 0, 0.82, 0);
+	k.cyl('solid', BARK_DARK, 0.31, 0.31, 0.03, 9, 0, 0.44, 0);
+	k.cyl('solid', BARK_DARK, 0.31, 0.31, 0.03, 9, 0, 0.82, 0);
+	// A balcony round the middle floor.
+	k.cyl('solid', WOOD, 0.42, 0.42, 0.03, 10, 0, 0.82, 0);
+	for (let i = 0; i < 10; i++) {
+		const a = (i / 10) * Math.PI * 2;
+		k.box('solid', WOOD_DARK, 0.015, 0.09, 0.015, Math.cos(a) * 0.4, 0.85, Math.sin(a) * 0.4);
+	}
+	k.cyl('solid', roof, 0.01, 0.42, 0.62, 9, 0, 1.18, 0);
+	k.cyl('solid', lighter(roof, 0.2), 0.42, 0.42, 0.03, 9, 0, 1.18, 0);
+	k.box('solid', BARK_DARK, 0.012, 0.18, 0.012, 0, 1.78, 0);
+	k.box('solid', pick([0xffc94d, 0xff8fab, 0x9fe0ff], rand()), 0.1, 0.06, 0.005, 0.05, 1.89, 0);
+	// Windows on each floor, and the door.
+	for (const [a, y] of [[-0.9, 0.26], [0.9, 0.26], [0.3, 0.6], [-1.2, 0.62], [0, 0.96], [2.0, 0.98]]) k.ball('glow', 0, 0.05, Math.sin(a) * 0.29, y, -Math.cos(a) * 0.29, { sy: 1.3 });
+	k.box('solid', 0xe8c98a, 0.18, 0.28, 0.03, 0, 0, -0.325);
+	k.box('solid', 0x6f4530, 0.13, 0.25, 0.04, 0, 0, -0.335);
+	k.cyl('solid', 0x6f4530, 0.065, 0.065, 0.04, 8, 0, 0.25, -0.335, { rx: Math.PI / 2 });
+	k.ball('solid', GOLD, 0.013, 0.04, 0.12, -0.36);
+	k.box('solid', 0xc9cdb6, 0.22, 0.025, 0.1, 0, 0, -0.4);
+	k.ball('solid', MOSS, 0.08, 0.3, 0.02, 0.2, { sy: 0.4 });
+	if (ctx.homed) doorLamp(k, 0.18, 0.36, -0.33);
+}
+
 export function buildPiece(id: PieceId, ctx: Ctx): Model {
 	const k = new Kit();
 	const anims: Anim[] = [];
@@ -1047,6 +1232,21 @@ export function buildPiece(id: PieceId, ctx: Ctx): Model {
 			break;
 		case 'teahouse':
 			teahouse(k, ctx);
+			break;
+		case 'garden':
+			garden(k, ctx);
+			break;
+		case 'workshop':
+			workshop(k, ctx);
+			break;
+		case 'library':
+			library(k, ctx);
+			break;
+		case 'timberhouse':
+			timberhouse(k, ctx);
+			break;
+		case 'towerhouse':
+			towerhouse(k, ctx);
 			break;
 		case 'well':
 			well(k, ctx);

@@ -50,7 +50,41 @@ export const actions = {
 	menuBack: () => {},
 	menuAdjust: (_step: number) => {},
 	modeChanged: () => {},
+	/** The player moved the view by hand. */
+	viewDragged: () => {},
 };
+
+/**
+ * Another module can take over pointers, held keys and the gamepad, for walking as an elf.
+ * Then the build camera stands still and the driver moves the camera itself.
+ */
+export interface Driver {
+	down: (id: number, x: number, y: number, touch: boolean) => void;
+	move: (id: number, x: number, y: number, dx: number, dy: number) => void;
+	up: (id: number, tap: boolean, x: number, y: number) => void;
+	/** Each frame: the held keys and the sticks of the gamepad. */
+	update: (dt: number, keys: Set<string>, pad: { lx: number; ly: number; rx: number; ry: number } | null, pressed: (i: number) => boolean) => void;
+	key: (k: string) => boolean;
+	/** The mouse wheel, as a zoom factor. */
+	wheel?: (factor: number) => void;
+	/** The mouse moves with no button down. */
+	hover?: (x: number, y: number) => void;
+}
+
+let driver: Driver | null = null;
+
+export function setDriver(d: Driver | null): void {
+	driver = d;
+	pointers.clear();
+	pinch = null;
+	multi = false;
+	held.clear();
+}
+
+/** Puts the build camera back where it was, after a driver lets go. */
+export function placeBuildCamera(): void {
+	placeCamera();
+}
 
 const MIN_DIST = 5;
 const MAX_DIST = 78;
@@ -152,8 +186,17 @@ function pinchState(): { dist: number; angle: number; midX: number; midY: number
 
 function onDown(e: PointerEvent): void {
 	if (!input.active) return;
-	canvas.setPointerCapture(e.pointerId);
+	try {
+		canvas.setPointerCapture(e.pointerId);
+	} catch {
+		/* A pointer that is already gone. Nothing to capture. */
+	}
 	const touch = e.pointerType !== 'mouse';
+	if (driver) {
+		pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY, button: e.button, moved: false, touch, road: false });
+		driver.down(e.pointerId, e.clientX, e.clientY, touch);
+		return;
+	}
 	setMode(touch ? 'touch' : 'mouse');
 	pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY, button: e.button, moved: false, touch, road: false });
 	if (pointers.size === 2) {
@@ -170,6 +213,10 @@ function onDown(e: PointerEvent): void {
 function onMove(e: PointerEvent): void {
 	const p = pointers.get(e.pointerId);
 	if (!p) {
+		if (driver) {
+			if (e.pointerType === 'mouse' && input.active) driver.hover?.(e.clientX, e.clientY);
+			return;
+		}
 		if (e.pointerType === 'mouse' && input.active) {
 			setMode('mouse');
 			hover(e.clientX, e.clientY);
@@ -178,6 +225,13 @@ function onMove(e: PointerEvent): void {
 	}
 	const dx = e.clientX - p.x;
 	const dy = e.clientY - p.y;
+	if (driver) {
+		if (Math.hypot(e.clientX - p.startX, e.clientY - p.startY) > 10) p.moved = true;
+		p.x = e.clientX;
+		p.y = e.clientY;
+		driver.move(e.pointerId, e.clientX, e.clientY, dx, dy);
+		return;
+	}
 	if (!p.moved && Math.hypot(e.clientX - p.startX, e.clientY - p.startY) > (p.touch ? 10 : 5)) {
 		p.moved = true;
 		if (p.button === 0 && !multi && pointers.size === 1) {
@@ -224,6 +278,7 @@ function onMove(e: PointerEvent): void {
 			const before = groundAt(p.x, p.y)?.clone();
 			const after = groundAt(e.clientX, e.clientY);
 			if (before && after) panBy(before.x - after.x, before.z - after.z);
+			actions.viewDragged();
 		}
 	}
 	p.x = e.clientX;
@@ -235,6 +290,10 @@ function onUp(e: PointerEvent): void {
 	const p = pointers.get(e.pointerId);
 	if (!p) return;
 	pointers.delete(e.pointerId);
+	if (driver) {
+		driver.up(e.pointerId, !p.moved && e.type !== 'pointercancel', e.clientX, e.clientY);
+		return;
+	}
 	if (pointers.size < 2) pinch = null;
 	const wasMulti = multi;
 	if (pointers.size === 0) multi = false;
@@ -261,6 +320,10 @@ function onWheel(e: WheelEvent): void {
 	if (!input.active) return;
 	e.preventDefault();
 	const amount = e.deltaMode === 1 ? e.deltaY * 30 : e.deltaY;
+	if (driver) {
+		driver.wheel?.(Math.exp(clamp(amount, -200, 200) * (e.ctrlKey ? 0.01 : 0.0012)));
+		return;
+	}
 	goal.dist *= Math.exp(clamp(amount, -200, 200) * (e.ctrlKey ? 0.01 : 0.0012));
 	clampGoal();
 }
@@ -307,6 +370,10 @@ function onKey(e: KeyboardEvent): void {
 	const typing = (e.target as HTMLElement | null)?.tagName === 'INPUT';
 	if (typing) return;
 	held.add(k);
+	if (driver) {
+		if (driver.key(k)) e.preventDefault();
+		return;
+	}
 	switch (k) {
 		case 'ArrowLeft':
 		case 'a':
@@ -362,6 +429,8 @@ function onKey(e: KeyboardEvent): void {
 /* Gamepad */
 
 const padWas: boolean[] = [];
+/** The driver got its update from the gamepad this frame. */
+let padDriven = false;
 let padRepeat = 0;
 let menuRepeat = 0;
 
@@ -376,6 +445,12 @@ function readPad(dt: number): void {
 	const rx = dead(pad.axes[2] ?? 0);
 	const ry = dead(pad.axes[3] ?? 0);
 	const any = lx || ly || rx || ry || pad.buttons.some((b) => b.pressed);
+	if (driver && input.active) {
+		driver.update(dt, held, { lx, ly, rx, ry }, hit);
+		for (let i = 0; i < pad.buttons.length; i++) padWas[i] = down(i);
+		padDriven = true;
+		return;
+	}
 	if (any && input.active) setMode('cursor');
 
 	if (!input.active) {
@@ -444,7 +519,12 @@ export function initInput(el: HTMLCanvasElement): void {
 
 /** Each frame: reads held keys and the gamepad, and eases the camera. `orbit` turns it slowly, for the title. */
 export function updateInput(dt: number, orbit: boolean): void {
+	padDriven = false;
 	readPad(dt);
+	if (driver) {
+		if (!padDriven) driver.update(dt, input.active ? held : new Set(), null, () => false);
+		return;
+	}
 	if (input.active) {
 		if (held.has('q')) goal.yaw += dt * 1.6;
 		if (held.has('e')) goal.yaw -= dt * 1.6;
@@ -470,6 +550,14 @@ export function updateInput(dt: number, orbit: boolean): void {
 	view.pitch = lerp(view.pitch, goal.pitch, ease);
 	view.dist = lerp(view.dist, goal.dist, ease);
 	placeCamera();
+}
+
+/** Keeps the camera on a moving point, for following an elf. */
+export function followTo(x: number, z: number, dist?: number): void {
+	goal.x = x;
+	goal.z = z;
+	if (dist) goal.dist = Math.min(goal.dist, dist);
+	clampGoal();
 }
 
 /** Zooms by a factor, for the on-screen buttons. */

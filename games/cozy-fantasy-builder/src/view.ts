@@ -568,7 +568,7 @@ function contextOf(x: number, z: number): Ctx {
 		combos: combosAt(x, z).map((c) => c.id),
 		spills: p.t === 'waterfall' ? spillSides(x, z) : [],
 		clusterSeed: p.t === 'cottage' ? clusterOf(key(x, z)).seed : p.s,
-		homed: !!p.h,
+		homed: !!p.who?.length,
 	};
 }
 

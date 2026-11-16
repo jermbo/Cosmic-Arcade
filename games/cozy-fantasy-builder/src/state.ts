@@ -1,7 +1,9 @@
 /** The state of the game: the pieces, the land, the rules of placing, undo and saving. */
 
-import { COMBOS, GOALS, ISLANDS, PIECE, PIECES, START_ISLANDS, TUNE, VILLAGER_NAMES, WORLD_RADIUS } from './content.ts';
+import { COMBOS, GOALS, ISLANDS, PIECE, PIECES, START_ISLANDS, TUNE, WORLD_RADIUS } from './content.ts';
 import type { ComboDef, GoalDef, PieceId } from './content.ts';
+import { assignJobs, livingFolk, makeFolk, pruneFolk } from './folk.ts';
+import type { Folk } from './folk.ts';
 import { DX, DZ, key, unkey } from './util.ts';
 
 export interface Piece {
@@ -12,8 +14,23 @@ export interface Piece {
 	s: number;
 	/** Growth of a tree, 0..1. */
 	g?: number;
-	/** For a tree home: index of the elf name plus one, when an elf lives here. */
-	h?: number;
+	/** For a home: the ids of the elves that live here. */
+	who?: number[];
+	/** For a home: the things inside it, floor by floor. */
+	decor?: DecorItem[][];
+}
+
+/** A thing inside a home: furniture, a lamp, a rug. */
+export interface DecorItem {
+	/** Furniture id. */
+	f: string;
+	/** Tile on the floor. */
+	x: number;
+	z: number;
+	/** Facing, 0..3. */
+	r: number;
+	/** Colour choice. */
+	c: number;
 }
 
 export type Quality = 'low' | 'medium' | 'high';
@@ -33,7 +50,9 @@ export interface AwayReport {
 }
 
 interface SaveData {
-	v: 2;
+	v: 3;
+	folk: Folk[];
+	nextFolk: number;
 	pieces: Record<string, Piece>;
 	lush: Record<string, number>;
 	islands: number;
@@ -42,7 +61,6 @@ interface SaveData {
 	goals: string[];
 	clock: number;
 	tutorial: boolean;
-	names: number;
 	gifts: number;
 	festivals?: number;
 	festDue?: number;
@@ -50,7 +68,9 @@ interface SaveData {
 	seen: number;
 }
 
-const SAVE_KEY = 'petalwisp-isles.save2';
+const SAVE_KEY = 'petalwisp-isles.save3';
+/** Saves of older versions. They do not fit, so the game removes them. */
+const OLD_KEYS = ['petalwisp-isles.save', 'petalwisp-isles.save2'];
 const SETTINGS_KEY = 'petalwisp-isles.settings';
 
 type Change = { k: string; before: Piece | null; after: Piece | null };
@@ -70,8 +90,10 @@ export const S = {
 	/** Time of day, 0..1. */
 	clock: 0.12,
 	tutorial: false,
-	/** How many elf names were given out. */
-	names: 0,
+	/** Every elf, by id. */
+	folk: new Map<number, Folk>(),
+	/** The id of the next elf. */
+	nextFolk: 0,
 	/** How many jelly gifts the player collected. */
 	gifts: 0,
 	/** How many night festivals the elves held. */
@@ -186,7 +208,8 @@ export function resetState(): void {
 	S.combos.clear();
 	S.goals.clear();
 	S.clock = 0.12;
-	S.names = 0;
+	S.folk.clear();
+	S.nextFolk = 0;
 	S.gifts = 0;
 	S.festivals = 0;
 	S.festDue = 0;
@@ -373,7 +396,10 @@ export function goalProgress(g: GoalDef): number {
 			for (const p of S.pieces.values()) if (p.t === g.piece || (p.t === 'crossing' && (g.piece === 'path' || g.piece === 'pond'))) n++;
 			break;
 		case 'villagers':
-			for (const p of S.pieces.values()) if (PIECE[p.t].home && p.h) n++;
+			for (const p of S.pieces.values()) if (PIECE[p.t].home) n += p.who?.length ?? 0;
+			break;
+		case 'jobs':
+			n = livingFolk().filter((f) => f.job !== 'none').length;
 			break;
 		case 'festivals':
 			n = S.festivals;
@@ -425,7 +451,9 @@ export function saveNow(): void {
 	const lush: Record<string, number> = {};
 	for (const [k, v] of S.lush) if (v > 0.02) lush[k] = Math.round(v * 100) / 100;
 	const data: SaveData = {
-		v: 2,
+		v: 3,
+		folk: [...S.folk.values()],
+		nextFolk: S.nextFolk,
 		pieces: Object.fromEntries(S.pieces),
 		lush,
 		islands: S.islands,
@@ -434,7 +462,6 @@ export function saveNow(): void {
 		goals: [...S.goals],
 		clock: S.clock,
 		tutorial: S.tutorial,
-		names: S.names,
 		gifts: S.gifts,
 		festivals: S.festivals,
 		festDue: S.festDue,
@@ -474,7 +501,7 @@ export function load(): boolean {
 		const raw = localStorage.getItem(SAVE_KEY);
 		if (!raw) return false;
 		const data = JSON.parse(raw) as SaveData;
-		if (data.v !== 2) return false;
+		if (data.v !== 3) return false;
 		S.islands = Math.min(ISLANDS.length, Math.max(START_ISLANDS, data.islands));
 		buildLand();
 		for (const [k, p] of Object.entries(data.pieces)) if (PIECE[p.t]) S.pieces.set(k, p);
@@ -484,7 +511,9 @@ export function load(): boolean {
 		S.goals = new Set(data.goals);
 		S.clock = data.clock ?? 0.12;
 		S.tutorial = !!data.tutorial;
-		S.names = data.names ?? 0;
+		for (const f of data.folk) S.folk.set(f.id, f);
+		S.nextFolk = data.nextFolk;
+		pruneFolk();
 		S.gifts = data.gifts ?? 0;
 		S.festivals = data.festivals ?? 0;
 		S.festDue = data.festDue ?? 0;
@@ -507,16 +536,30 @@ function catchUp(seconds: number): void {
 		if (p.t === 'tree' && (p.g ?? 1) < 1) {
 			p.g = Math.min(1, (p.g ?? 0) + time / TUNE.treeGrowTime);
 			if (p.g >= 1) report.trees++;
-		} else if (PIECE[p.t].home && !p.h) {
-			const index = S.names++;
-			p.h = index + 1;
-			report.elves.push(VILLAGER_NAMES[index % VILLAGER_NAMES.length]);
 		}
 	}
+	for (const [k, p] of S.pieces) {
+		const beds = PIECE[p.t].beds ?? 0;
+		while ((p.who?.length ?? 0) < beds) {
+			const f = makeFolk(k);
+			p.who = [...(p.who ?? []), f.id];
+			report.elves.push(f.name);
+		}
+	}
+	if (report.elves.length) assignJobs();
 	report.gifts = Math.min(3, Math.floor(time / 900));
 	S.gifts += report.gifts;
 	S.clock = (S.clock + time / TUNE.dayLength) % 1;
 	if (report.trees || report.elves.length || report.gifts) S.away = report;
+}
+
+/** Removes saves of older versions. */
+export function dropOldSaves(): void {
+	try {
+		for (const k of OLD_KEYS) localStorage.removeItem(k);
+	} catch {
+		/* Storage is blocked. Nothing to clean up. */
+	}
 }
 
 export function wipeSave(): void {

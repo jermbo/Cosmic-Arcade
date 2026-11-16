@@ -24,6 +24,9 @@
 				<button class="round" id="btn-isles" type="button" aria-label="Islands">
 					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h16l-3 5-3 1-2 5-2-5-3-1zM9 9c0-3 1.500-5 3-5s3 2 3 5" /></svg>
 				</button>
+				<button class="round" id="btn-folk" type="button" aria-label="Elves">
+					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4l-3 6h6zM8.5 10a3 3 0 1 0 1 0M4 21c0-4 2.5-6 5-6s5 2 5 6M17 7a2.500 2.500 0 1 0 0 .1M14.500 21c.5-3 1.500-5 3-5s3 1.500 3.500 5" /></svg>
+				</button>
 				<button class="round" id="btn-book" type="button" aria-label="Book of magic links">
 					<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7c-2-1.5-4.5-2-8-2v13c3.500 0 6 .5 8 2 2-1.500 4.500-2 8-2V5c-3.500 0-6 .5-8 2zM12 7v13" /></svg>
 					<span class="round__badge" id="book-count">0</span>
@@ -55,6 +58,40 @@
 						<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13" /></svg>
 					</button>
 				</div>
+			</div>
+
+			<aside class="card" id="card" hidden aria-label="Elf"></aside>
+
+			<div class="decor" id="decor" hidden>
+				<div class="decor__top">
+					<button class="round" id="decor-exit" type="button" aria-label="Leave the home">
+						<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+					</button>
+					<p class="decor__name" id="decor-name"></p>
+					<button class="btn btn--big decor__walk" id="decor-walk" type="button">Walk in</button>
+				</div>
+				<div class="decor__floors choices" id="decor-floors" role="group" aria-label="Floors"></div>
+				<div class="decor__dock">
+					<p class="dock__hint" id="decor-hint"></p>
+					<div class="decor__sel" id="decor-sel" hidden></div>
+					<div class="decor__cats" id="decor-cats" role="group" aria-label="Kinds of things"></div>
+					<div class="decor__items" id="decor-items" role="toolbar" aria-label="Things"></div>
+				</div>
+			</div>
+
+			<div class="drive" id="drive" hidden>
+				<div class="drive__top">
+					<button class="round" id="drive-exit" type="button" aria-label="Stop playing as this elf">
+						<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+					</button>
+					<p class="drive__name"><small>Playing as</small> <b id="drive-name"></b></p>
+					<button class="round" id="drive-view" type="button" aria-label="Switch to first person" aria-pressed="false">
+						<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.500-6 10-6 10 6 10 6-3.500 6-10 6S2 12 2 12zM12 9.500a2.500 2.500 0 1 0 0 5 2.500 2.500 0 0 0 0-5z" /></svg>
+					</button>
+				</div>
+				<p class="drive__hint" id="drive-hint"></p>
+				<div class="drive__stick" id="drive-stick" hidden><i></i></div>
+				<button class="btn btn--big drive__act" id="drive-act" type="button" hidden></button>
 			</div>
 
 			<div class="toasts" id="toasts" aria-live="polite"></div>

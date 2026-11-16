@@ -23,7 +23,7 @@ export const festEvents = {
 };
 
 /** How high a string of lights hangs on each piece. Pieces that are not here get no string. */
-const HANG: Partial<Record<PieceId, number>> = { cottage: 1.0, shroomhouse: 0.8, stonehut: 0.78, nest: 1.32, market: 0.76, bakery: 0.66, teahouse: 0.9, lantern: 0.56, well: 0.76, board: 0.6, tower: 1.3, swing: 0.78, windmill: 0.86 };
+const HANG: Partial<Record<PieceId, number>> = { cottage: 1.0, shroomhouse: 0.8, stonehut: 0.78, nest: 1.32, market: 0.76, bakery: 0.66, teahouse: 0.9, timberhouse: 0.9, towerhouse: 1.2, workshop: 0.6, library: 0.8, lantern: 0.56, well: 0.76, board: 0.6, tower: 1.3, swing: 0.78, windmill: 0.86 };
 const BULBS = [0xffd27a, 0xff9fc0, 0x9fe0ff, 0xc9a8ff, 0xb9ffb0, 0xfff1c4];
 const MAX_STRINGS = 14;
 const MAX_BOATS = 7;

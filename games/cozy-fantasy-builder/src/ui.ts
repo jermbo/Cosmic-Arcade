@@ -5,7 +5,7 @@ import type { ComboDef, GoalDef, GroupDef, PieceId } from './content.ts';
 import { goalProgress, nextGoal, S, saveSettings } from './state.ts';
 import type { Quality } from './state.ts';
 
-export type Panel = 'pause' | 'settings' | 'book' | 'goals' | 'isles' | 'away' | 'help' | 'tutorial' | 'confirm';
+export type Panel = 'pause' | 'settings' | 'book' | 'goals' | 'isles' | 'away' | 'help' | 'tutorial' | 'confirm' | 'folk';
 export type Tool = PieceId | 'erase' | null;
 
 export const ui = {
@@ -40,6 +40,15 @@ export const uiActions = {
 	roadNo: () => {},
 	/** The player wants to look at an island. */
 	flyToIsland: (_index: number) => {},
+	/** The player picked an elf in the Elves panel. */
+	selectFolk: (_id: number) => {},
+	/** Back was pressed. Returns true when something else took it, like the elf card. */
+	back: (): boolean => false,
+};
+
+/** Panels whose content other modules make. */
+export const panelSources = {
+	folk: (): { title: string; html: string } => ({ title: 'Elves', html: '' }),
 };
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
@@ -205,7 +214,17 @@ export function setTool(tool: Tool): void {
 	if (tool === 'erase') setHint('<b>Remove</b> Tap a piece to take it away.');
 	else if (tool && PIECE[tool].draw) setHint(`<b>${PIECE[tool].name}</b> ${PIECE[tool].blurb} ${isTouch() ? 'Two fingers move the view.' : 'Right-drag turns the view.'}`);
 	else if (tool) setHint(`<b>${PIECE[tool].name}</b> ${PIECE[tool].blurb}`);
-	else setHint('Pick a piece to build. Tap a jelly for a gift.');
+	else setHint('Pick a piece to build. Tap an elf to see its day.');
+}
+
+/** Shows or hides the top bar, for walking as an elf. */
+export function showHud(show: boolean): void {
+	el.hud.hidden = !show || ui.screen !== 'play';
+}
+
+/** Shows or hides the toolbar, for the elf card and other modes. */
+export function showDock(show: boolean): void {
+	el.dock.hidden = !show || ui.screen !== 'play';
 }
 
 export function setHint(html: string): void {
@@ -306,6 +325,9 @@ function controlsHtml(kind: 'touch' | 'mouse' | 'pad'): string {
 			['Two fingers', 'Move the view while you draw'],
 			['Pinch', 'Zoom'],
 			['Tap a jelly', 'Take its gift'],
+			['Tap an elf or a home', 'See its day, its job and its home'],
+			['Play as', 'Left thumb walks, right thumb looks'],
+			['Home', 'Go inside to decorate. Drag turns the room'],
 			['Islands button', 'Jump to another island'],
 			['Twist', 'Turn the view with two fingers'],
 			['Turn button', 'Turn the piece you just placed'],
@@ -318,6 +340,9 @@ function controlsHtml(kind: 'touch' | 'mouse' | 'pad'): string {
 			['Click a group', 'Pick a piece. A menu shows its other types'],
 			['Drag with a path or a river', 'Draw it. Enter builds it, Esc cancels'],
 			['Click a jelly', 'Take its gift'],
+			['Click an elf or a home', 'See its day, its job and its home'],
+			['Play as: WASD, Shift, V', 'Walk, run, and switch first or third person'],
+			['In a home: R, X', 'Turn or remove the picked thing'],
 			['Scroll', 'Zoom'],
 			['Right-drag', 'Turn the view'],
 			['R', 'Turn a piece'],
@@ -358,7 +383,7 @@ const TUTORIAL: { title: string; html: () => string }[] = [
 	{
 		title: 'Watch it come alive',
 		html: () =>
-			`<p><b>Pieces join up.</b> Paths connect, tree homes link their branches, and pools flow into rivers. A path crosses a river on a little bridge.</p><p><b>Elves move in.</b> Each tree home gets an elf. Grass grows near water. Saplings grow tall.</p><p><b>The sky is alive.</b> Whales, jellies and dragons fly by day. Shy creatures come out at night. Tap a jelly for a gift.</p><p><b>Magic links.</b> Some pieces spark when they stand side by side. The book keeps what you find.</p><p><b>Goals</b> unlock new pieces. Big goals grow a bridge to a new island.</p><p><b>The town tree.</b> Plant one, and the elves hold a night festival around it.</p>`,
+			`<p><b>Pieces join up.</b> Paths connect, tree homes link their branches, and pools flow into rivers. A path crosses a river on a little bridge.</p><p><b>Elves move in.</b> Each tree home gets an elf. Grass grows near water. Saplings grow tall.</p><p><b>The sky is alive.</b> Whales, jellies and dragons fly by day. Shy creatures come out at night. Tap a jelly for a gift.</p><p><b>Magic links.</b> Some pieces spark when they stand side by side. The book keeps what you find.</p><p><b>Goals</b> unlock new pieces. Big goals grow a bridge to a new island.</p><p><b>The town tree.</b> Plant one, and the elves hold a night festival around it.</p><p><b>Elves have jobs.</b> Gardens, shops and workshops give them work. Tap an elf to see its day and its path. Play as it, or visit its home and make it cosy.</p>`,
 	},
 ];
 
@@ -440,6 +465,8 @@ function panelHtml(p: Panel): { title: string; html: string; wide?: boolean } {
 					<div class="row">${tutorialStep > 0 ? '<button class="btn btn--ghost" data-act="tut-back" type="button">Back</button>' : ''}<button class="btn btn--big" data-act="tut-next" type="button">${last ? 'Start building' : 'Next'}</button></div>`,
 			};
 		}
+		case 'folk':
+			return panelSources.folk();
 		case 'confirm':
 			return {
 				title: 'Start a new grove?',
@@ -481,6 +508,7 @@ export function closePanel(): void {
 /** The back gesture, Escape or B: one step back, and never out of the game. */
 export function goBack(): void {
 	if (ui.group) closeFlyout();
+	else if (!ui.panel && uiActions.back()) return;
 	else if (ui.panel) closePanel();
 	else if (ui.screen === 'play') openPanel('pause');
 }
@@ -523,6 +551,7 @@ export function initUI(): void {
 	$('btn-pause').addEventListener('click', () => openPanel('pause'));
 	$('btn-book').addEventListener('click', () => openPanel('book'));
 	$('btn-isles').addEventListener('click', () => openPanel('isles'));
+	$('btn-folk').addEventListener('click', () => openPanel('folk'));
 	$('road-yes').addEventListener('click', () => uiActions.roadYes());
 	$('road-no').addEventListener('click', () => uiActions.roadNo());
 	el.goal.addEventListener('click', () => openPanel('goals'));
@@ -545,7 +574,9 @@ export function initUI(): void {
 			return;
 		}
 		ui.group = null;
-		uiActions.pickTool(ui.tool === id ? null : id);
+		// A tap in the menu always picks. The group button already picked its first piece.
+		if (ui.tool === id) renderPieces();
+		else uiActions.pickTool(id);
 	});
 	// A tap anywhere else closes the menu.
 	document.addEventListener('pointerdown', (e) => {
@@ -563,10 +594,14 @@ export function initUI(): void {
 			closePanel();
 			return;
 		}
-		const b = t.closest<HTMLElement>('[data-act], [data-open], [data-quality], [data-fly]');
+		const b = t.closest<HTMLElement>('[data-act], [data-open], [data-quality], [data-fly], [data-folk]');
 		if (!b) return;
 		uiActions.click();
-		if (b.dataset.fly) {
+		if (b.dataset.folk) {
+			parent = null;
+			closePanel();
+			uiActions.selectFolk(Number(b.dataset.folk));
+		} else if (b.dataset.fly) {
 			parent = null;
 			closePanel();
 			uiActions.flyToIsland(Number(b.dataset.fly));
