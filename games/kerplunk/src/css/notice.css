@@ -5,9 +5,10 @@
 	margin-top: 14px;
 	max-width: 300px;
 	padding: 10px 34px 10px 14px;
-	border-radius: 14px;
-	background: rgba(26, 20, 56, 0.9);
-	border: 1px solid rgba(242, 200, 121, 0.35);
+	background: var(--card);
+	border: var(--bw) solid var(--ink);
+	border-radius: var(--r);
+	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
 	font-size: 0.88rem;
 	line-height: 1.4;
 	text-align: left;
@@ -22,7 +23,7 @@
 	height: 18px;
 	vertical-align: -3px;
 	fill: none;
-	stroke: #6cb8ff;
+	stroke: currentColor;
 	stroke-width: 2;
 	stroke-linecap: round;
 	stroke-linejoin: round;
@@ -35,7 +36,7 @@
 }
 
 .ios-hint__close:focus-visible {
-	outline: 3px solid var(--gold-2);
+	outline: 3px solid var(--ink);
 }
 
 .ios-hint__close {
@@ -47,35 +48,38 @@
 	border: 0;
 	background: none;
 	font-size: 1.3rem;
-	color: var(--muted);
 	cursor: pointer;
 }
 
+/* A big sticker: "Time!", "All clear!", "REMIX!". */
 .banner {
 	position: absolute;
-	left: 0;
-	right: 0;
-	top: 42%;
+	left: 50%;
+	top: 40%;
 	z-index: 6;
-	text-align: center;
-	font-size: clamp(2.4rem, 12vw, 3.4rem);
-	font-weight: 900;
-	color: var(--gold-2);
-	text-shadow: 0 4px 0 var(--lead), 0 0 26px rgba(242, 200, 121, 0.7);
+	padding: 6px 18px;
+	background: var(--accent);
+	color: var(--on-accent);
+	border: var(--bw) solid var(--ink);
+	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	font-family: var(--font-display);
+	font-size: clamp(2rem, 11vw, 3rem);
+	white-space: nowrap;
 	pointer-events: none;
-	animation: banner-in 0.5s cubic-bezier(0.2, 1.5, 0.4, 1);
+	transform: translateX(-50%) rotate(-4deg);
+	animation: banner-in 0.35s cubic-bezier(0.2, 1.5, 0.4, 1);
 }
 
 @keyframes banner-in {
 	from {
-		transform: scale(2);
+		transform: translateX(-50%) rotate(-10deg) scale(0.5);
 		opacity: 0;
 	}
 }
 
 .toast:focus-visible {
-	outline: 3px solid var(--gold-2);
-	outline-offset: 2px;
+	outline: 3px solid var(--ink);
+	outline-offset: 3px;
 }
 
 .toast {
@@ -85,19 +89,20 @@
 	z-index: 20;
 	transform: translateX(-50%);
 	padding: 12px 18px;
-	border-radius: 99px;
-	border: 2px solid var(--gold);
-	background: var(--ink-2);
-	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+	background: var(--accent2);
+	color: var(--on-accent2);
+	border: var(--bw) solid var(--ink);
+	border-radius: var(--r);
+	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
 	font-weight: 700;
 	white-space: nowrap;
 	cursor: pointer;
-	animation: toast-in 0.3s ease-out;
+	animation: toast-in 0.2s ease-out;
 }
 
 @keyframes toast-in {
 	from {
-		transform: translate(-50%, 30px);
+		transform: translate(-50%, 24px);
 		opacity: 0;
 	}
 }

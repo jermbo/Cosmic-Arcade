@@ -41,4 +41,5 @@ As the player, I want blocks with faces that blink, so that the well feels alive
 
 ## Architecture
 
+- [Game README](../../../../games/kerplunk/README.md)
 - [Spec, scope 5 b to 5 d](../../../initiatives/kerplunk/v2/spec.md)

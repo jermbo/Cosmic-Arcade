@@ -1,6 +1,6 @@
 // Checks the match, chain and power-up rules on hand-made boards. Run: node tools/engine-test.js
 import assert from 'node:assert/strict';
-import { Game, dailySeed, glintsFor, glintsForAllClear, SECOND_WIND_ROWS, POWER_KINDS, REWARD_CHAIN, REWARD_GROUP, BAG_SIZE, groupMultiplier } from '../src/js/engine.js';
+import { Game, timeForTurn, TIMED_SECONDS, dailySeed, glintsFor, glintsForAllClear, SECOND_WIND_ROWS, POWER_KINDS, REWARD_CHAIN, REWARD_GROUP, BAG_SIZE, groupMultiplier } from '../src/js/engine.js';
 import { REROLL_COST, REROLL_STEP } from '../src/js/prices.js';
 import { SHAPES } from '../src/js/shape-list.js';
 
@@ -341,5 +341,96 @@ assert.deepEqual(bySize(g.neighborsOf(g.index(0, 0))), bySize([g.index(1, 0), g.
 assert.equal(g.neighborsOf(g.index(g.cols - 1, g.rows - 1)).length, 2);
 assert.equal(g.neighborsOf(g.index(3, 0)).length, 3);
 assert.equal(g.neighborsOf(g.index(3, 3)).length, 4);
+
+// The tray: a used slot stays empty while the other slot has a piece.
+g = new Game({ lab: { grid: 'medium' }, seed: 41 });
+g.grid.fill(null);
+const keep = g.pieces[1];
+assert.ok(g.place(0, 0));
+assert.deepEqual(g.refillTray(), [], 'no refill while a piece is left');
+assert.equal(g.pieces[0], null, 'slot 1 is empty');
+assert.equal(g.pieces[1], keep, 'slot 2 still has its piece');
+
+// A reroll swaps only the pieces in the tray. The empty slot stays empty.
+g.reroll();
+assert.equal(g.pieces[0], null, 'the empty slot stays empty after a reroll');
+assert.ok(g.pieces[1] && g.pieces[1].id !== keep.id, 'slot 2 gets a new piece');
+
+// When both slots are used, both get a new piece at the same time.
+assert.ok(g.place(1, 3));
+assert.deepEqual(g.refillTray(), [0, 1]);
+assert.ok(g.pieces.every(Boolean), 'two new pieces');
+
+// A Lab tray of 3 refills only when all 3 are used.
+g = new Game({ lab: { grid: 'large', pieces: 3 }, seed: 42 });
+g.grid.fill(null);
+g.place(0, 0);
+assert.deepEqual(g.refillTray(), []);
+g.place(1, 4);
+assert.deepEqual(g.refillTray(), [], 'one piece is left, so no refill');
+g.place(2, 0);
+assert.deepEqual(g.refillTray(), [0, 1, 2]);
+
+// The game is over when the piece left does not fit and there is no Blast. A Blast keeps it going.
+g = board(['000000', '111111', '000000', '111111', '000000', '111111', '000000', '.11111']);
+g.pieces = [null, { id: 900, w: 2, h: 1, cells: [{ dx: 0, dy: 0, color: 2 }, { dx: 1, dy: 0, color: 3 }] }];
+assert.equal(g.stuck, true, 'slot 1 is empty and slot 2 does not fit');
+g.bag.push('blast');
+assert.equal(g.stuck, false, 'a Blast can still make room');
+
+// Timed: a turn adds seconds for its longest chain, and more for a big group.
+assert.equal(TIMED_SECONDS, 60, 'a Timed game starts with 60 seconds');
+assert.equal(timeForTurn(2), 0, 'a chain of 2 adds no time');
+assert.equal(timeForTurn(3), 3);
+assert.equal(timeForTurn(4), 10, 'a chain of 4 adds 10 seconds');
+assert.equal(timeForTurn(5), 15, 'a chain of 5 adds 15 seconds');
+assert.equal(timeForTurn(7), 15, 'a chain longer than 5 adds the time of 5');
+assert.equal(timeForTurn(3, 6), 6, 'a chain of 3 and a group of 6 add 3 + 3');
+assert.equal(timeForTurn(1, 5), 0, 'a group of 5 adds nothing');
+
+// Timed: power-ups act by themselves. Endless keeps them in the bag.
+assert.equal(new Game({ mode: 'timed', seed: 1 }).autoPowers, true);
+assert.equal(new Game({ mode: 'endless', seed: 1 }).autoPowers, false);
+
+// An automatic Prism paints both tray pieces the color with the biggest clear.
+// Here two Tide (3) blocks wait at the ceiling: a Tide piece under them clears.
+g = board(['33....', '......'], { grid: 'small' });
+g.mode = 'timed';
+const dot = (id) => ({ id, w: 1, h: 1, cells: [{ dx: 0, dy: 0, color: 0 }] });
+const bar2 = (id) => ({ id, w: 2, h: 1, cells: [{ dx: 0, dy: 0, color: 0 }, { dx: 1, dy: 0, color: 1 }] });
+g.pieces = [bar2(501), dot(502)];
+g.bag.push('prism');
+assert.equal(g.bestPrismColor(), 3, 'Tide gives the biggest clear');
+assert.equal(g.autoPrism(), 3);
+assert.ok(g.pieces.every((p) => p.cells.every((c) => c.color === 3)), 'both tray pieces are Tide');
+assert.equal(g.bag.length, 0, 'the Prism is used');
+
+// The color it picks gives a clear at least as big as any other color.
+for (let seed = 50; seed < 70; seed++) {
+	const game = new Game({ mode: 'timed', lab: { grid: 'medium' }, seed });
+	for (let i = 0; i < 25; i++) game.grid[(i * 7 + seed) % game.grid.length] = game.makeBlock((i * 3 + seed) % 4);
+	game.applyGravity();
+	game.resolveAll();
+	const pick = game.bestPrismColor();
+	const most = (color) => {
+		let m = 0;
+		for (const p of game.pieces) {
+			const painted = { ...p, cells: p.cells.map((c) => ({ ...c, color })) };
+			for (let x = 0; x <= game.cols - p.w; x++) if (game.fits(painted, x)) m = Math.max(m, game.clearedBy(painted, x));
+		}
+		return m;
+	};
+	for (let c = 0; c < game.colors; c++) assert.ok(most(pick) >= most(c), 'no other color gives a bigger clear');
+	for (let c = 0; c < pick; c++) assert.ok(most(c) < most(pick), 'a tie goes to the lower color');
+}
+
+// An automatic Blast aims at the 3x3 area with the most blocks; a tie goes to the area nearest the tray.
+g = board(['1.....', '1.....', '......', '......', '......', '...2..', '...2..', '......']);
+assert.equal(g.bestBlastCell().y, 6, 'a tie goes to the area nearest the tray');
+g = board(['111...', '111...', '......', '......', '......', '...2..', '...2..', '......']);
+assert.deepEqual(g.bestBlastCell(), { x: 1, y: 1 }, 'the area with the most blocks');
+g.bag.push('blast');
+assert.equal(g.autoUse('blast'), true);
+assert.equal(count(g), 2, 'the blast clears its area');
 
 console.log('engine ok');

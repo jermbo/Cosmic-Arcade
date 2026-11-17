@@ -1,8 +1,8 @@
-// Offline cache for Glintwell. Bump VERSION (and js/version.js) for each release.
+// Offline cache for Kerplunk. Bump VERSION (and js/version.js) for each release.
 // A new VERSION makes a new cache; the page then shows "Update ready, tap to reload".
 
-const VERSION = '1.12.0';
-const CACHE = `glintwell-${VERSION}`;
+const VERSION = '2.0.0';
+const CACHE = `kerplunk-${VERSION}`;
 const FILES = [
 	'./',
 	'index.html',
@@ -36,7 +36,6 @@ const FILES = [
 	'js/cheats.js',
 	'js/dom.js',
 	'js/session.js',
-	'js/daily.js',
 	'js/hud.js',
 	'js/title.js',
 	'js/engine.js',
@@ -50,6 +49,14 @@ const FILES = [
 	'js/remix-styles.js',
 	'js/fx.js',
 	'js/sprites.js',
+	'js/themes.js',
+	'js/looks.js',
+	'js/theme-vars.js',
+	'fonts/archivo-black-latin-400-normal.woff2',
+	'fonts/dm-mono-latin-500-normal.woff2',
+	'fonts/space-grotesk-latin-500-normal.woff2',
+	'fonts/space-grotesk-latin-700-normal.woff2',
+	'fonts/bricolage-grotesque-latin-800-normal.woff2',
 	'js/audio.js',
 	'js/storage.js',
 	'js/version.js',
@@ -71,7 +78,7 @@ self.addEventListener('activate', (event) => {
 	event.waitUntil(
 		caches
 			.keys()
-			.then((keys) => Promise.all(keys.filter((k) => k.startsWith('glintwell-') && k !== CACHE).map((k) => caches.delete(k))))
+			.then((keys) => Promise.all(keys.filter((k) => (k.startsWith('kerplunk-') || k.startsWith('glintwell-')) && k !== CACHE).map((k) => caches.delete(k))))
 			.then(() => self.clients.claim()),
 	);
 });

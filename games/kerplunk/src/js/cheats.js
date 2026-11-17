@@ -3,7 +3,6 @@
 import { POWER_KINDS } from './engine.js';
 import { REMIX_STYLES, REMIX_STYLE_NAMES } from './remix-styles.js';
 import { POWER_NAMES } from './view.js';
-import { GOLD } from './sprites.js';
 import { store } from './storage.js';
 import { state, view, save, waitFor } from './session.js';
 import { bumpWallet } from './hud.js';
@@ -11,7 +10,7 @@ import { dropPiece, DROP_START_BELOW_WELL } from './move.js';
 import { useRemix } from './powers.js';
 
 // On for localhost and for any page opened with ?debug. Off on a real host.
-// Hold Shift and press a number key for a cheat. In the console, glintwell.help() lists them all.
+// Hold Shift and press a number key for a cheat. In the console, kerplunk.help() lists them all.
 
 const FILL_PAUSE_MS = 1500; // the wait for the blocks to rise before a Remix
 const cheatsOn = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) || new URLSearchParams(location.search).has('debug');
@@ -37,7 +36,7 @@ if (cheatsOn) {
 		});
 		return best;
 	};
-	window.glintwell = {
+	window.kerplunk = {
 		state,
 		view,
 		store,
@@ -65,11 +64,11 @@ if (cheatsOn) {
 					continue;
 				}
 				if (g.bag.length >= g.bagSize) {
-					console.warn(`The bag is full (${g.bagSize}). Use one or call glintwell.empty().`);
+					console.warn(`The bag is full (${g.bagSize}). Use one or call kerplunk.empty().`);
 					break;
 				}
 				g.bag.push(kind);
-				view.fx.pop({ x: view.bar.x + view.bar.w / 2, y: view.bar.y - view.cell * 0.4, text: `Cheat: ${POWER_NAMES[kind]}`, sub: '', color: GOLD });
+				view.fx.pop({ x: view.bar.x + view.bar.w / 2, y: view.bar.y - view.cell * 0.4, text: `Cheat: ${POWER_NAMES[kind]}`, sub: '' });
 			}
 			return g.bag.slice();
 		},
@@ -95,7 +94,7 @@ if (cheatsOn) {
 				cheat.give('remix');
 			}
 			const at = REMIX_STYLE_NAMES.indexOf(view.remixStyle) + 1;
-			view.fx.pop({ x: view.boardX + view.boardW / 2, y: view.boardY + view.cell * 0.6, text: `${REMIX_STYLES[view.remixStyle].label} (${at}/${REMIX_STYLE_NAMES.length})`, sub: '', color: GOLD, big: true });
+			view.fx.pop({ x: view.boardX + view.boardW / 2, y: view.boardY + view.cell * 0.6, text: `${REMIX_STYLES[view.remixStyle].label} (${at}/${REMIX_STYLE_NAMES.length})`, sub: '', big: true });
 			useRemix();
 		},
 		/** Shows the next style, one after another. An empty well is filled first. */
@@ -110,7 +109,7 @@ if (cheatsOn) {
 			cheat.remix(REMIX_STYLE_NAMES[cheat.demo]);
 		},
 		demo: -1,
-		/** Adds Glints to the wallet: glints(500). */
+		/** Adds Plunks to the wallet: glints(500). */
 		glints(n = 100) {
 			store.glints = Math.max(0, store.glints + Math.floor(n));
 			save();
@@ -155,23 +154,23 @@ if (cheatsOn) {
 		help() {
 			console.info(
 				[
-					'Glintwell cheats',
-					'  Hold Shift and press: 1 Prism, 2 Blast, 3 Remix, 4 all three, 5 drop 50 blocks, 6 fill the well, 7 next Remix style, 8 play it again, 9 add 100 Glints, 0 empty the bag',
-					'  glintwell.give("remix", "blast")  add power-ups (bag holds 3)',
-					'  glintwell.prism() / blast()       add one',
-					'  glintwell.remix("swirl")          fire a Remix in that style (glintwell.remixStyles() lists them)',
-					'  glintwell.nextRemix()             show the next Remix style',
-					'  glintwell.glints(500)             add Glints to the wallet',
-					'  glintwell.all() / empty()         one of each / clear the bag',
-					'  glintwell.drop(50)                drop 50 random blocks into the well',
-					'  glintwell.fill(0.6)               empty the well, then fill it 60%',
-					'  glintwell.bot(50)                 play 50 moves',
-					'  glintwell.setTime(5)              set the clock in Timed mode',
+					'Kerplunk cheats',
+					'  Hold Shift and press: 1 Prism, 2 Blast, 3 Remix, 4 all three, 5 drop 50 blocks, 6 fill the well, 7 next Remix style, 8 play it again, 9 add 100 Plunks, 0 empty the bag',
+					'  kerplunk.give("remix", "blast")  add power-ups (bag holds 3)',
+					'  kerplunk.prism() / blast()       add one',
+					'  kerplunk.remix("swirl")          fire a Remix in that style (kerplunk.remixStyles() lists them)',
+					'  kerplunk.nextRemix()             show the next Remix style',
+					'  kerplunk.glints(500)             add Plunks to the wallet',
+					'  kerplunk.all() / empty()         one of each / clear the bag',
+					'  kerplunk.drop(50)                drop 50 random blocks into the well',
+					'  kerplunk.fill(0.6)               empty the well, then fill it 60%',
+					'  kerplunk.bot(50)                 play 50 moves',
+					'  kerplunk.setTime(5)              set the clock in Timed mode',
 				].join('\n'),
 			);
 		},
 	};
-	const cheat = window.glintwell;
+	const cheat = window.kerplunk;
 	document.addEventListener('keydown', (e) => {
 		if (!e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || state.screen !== 'playing' || state.paused || !state.game) return;
 		const codes = { Digit1: () => cheat.give('prism'), Digit2: () => cheat.give('blast'), Digit3: () => cheat.give('remix'), Digit4: () => cheat.all(), Digit7: () => cheat.nextRemix(), Digit8: () => cheat.remix(), Digit9: () => cheat.glints(100), Digit5: () => cheat.drop(50), Digit6: () => cheat.fill(0.6), Digit0: () => cheat.empty() };
@@ -180,5 +179,5 @@ if (cheatsOn) {
 		e.preventDefault();
 		run();
 	});
-	console.info('Glintwell cheats are on. Type glintwell.help()');
+	console.info('Kerplunk cheats are on. Type kerplunk.help()');
 }

@@ -2,17 +2,21 @@
 import assert from 'node:assert/strict';
 import { SHAPES, parseArt, cleanShapes, pickShape, setShapes, MAX_SHAPE_WIDTH } from '../src/js/shape-list.js';
 import { SHAPE_ART } from '../src/js/shapes.js';
+import { GRID_SIZES } from '../src/js/engine.js';
 
 // ASCII art turns into cells. A hole inside a column is fine (the shape lab can make them).
 assert.deepEqual(parseArt(['#', '.', '#']), [[0, 0], [0, 2]]);
 assert.deepEqual(parseArt(['##', '#.']), [[0, 0], [1, 0], [0, 1]]);
 
-// Every shape is different, has at least 2 blocks, and fits a 5-wide well.
-const GRID_MIN_COLS = MAX_SHAPE_WIDTH;
+// The built-in list has 14 shapes. Each is different, has 3 or more blocks, and fits the narrowest well.
+const NARROWEST = Math.min(...Object.values(GRID_SIZES).map((g) => g.cols));
+const SHORTEST = Math.min(...Object.values(GRID_SIZES).map((g) => g.rows));
+assert.equal(SHAPES.length, 14, 'the built-in list has 14 shapes');
 assert.equal(new Set(SHAPES.map((sh) => JSON.stringify(sh))).size, SHAPES.length, 'no shape is listed twice');
 for (const sh of SHAPES) {
-	assert.ok(sh.length >= 2, 'a piece has at least 2 blocks');
-	assert.ok(Math.max(...sh.map(([dx]) => dx)) < GRID_MIN_COLS, 'a piece is at most 5 wide');
+	assert.ok(sh.length >= 3, 'a piece has 3 or more blocks');
+	assert.ok(Math.max(...sh.map(([dx]) => dx)) < NARROWEST, 'a piece fits the narrowest well');
+	assert.ok(Math.max(...sh.map(([, dy]) => dy)) < SHORTEST, 'a piece fits the shortest well');
 }
 
 // A list of good shapes passes as it is.

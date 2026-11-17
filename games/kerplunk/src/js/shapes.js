@@ -13,29 +13,14 @@ export const SHAPE_ART = [
 	{ weight: 3, art: ['##', '.#'] },
 	{ weight: 3, art: ['#.', '##'] },
 	{ weight: 3, art: ['.#', '##'] },
-	// Twos
-	{ weight: 2, art: ['##'] },
-	{ weight: 2, art: ['#', '#'] },
 	// Fours
 	{ weight: 3, art: ['##', '##'] },
 	{ weight: 3, art: ['###', '.#.'] },
 	{ weight: 3, art: ['.##', '##.'] },
 	{ weight: 3, art: ['##.', '.##'] },
-	{ weight: 2, art: ['####'] },
-	{ weight: 2, art: ['#', '#', '#', '#'] },
-	{ weight: 2, art: ['#.', '#.', '##'] },
-	{ weight: 2, art: ['.#', '.#', '##'] },
-	{ weight: 2, art: ['###', '#..'] },
-	{ weight: 2, art: ['###', '..#'] },
-	// Fives and bigger
-	{ weight: 1, art: ['#####'] },
-	{ weight: 1, art: ['.#.', '###', '.#.'] },
+	// Fun shapes: U, upside-down U, plus, stair
 	{ weight: 1, art: ['#.#', '###'] },
-	{ weight: 1, art: ['..#', '.##', '##.'] },
-	{ weight: 1, art: ['##', '##', '#.'] },
-	{ weight: 1, art: ['#..', '#..', '###'] },
-	{ weight: 1, art: ['##.', '.#.', '.##'] },
-	{ weight: 1, art: ['#...#', '.###.'] },
-	{ weight: 1, art: ['####.', '.####'] },
-	{ weight: 1, art: ['..#..', '.###.', '#####'] },
+	{ weight: 1, art: ['###', '#.#'] },
+	{ weight: 1, art: ['.#.', '###', '.#.'] },
+	{ weight: 1, art: ['#..', '##.', '.##'] },
 ];

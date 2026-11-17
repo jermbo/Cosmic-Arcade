@@ -1,22 +1,25 @@
-// Draws the stained-glass blocks once per size, so each frame only copies images.
+// Draws the blocks once per size, theme and block style, so each frame only copies images.
+// Each block style gives each color a second clue, so the five colors stay different in grayscale.
 
-export const PALETTE = [
-	{ name: 'Ember', base: '#ff5d73', light: '#ffc0c8', dark: '#9e1f3c', glyph: 'tri' },
-	{ name: 'Amber', base: '#ffbe45', light: '#ffeab0', dark: '#b06a12', glyph: 'sun' },
-	{ name: 'Moss', base: '#47cf86', light: '#c0f7d7', dark: '#16774a', glyph: 'leaf' },
-	{ name: 'Tide', base: '#45b0ff', light: '#bfe6ff', dark: '#18589e', glyph: 'drop' },
-	{ name: 'Dusk', base: '#b285ff', light: '#e6d6ff', dark: '#5a2ab0', glyph: 'moon' },
-];
+import { BLOCK_NAMES, LIGHT, textOn } from './themes.js';
 
-/** Paints the shared palette. Rebuild the sprites afterwards (view.sprites = null; view.layout()). */
+/** The five block colors in play. paintPalette() changes them when the theme changes. */
+export const PALETTE = BLOCK_NAMES.map((name, i) => ({ name, base: LIGHT.blocks[i] }));
+
+/** Paints the shared palette from a list of five #rrggbb colors. Rebuild the sprites afterwards. */
 export function paintPalette(colors) {
-	colors.forEach((c, i) => Object.assign(PALETTE[i], c));
+	colors.forEach((base, i) => (PALETTE[i].base = base));
 }
 
-export const LEAD = '#130f26';
-export const GOLD = '#f2c879';
+/** The block styles, in the order of the shop. */
+export const BLOCK_STYLES = ['patterns', 'symbols', 'pips', 'silhouettes', 'faces'];
 
-function roundRect(ctx, x, y, w, h, r) {
+// Faces blink once every BLINK_EVERY seconds, each at its own moment, for BLINK_TIME seconds.
+export const BLINK_EVERY = 6;
+export const BLINK_TIME = 0.14;
+
+export function roundRect(ctx, x, y, w, h, r) {
+	r = Math.max(0, Math.min(r, w / 2, h / 2));
 	ctx.beginPath();
 	ctx.moveTo(x + r, y);
 	ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -26,161 +29,248 @@ function roundRect(ctx, x, y, w, h, r) {
 	ctx.closePath();
 }
 
-function starPath(ctx, cx, cy, points, outer, inner, turn = -Math.PI / 2) {
+/** The shape of a Silhouettes block: square, circle, leaf, octagon, arch. */
+function silhouettePath(ctx, color, x, y, w) {
+	const c = x + w / 2;
+	const m = y + w / 2;
 	ctx.beginPath();
-	for (let i = 0; i < points * 2; i++) {
-		const r = i % 2 ? inner : outer;
-		const a = turn + (i * Math.PI) / points;
-		ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+	switch (color) {
+		case 0:
+			roundRect(ctx, x, y, w, w, w * 0.08);
+			return;
+		case 1:
+			ctx.arc(c, m, w / 2, 0, Math.PI * 2);
+			break;
+		case 2: {
+			// A leaf: the top-left and bottom-right corners are round, the others are sharp.
+			const r = w * 0.48;
+			ctx.moveTo(x + r, y);
+			ctx.lineTo(x + w, y);
+			ctx.lineTo(x + w, y + w - r);
+			ctx.arcTo(x + w, y + w, x + w - r, y + w, r);
+			ctx.lineTo(x, y + w);
+			ctx.lineTo(x, y + r);
+			ctx.arcTo(x, y, x + r, y, r);
+			break;
+		}
+		case 3: {
+			const k = w * 0.29;
+			ctx.moveTo(x + k, y);
+			ctx.lineTo(x + w - k, y);
+			ctx.lineTo(x + w, y + k);
+			ctx.lineTo(x + w, y + w - k);
+			ctx.lineTo(x + w - k, y + w);
+			ctx.lineTo(x + k, y + w);
+			ctx.lineTo(x, y + w - k);
+			ctx.lineTo(x, y + k);
+			break;
+		}
+		default:
+			// An arch: a round top and a flat bottom.
+			ctx.moveTo(x, y + w);
+			ctx.lineTo(x, y + w / 2);
+			ctx.arc(c, y + w / 2, w / 2, Math.PI, 0);
+			ctx.lineTo(x + w, y + w);
 	}
 	ctx.closePath();
 }
 
-function glyphPath(ctx, glyph, cx, cy, r) {
-	ctx.beginPath();
-	switch (glyph) {
-		case 'tri':
-			ctx.moveTo(cx, cy - r);
-			ctx.lineTo(cx + r * 0.92, cy + r * 0.66);
-			ctx.lineTo(cx - r * 0.92, cy + r * 0.66);
-			ctx.closePath();
-			break;
-		case 'sun':
-			ctx.arc(cx, cy, r * 0.78, 0, Math.PI * 2);
-			break;
-		case 'leaf':
-			ctx.moveTo(cx, cy - r);
-			ctx.lineTo(cx + r * 0.75, cy);
-			ctx.lineTo(cx, cy + r);
-			ctx.lineTo(cx - r * 0.75, cy);
-			ctx.closePath();
-			break;
-		case 'drop':
-			ctx.moveTo(cx, cy - r);
-			ctx.bezierCurveTo(cx + r * 0.25, cy - r * 0.5, cx + r * 0.8, cy, cx + r * 0.8, cy + r * 0.25);
-			ctx.arc(cx, cy + r * 0.25, r * 0.8, 0, Math.PI, false);
-			ctx.bezierCurveTo(cx - r * 0.8, cy, cx - r * 0.25, cy - r * 0.5, cx, cy - r);
-			ctx.closePath();
-			break;
-		case 'moon':
-			ctx.arc(cx, cy, r * 0.85, Math.PI * 0.3, Math.PI * 1.7, false);
-			ctx.arc(cx + r * 0.42, cy - r * 0.08, r * 0.62, Math.PI * 1.45, Math.PI * 0.55, true);
-			ctx.closePath();
-			break;
-	}
-}
-
-/** The glass body that every block shares. */
-function drawGlass(ctx, s, color) {
-	const gap = s * 0.04;
-	ctx.fillStyle = LEAD;
-	roundRect(ctx, gap, gap, s - gap * 2, s - gap * 2, s * 0.2);
-	ctx.fill();
-
-	const inset = s * 0.11;
-	const w = s - inset * 2;
-	const grad = ctx.createLinearGradient(inset, inset, s - inset, s - inset);
-	grad.addColorStop(0, color.light);
-	grad.addColorStop(0.38, color.base);
-	grad.addColorStop(1, color.dark);
-	ctx.fillStyle = grad;
-	roundRect(ctx, inset, inset, w, w, s * 0.13);
-	ctx.fill();
-
-	// Bevel: light on the top-left edge, shade on the bottom-right edge.
-	ctx.save();
-	roundRect(ctx, inset, inset, w, w, s * 0.13);
-	ctx.clip();
-	ctx.lineWidth = s * 0.06;
-	ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-	ctx.beginPath();
-	ctx.moveTo(inset, s - inset);
-	ctx.lineTo(inset, inset);
-	ctx.lineTo(s - inset, inset);
-	ctx.stroke();
-	ctx.strokeStyle = 'rgba(0,0,0,0.28)';
-	ctx.beginPath();
-	ctx.moveTo(s - inset, inset);
-	ctx.lineTo(s - inset, s - inset);
-	ctx.lineTo(inset, s - inset);
-	ctx.stroke();
-	// A thin lead line across one corner, like a pane of leaded glass.
-	ctx.strokeStyle = LEAD;
-	ctx.lineWidth = Math.max(1, s * 0.035);
-	ctx.beginPath();
-	ctx.moveTo(s - inset - w * 0.34, s - inset);
-	ctx.lineTo(s - inset, s - inset - w * 0.34);
-	ctx.stroke();
-	ctx.restore();
-
-	// Gloss.
-	ctx.fillStyle = 'rgba(255,255,255,0.22)';
-	ctx.beginPath();
-	ctx.ellipse(s * 0.36, s * 0.3, s * 0.2, s * 0.09, -0.6, 0, Math.PI * 2);
-	ctx.fill();
-}
-
-function drawPlain(ctx, s, color) {
-	drawGlass(ctx, s, color);
-	const r = s * 0.2;
-	glyphPath(ctx, color.glyph, s / 2, s / 2 + s * 0.02, r);
-	ctx.fillStyle = 'rgba(255,255,255,0.82)';
-	ctx.fill();
-	ctx.lineWidth = Math.max(1, s * 0.035);
-	ctx.strokeStyle = LEAD;
-	ctx.stroke();
-}
-
-function drawFlare(ctx, s, color) {
-	drawGlass(ctx, s, color);
-	const c = s / 2;
-	ctx.fillStyle = LEAD;
-	ctx.beginPath();
-	ctx.arc(c, c, s * 0.29, 0, Math.PI * 2);
-	ctx.fill();
-	const core = ctx.createRadialGradient(c, c, 0, c, c, s * 0.26);
-	core.addColorStop(0, '#fffbe8');
-	core.addColorStop(0.45, color.light);
-	core.addColorStop(1, color.base);
-	ctx.fillStyle = core;
-	ctx.beginPath();
-	ctx.arc(c, c, s * 0.25, 0, Math.PI * 2);
-	ctx.fill();
-	starPath(ctx, c, c, 4, s * 0.22, s * 0.06, -Math.PI / 2);
-	ctx.fillStyle = '#fffdf2';
-	ctx.fill();
-	ctx.lineWidth = Math.max(1, s * 0.025);
-	ctx.strokeStyle = LEAD;
-	ctx.stroke();
-	// Rivets in the corners mark it as a charged block.
-	ctx.fillStyle = GOLD;
-	for (const [x, y] of [[0.2, 0.2], [0.8, 0.2], [0.2, 0.8], [0.8, 0.8]]) {
+/** Patterns: stripes, dots, plain, checks, rings. The pattern is clipped to the block. */
+function drawPattern(ctx, color, s, ink) {
+	const k = s / 40;
+	ctx.fillStyle = ink;
+	ctx.strokeStyle = ink;
+	ctx.globalAlpha = 0.8;
+	if (color === 0) {
+		ctx.lineWidth = 2 * k;
 		ctx.beginPath();
-		ctx.arc(s * x, s * y, s * 0.045, 0, Math.PI * 2);
+		for (let d = -s; d < s * 2; d += 7 * k) {
+			ctx.moveTo(d, s);
+			ctx.lineTo(d + s, 0);
+		}
+		ctx.stroke();
+	} else if (color === 1) {
+		for (let y = 3.5 * k; y < s; y += 7 * k) {
+			for (let x = 3.5 * k; x < s; x += 7 * k) {
+				ctx.beginPath();
+				ctx.arc(x, y, 1.6 * k, 0, Math.PI * 2);
+				ctx.fill();
+			}
+		}
+	} else if (color === 3) {
+		const q = 5 * k;
+		for (let y = 0, row = 0; y < s; y += q, row++) for (let x = (row % 2) * q; x < s; x += q * 2) ctx.fillRect(x, y, q, q);
+	} else if (color === 4) {
+		ctx.lineWidth = 2 * k;
+		for (let r = 4 * k; r < s * 0.75; r += 5 * k) {
+			ctx.beginPath();
+			ctx.arc(s / 2, s / 2, r, 0, Math.PI * 2);
+			ctx.stroke();
+		}
+	}
+	ctx.globalAlpha = 1;
+}
+
+/** Symbols: a solid triangle, circle, diamond, square or plus. */
+function drawSymbol(ctx, color, s, mark) {
+	const c = s / 2;
+	const r = s * 0.21;
+	ctx.fillStyle = mark;
+	ctx.beginPath();
+	switch (color) {
+		case 0:
+			ctx.moveTo(c, c - r * 1.05);
+			ctx.lineTo(c + r * 1.1, c + r * 0.85);
+			ctx.lineTo(c - r * 1.1, c + r * 0.85);
+			break;
+		case 1:
+			ctx.arc(c, c, r, 0, Math.PI * 2);
+			break;
+		case 2:
+			ctx.moveTo(c, c - r * 1.2);
+			ctx.lineTo(c + r * 1.2, c);
+			ctx.lineTo(c, c + r * 1.2);
+			ctx.lineTo(c - r * 1.2, c);
+			break;
+		case 3:
+			ctx.rect(c - r * 0.9, c - r * 0.9, r * 1.8, r * 1.8);
+			break;
+		default: {
+			const t = r * 0.42;
+			ctx.rect(c - r * 1.1, c - t, r * 2.2, t * 2);
+			ctx.rect(c - t, c - r * 1.1, t * 2, r * 2.2);
+		}
+	}
+	ctx.closePath();
+	ctx.fill();
+}
+
+const PIPS = [
+	[[0, 0]],
+	[[-1, -1], [1, 1]],
+	[[-1, -1], [0, 0], [1, 1]],
+	[[-1, -1], [1, -1], [-1, 1], [1, 1]],
+	[[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]],
+];
+
+/** Dice pips: Ember 1 dot up to Dusk 5 dots. */
+function drawPips(ctx, color, s, mark) {
+	const d = s * 0.22;
+	ctx.fillStyle = mark;
+	for (const [px, py] of PIPS[color]) {
+		ctx.beginPath();
+		ctx.arc(s / 2 + px * d, s / 2 + py * d, s * 0.075, 0, Math.PI * 2);
 		ctx.fill();
 	}
 }
 
-function drawNova(ctx, s, color) {
-	drawGlass(ctx, s, color);
+/** Faces: grumpy, happy, sleepy, surprised, wink. A blink closes each open eye. */
+function drawFace(ctx, color, s, mark, blink) {
 	const c = s / 2;
-	ctx.fillStyle = LEAD;
-	starPath(ctx, c, c, 8, s * 0.36, s * 0.2, 0);
+	const ex = s * 0.17; // eye distance from the middle
+	const ey = c - s * 0.06;
+	ctx.fillStyle = mark;
+	ctx.strokeStyle = mark;
+	ctx.lineWidth = s * 0.055;
+	ctx.lineCap = 'round';
+	const dot = (x, r) => {
+		ctx.beginPath();
+		ctx.arc(x, ey, r, 0, Math.PI * 2);
+		ctx.fill();
+	};
+	const shut = (x, w = s * 0.07) => {
+		ctx.beginPath();
+		ctx.moveTo(x - w, ey);
+		ctx.lineTo(x + w, ey);
+		ctx.stroke();
+	};
+	const eye = (x, r) => (blink ? shut(x) : dot(x, r));
+	const line = (x1, y1, x2, y2) => {
+		ctx.beginPath();
+		ctx.moveTo(x1, y1);
+		ctx.lineTo(x2, y2);
+		ctx.stroke();
+	};
+	const my = c + s * 0.17;
+	switch (color) {
+		case 0: // grumpy: slanted brows, flat mouth
+			eye(c - ex, s * 0.05);
+			eye(c + ex, s * 0.05);
+			line(c - ex - s * 0.08, ey - s * 0.14, c - ex + s * 0.07, ey - s * 0.07);
+			line(c + ex + s * 0.08, ey - s * 0.14, c + ex - s * 0.07, ey - s * 0.07);
+			line(c - s * 0.1, my, c + s * 0.1, my);
+			break;
+		case 1: // happy: round eyes, smile
+			eye(c - ex, s * 0.06);
+			eye(c + ex, s * 0.06);
+			ctx.beginPath();
+			ctx.arc(c, my - s * 0.07, s * 0.13, Math.PI * 0.15, Math.PI * 0.85);
+			ctx.stroke();
+			break;
+		case 2: // sleepy: closed eyes, small round mouth
+			for (const x of [c - ex, c + ex]) {
+				ctx.beginPath();
+				ctx.arc(x, ey - s * 0.02, s * 0.065, Math.PI * 0.1, Math.PI * 0.9);
+				ctx.stroke();
+			}
+			ctx.beginPath();
+			ctx.arc(c, my, s * 0.045, 0, Math.PI * 2);
+			ctx.stroke();
+			break;
+		case 3: // surprised: big eyes, round open mouth
+			eye(c - ex, s * 0.085);
+			eye(c + ex, s * 0.085);
+			ctx.beginPath();
+			ctx.ellipse(c, my + s * 0.01, s * 0.07, s * 0.09, 0, 0, Math.PI * 2);
+			ctx.fill();
+			break;
+		default: // wink: one eye open, one closed, half smile
+			eye(c - ex, s * 0.06);
+			shut(c + ex);
+			ctx.beginPath();
+			ctx.arc(c - s * 0.02, my - s * 0.08, s * 0.13, Math.PI * 0.1, Math.PI * 0.6);
+			ctx.stroke();
+	}
+	ctx.lineCap = 'butt';
+}
+
+/**
+ * Draws one block of a style into a square of size s at (0, 0).
+ * theme gives the ink; the block color comes from PALETTE unless base is given.
+ */
+export function drawBlock(ctx, { style, color, s, theme, blink = false, base = PALETTE[color].base }) {
+	const lw = Math.max(1, s * 0.0625); // 2.5px at a 40px block
+	const gap = s * 0.05;
+	const box = s - gap * 2;
+	const mark = textOn(base);
+	ctx.save();
+	if (style === 'silhouettes') {
+		silhouettePath(ctx, color, gap + lw / 2, gap + lw / 2, box - lw);
+		ctx.fillStyle = base;
+		ctx.fill();
+		ctx.lineJoin = 'round';
+		ctx.lineWidth = lw;
+		ctx.strokeStyle = theme.blockInk;
+		ctx.stroke();
+		ctx.restore();
+		return;
+	}
+	const r = Math.min(theme.r, 6) * (s / 40);
+	roundRect(ctx, gap + lw / 2, gap + lw / 2, box - lw, box - lw, r);
+	ctx.fillStyle = base;
 	ctx.fill();
-	const rainbow = ctx.createConicGradient
-		? ctx.createConicGradient(0, c, c)
-		: ctx.createLinearGradient(0, 0, s, s);
-	['#ff6b8a', '#ffc65a', '#7ef0a0', '#5ac8ff', '#c08cff', '#ff6b8a'].forEach((col, i) => rainbow.addColorStop(i / 5, col));
-	ctx.fillStyle = rainbow;
-	starPath(ctx, c, c, 8, s * 0.31, s * 0.16, 0);
-	ctx.fill();
-	ctx.fillStyle = '#ffffff';
-	ctx.beginPath();
-	ctx.arc(c, c, s * 0.1, 0, Math.PI * 2);
-	ctx.fill();
-	ctx.lineWidth = Math.max(1, s * 0.03);
-	ctx.strokeStyle = color.dark;
+	ctx.save();
+	ctx.clip();
+	if (style === 'patterns') drawPattern(ctx, color, s, theme.blockInk);
+	ctx.restore();
+	if (style === 'symbols') drawSymbol(ctx, color, s, mark);
+	if (style === 'pips') drawPips(ctx, color, s, mark);
+	if (style === 'faces') drawFace(ctx, color, s, mark, blink);
+	roundRect(ctx, gap + lw / 2, gap + lw / 2, box - lw, box - lw, r);
+	ctx.lineWidth = lw;
+	ctx.strokeStyle = theme.blockInk;
 	ctx.stroke();
+	ctx.restore();
 }
 
 function makeCanvas(px) {
@@ -189,46 +279,41 @@ function makeCanvas(px) {
 	return c;
 }
 
-/** Builds every block image for one cell size in device pixels. */
-export function buildSprites(px) {
-	const out = { px, plain: [], flare: [], nova: [], glow: [], slot: null, sparkle: null };
-	PALETTE.forEach((color, i) => {
-		for (const kind of ['plain', 'flare', 'nova']) {
-			const c = makeCanvas(px);
-			const ctx = c.getContext('2d');
-			if (kind === 'plain') drawPlain(ctx, px, color);
-			if (kind === 'flare') drawFlare(ctx, px, color);
-			if (kind === 'nova') drawNova(ctx, px, color);
-			out[kind][i] = c;
+/** Builds every block image for one cell size in device pixels. Faces also get a blink image. */
+export function buildSprites(px, { style, theme }) {
+	const out = { px, style, theme, plain: [], blink: [], slot: null };
+	PALETTE.forEach((_, color) => {
+		const c = makeCanvas(px);
+		drawBlock(c.getContext('2d'), { style, color, s: px, theme });
+		out.plain[color] = c;
+		if (style === 'faces') {
+			const b = makeCanvas(px);
+			drawBlock(b.getContext('2d'), { style, color, s: px, theme, blink: true });
+			out.blink[color] = b;
 		}
-		out.glow[i] = makeGlow(64, color.base);
 	});
-	out.glowWhite = makeGlow(64, '#fff6dc');
-	out.glowGold = makeGlow(64, GOLD);
-
 	const slot = makeCanvas(px);
 	const sctx = slot.getContext('2d');
-	sctx.fillStyle = 'rgba(160,140,255,0.06)';
-	roundRect(sctx, px * 0.08, px * 0.08, px * 0.84, px * 0.84, px * 0.18);
-	sctx.fill();
-	sctx.fillStyle = 'rgba(200,190,255,0.12)';
-	sctx.beginPath();
-	sctx.arc(px / 2, px / 2, px * 0.04, 0, Math.PI * 2);
+	sctx.fillStyle = theme.empty;
+	roundRect(sctx, px * 0.05, px * 0.05, px * 0.9, px * 0.9, Math.min(theme.r, 6) * (px / 40));
 	sctx.fill();
 	out.slot = slot;
 	return out;
 }
 
-function makeGlow(px, color) {
-	const c = makeCanvas(px);
+/** A small canvas with a row of blocks, for the shop, the tutorial and the shape lab. */
+export function blockStrip({ style, theme, size = 26, colors = [0, 1, 2, 3, 4], dpr = 2 }) {
+	const c = document.createElement('canvas');
+	c.width = Math.round(size * colors.length * dpr);
+	c.height = Math.round(size * dpr);
+	c.style.width = `${size * colors.length}px`;
+	c.style.height = `${size}px`;
 	const ctx = c.getContext('2d');
-	const g = ctx.createRadialGradient(px / 2, px / 2, 0, px / 2, px / 2, px / 2);
-	g.addColorStop(0, '#ffffff');
-	g.addColorStop(0.2, color);
-	g.addColorStop(1, color + '00');
-	ctx.fillStyle = g;
-	ctx.fillRect(0, 0, px, px);
+	colors.forEach((color, i) => {
+		ctx.save();
+		ctx.translate(i * size * dpr, 0);
+		drawBlock(ctx, { style, color, s: size * dpr, theme, base: theme.blocks[color] });
+		ctx.restore();
+	});
 	return c;
 }
-
-export { roundRect, starPath, glyphPath };

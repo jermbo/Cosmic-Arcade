@@ -33,4 +33,5 @@ None.
 
 ## Architecture
 
+- [Game README](../../../../games/kerplunk/README.md)
 - [Spec, scope 7](../../../initiatives/kerplunk/v2/spec.md)

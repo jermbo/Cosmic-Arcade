@@ -1,6 +1,6 @@
 // The end of a game: when it is over, what it pays, and when the game over screen shows.
 
-import { recordBest, claimDailyBonus } from './wallet.js';
+import { recordBest } from './wallet.js';
 import { audio } from './audio.js';
 import { store } from './storage.js';
 import { $, showBanner } from './dom.js';
@@ -23,9 +23,6 @@ function endGame(reason) {
 	const g = state.game;
 	const isBest = g.score > bestOf(state.mode);
 	if (isBest) saveBest(g.score);
-	const bonus = state.mode === 'daily' ? claimDailyBonus(store.daily).bonus : 0;
-	if (bonus) payDailyBonus();
-	const dailyNote = bonus ? `Daily bonus: +✦${bonus}` : '';
 	showBanner(reason === 'time' ? 'Time!' : 'No room!', 0);
 	audio.gameOver();
 	vibrate([30, 60, 30]);
@@ -33,21 +30,12 @@ function endGame(reason) {
 		if (state.game !== g) return;
 		$('banner').hidden = true;
 		state.screen = 'over';
-		showOver({ game: g, reason, isBest, dailyNote });
+		showOver({ game: g, reason, isBest });
 		if (isBest && g.score > 0) audio.best();
 	}, OVER_DELAY_MS);
 }
 
 function saveBest(score) {
-	const { best, daily } = recordBest(store, state.mode, score);
-	store.best = best;
-	store.daily = daily;
-	save();
-}
-
-function payDailyBonus() {
-	const claim = claimDailyBonus(store.daily);
-	store.daily = claim.daily;
-	store.glints += claim.bonus;
+	store.best = recordBest(store, state.mode, score).best;
 	save();
 }

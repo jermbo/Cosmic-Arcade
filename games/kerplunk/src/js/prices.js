@@ -9,5 +9,7 @@ export const REROLL_COST = 10; // swap the tray for new pieces; each use in a ga
 export const REROLL_STEP = 5;
 export const EXTEND_COST = 20; // +EXTEND_SECONDS in Timed, once per game
 export const EXTEND_SECONDS = 15;
-export const DAILY_BONUS = 20; // the first daily challenge run of each day
 export const BAG_UPGRADE_COSTS = [150, 300]; // permanent: the bag holds 1 more power-up each time
+// The looks, bought once in the shop. Drafts: the owner tunes them.
+export const THEME_PRICES = { light: 0, dark: 150, random: 300 };
+export const STYLE_PRICES = { patterns: 0, symbols: 100, pips: 100, silhouettes: 150, faces: 250 };

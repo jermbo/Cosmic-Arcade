@@ -1,10 +1,9 @@
-// Glintwell: starts the game, and runs the loop that draws every frame.
+// Kerplunk: starts the game, and runs the loop that draws every frame.
 
 import { audio } from './audio.js';
 import { LOW_TIME_SECONDS, LOUD_TICK_SECONDS } from './engine.js';
 import { setShapes } from './shape-list.js';
-import { skinById } from './shop.js';
-import { paintPalette } from './sprites.js';
+import { initLooks } from './looks.js';
 import { store, loadCustomShapes } from './storage.js';
 import { state, view, save, runWaiters } from './session.js';
 import { updateHud, updateWallet } from './hud.js';
@@ -22,9 +21,7 @@ import './cheats.js';
 // Shapes saved from the secret shape lab replace the built-in list.
 const customShapes = loadCustomShapes();
 const usingCustomShapes = Boolean(customShapes) && setShapes(customShapes);
-if (usingCustomShapes) console.info('Glintwell: playing with the custom shapes from the shape lab.');
-
-paintPalette(skinById(store.perks.skin).colors);
+if (usingCustomShapes) console.info('Kerplunk: playing with the custom shapes from the shape lab.');
 
 // ---- audio unlock ----
 
@@ -85,6 +82,7 @@ initSettings();
 updateWallet();
 audio.startMusic();
 view.resize();
+initLooks();
 buildLogo();
 updateBestLabels();
 save();

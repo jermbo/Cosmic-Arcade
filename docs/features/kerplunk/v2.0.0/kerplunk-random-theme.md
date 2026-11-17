@@ -49,4 +49,5 @@ As the player, I want a theme that looks new in each game, so that a run feels f
 
 ## Architecture
 
+- [Game README](../../../../games/kerplunk/README.md)
 - [Spec, scope 4 b and 4 c](../../../initiatives/kerplunk/v2/spec.md)

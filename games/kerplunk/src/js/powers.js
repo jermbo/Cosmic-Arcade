@@ -1,6 +1,7 @@
 // Power-ups: choosing one, aiming it, and what each one does.
 
 import { audio } from './audio.js';
+import { POWER_NAMES } from './view.js';
 import { canvas, state, view, vibrate, waitFor, setPower } from './session.js';
 import { showBanner, capturePointer } from './dom.js';
 import { resolveChain } from './move.js';
@@ -60,6 +61,35 @@ export async function fireBlast(x, y) {
 	if (state.game !== g) return;
 	state.busy = false;
 	checkEnd();
+}
+
+/**
+ * Timed: an earned power-up acts by itself, with the same animation as a tapped one,
+ * and a sticker with its name. The caller keeps state.busy on while it runs.
+ */
+export async function actAuto(kind) {
+	const g = state.game;
+	const mid = view.cellCenter((g.cols - 1) / 2, (g.rows - 1) / 2);
+	view.fx.pop({ x: mid.x, y: mid.y, text: POWER_NAMES[kind], sub: '', big: true, sticker: true });
+	if (kind === 'prism') {
+		if (g.autoPrism() !== null) {
+			g.pieces.forEach((p, i) => p && view.pieceSpawned(i));
+			audio.forge('flare');
+			vibrate(10);
+		}
+	} else if (kind === 'blast') {
+		const cell = g.bestBlastCell();
+		if (cell && g.useBlast(cell.x, cell.y)) await resolveChain();
+	} else {
+		const moves = g.useRemix();
+		if (moves) {
+			view.startRemix(moves);
+			await waitFor(() => !view.remix);
+			if (state.game === g) await resolveChain();
+		}
+	}
+	// A power-up that had nothing to act on is spent all the same: Timed has no bar to keep it in.
+	if (state.game === g) g.take(kind);
 }
 
 function paintSlot(slot) {

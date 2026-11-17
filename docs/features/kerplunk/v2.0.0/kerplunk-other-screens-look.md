@@ -46,4 +46,5 @@ As the player, I want every screen of the game in the same neo-brutalist look, s
 
 ## Architecture
 
+- [Game README](../../../../games/kerplunk/README.md)
 - [Spec, scope 3 d](../../../initiatives/kerplunk/v2/spec.md)

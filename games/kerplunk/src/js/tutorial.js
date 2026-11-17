@@ -10,7 +10,7 @@ import { drawTutorialDrop, drawTutorialMatch, drawTutorialPowerUps, drawTutorial
 const TUTORIAL = [
 	{
 		title: 'Drop into the well',
-		text: 'Drag a piece up into the well and let go. It <b>rises and sticks to the ceiling</b>. The ghost shows where each block lands. <b>Pieces never turn: you get what you get.</b>',
+		text: 'Drag a piece up into the well and let go. It <b>rises and sticks to the ceiling</b>. The ghost shows where each block lands. <b>Pieces never turn: you get what you get.</b> New pieces come only when you have used every piece in the tray.',
 		draw: drawTutorialDrop,
 	},
 	{
@@ -20,12 +20,12 @@ const TUTORIAL = [
 	},
 	{
 		title: 'Earn power-ups',
-		text: `A chain of ${REWARD_CHAIN} or a group of ${REWARD_GROUP} earns a power-up for the bar under the well. You get all three kinds in turn, never the same one twice in a row. <b>Prism</b> paints a piece one color. <b>Blast</b> clears a 3×3 area. <b>Remix</b> shuffles every block on the board.`,
+		text: `A chain of ${REWARD_CHAIN} or a group of ${REWARD_GROUP} earns a power-up. In Endless it waits in the bar under the well until you tap it. In Timed it acts by itself. You get all three kinds in turn, never the same one twice in a row. <b>Prism</b> paints a piece one color. <b>Blast</b> clears a 3×3 area. <b>Remix</b> shuffles every block on the board.`,
 		draw: drawTutorialPowerUps,
 	},
 	{
 		title: 'Keep room to play',
-		text: `The game ends when no piece fits. Endless has no clock. Timed gives you 90 seconds. <b>Combos earn Glints (✦).</b> Spend them in the Shop, on boosts before a game, on a Reroll, or to keep going when you run out of room.<br /><span class="tutorial__keys">Keys: <kbd class="tutorial__key">←</kbd> <kbd class="tutorial__key">→</kbd> move · <kbd class="tutorial__key">↓</kbd> next piece · <kbd class="tutorial__key">Space</kbd> drop</span>`,
+		text: `The game ends when no piece fits. Endless has no clock. Timed starts with 60 seconds, and good chains add time. <b>Combos earn Plunks (✦).</b> Spend them in the Shop, on boosts before a game, on a Reroll, or to keep going when you run out of room.<br /><span class="tutorial__keys">Keys: <kbd class="tutorial__key">←</kbd> <kbd class="tutorial__key">→</kbd> move · <kbd class="tutorial__key">↓</kbd> next piece · <kbd class="tutorial__key">Space</kbd> drop</span>`,
 		draw: drawTutorialEnd,
 	},
 ];

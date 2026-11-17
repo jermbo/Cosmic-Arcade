@@ -3,15 +3,16 @@
 
 import { DEFAULT_LAB } from './engine.js';
 
-const KEY = 'glintwell.save.v1';
+const KEY = 'kerplunk.save.v2';
 
 const DEFAULTS = {
 	best: { endless: 0, timed: 0 },
 	settings: { sfx: true, music: true, vibrate: true, shake: true },
 	lab: { ...DEFAULT_LAB },
 	glints: 0,
-	perks: { bag: 0, skins: ['classic'], skin: 'classic' },
-	daily: { date: '', best: 0, claimed: false },
+	perks: { bag: 0 },
+	// The looks: the owned and the active theme and block style, and the last Random roll.
+	looks: { themes: ['light'], theme: 'light', styles: ['patterns'], style: 'patterns', roll: null },
 	tutorialDone: false,
 	iosHintDismissed: false,
 };
@@ -41,7 +42,7 @@ export const store = {
 	lab: { ...DEFAULTS.lab, ...saved.lab },
 	glints: Math.max(0, Math.floor(Number(saved.glints) || 0)),
 	perks: { ...DEFAULTS.perks, ...saved.perks },
-	daily: { ...DEFAULTS.daily, ...saved.daily },
+	looks: { ...DEFAULTS.looks, ...saved.looks },
 	tutorialDone: Boolean(saved.tutorialDone),
 	iosHintDismissed: Boolean(saved.iosHintDismissed),
 	hintDone: Boolean(saved.hintDone),

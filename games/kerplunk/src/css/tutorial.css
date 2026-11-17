@@ -11,27 +11,33 @@
 .tutorial__picture {
 	width: 220px;
 	height: 150px;
+	border: 2px solid var(--ink);
+	border-radius: var(--r);
+	background-color: var(--bg);
+	background-image: radial-gradient(var(--dot) 1.2px, transparent 1.4px);
+	background-size: 16px 16px;
 }
 
 .tutorial__title {
 	margin: 0;
+	font-family: var(--font-display);
+	font-weight: 400;
 	font-size: 1.35rem;
-	color: var(--gold-2);
 }
 
 .tutorial__text {
 	margin: 0;
-	color: var(--text);
 	line-height: 1.45;
 	max-width: 290px;
 }
 
 .tutorial__key {
-	font-family: inherit;
-	font-size: 0.8rem;
+	font-family: var(--font-label);
+	font-size: 0.75rem;
 	padding: 1px 6px;
-	border-radius: 6px;
-	border: 1px solid var(--muted);
+	border: 2px solid var(--ink);
+	border-radius: 4px;
+	background: var(--bg);
 }
 
 .tutorial__dots {
@@ -40,12 +46,12 @@
 }
 
 .tutorial__dot {
-	width: 8px;
-	height: 8px;
-	border-radius: 50%;
-	background: rgba(255, 255, 255, 0.2);
+	width: 10px;
+	height: 10px;
+	border: 2px solid var(--ink);
+	background: var(--card);
 }
 
 .tutorial__dot.is-on {
-	background: var(--gold);
+	background: var(--ink);
 }

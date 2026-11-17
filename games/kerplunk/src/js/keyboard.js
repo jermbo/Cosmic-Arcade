@@ -46,8 +46,12 @@ function moveSelection(e) {
 			break;
 		case 'ArrowDown':
 		case 'Tab': {
+			// Skip the empty slots of the tray.
 			const n = g.pieces.length;
-			cursor.slot = (cursor.slot + (e.shiftKey ? n - 1 : 1)) % n;
+			for (let k = 0; k < n; k++) {
+				cursor.slot = (cursor.slot + (e.shiftKey ? n - 1 : 1)) % n;
+				if (g.pieces[cursor.slot]) break;
+			}
 			audio.move();
 			break;
 		}

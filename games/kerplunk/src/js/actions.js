@@ -12,7 +12,6 @@ import { openTutorial, tutorialStep, closeTutorial } from './tutorial.js';
 import { dismissIosHint } from './install.js';
 
 const actions = {
-	'play-daily': () => startGame('daily'),
 	shop: openShop,
 	'shop-back': () => hideModals(),
 	reroll: rerollTray,

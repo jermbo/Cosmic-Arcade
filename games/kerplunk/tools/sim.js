@@ -83,7 +83,7 @@ function play(botName, lab, mode, seed, maxTurns = 400) {
 		const won = game.awardChain(steps.length, biggest);
 		if (won && won.kind) rewards[won.kind]++;
 		game.bag.length = 0;
-		game.refill(m.slot);
+		game.refillTray();
 	}
 	game.sim = { rewards, chains, groups };
 	return game;

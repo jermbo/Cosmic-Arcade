@@ -49,6 +49,18 @@ export function bankGlints() {
 	bumpWallet();
 }
 
+/** Timed: adds seconds to the clock, and shows a "+Ns" sticker on it. */
+export function addTime(seconds) {
+	if (seconds <= 0) return;
+	state.timeLeft += seconds;
+	const plus = $('time-plus');
+	plus.textContent = `+${seconds}s`;
+	plus.hidden = false;
+	plus.classList.remove('is-shown');
+	void plus.offsetWidth; // restarts the animation
+	plus.classList.add('is-shown');
+}
+
 export function updateHud(dt) {
 	const g = state.game;
 	if (!g) return;
@@ -61,7 +73,8 @@ export function updateHud(dt) {
 	$('best').textContent = Math.max(bestOf(state.mode), g.score).toLocaleString();
 	if (state.mode === 'timed') {
 		$('time').textContent = formatTime(state.timeLeft);
-		$('time-fill').style.transform = `scaleX(${Math.max(0, state.timeLeft / TIMED_SECONDS)})`;
+		// The bar fills to TIMED_SECONDS at most; the number shows the real time.
+		$('time-fill').style.transform = `scaleX(${Math.min(1, Math.max(0, state.timeLeft / TIMED_SECONDS))})`;
 		$('time-box').classList.toggle('is-low', state.timeLeft <= LOW_TIME_SECONDS);
 	}
 }

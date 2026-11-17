@@ -39,7 +39,9 @@ export function autoPlay(game, rounds = WARMUP_ROUNDS) {
 		game.place(move.slot, move.x);
 		const steps = game.resolveAll();
 		game.awardChain(steps.length, Math.max(0, ...steps.map((s) => s.biggest)));
-		game.refill(move.slot);
+		game.refillTray();
+		// In Timed an earned power-up acts at once, so the bag stays empty.
+		if (game.autoPowers) while (game.bag.length) if (!game.autoUse(game.bag[0])) game.bag.shift();
 	}
 	return played;
 }

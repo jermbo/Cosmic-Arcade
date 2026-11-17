@@ -7,8 +7,8 @@ import { $, showModal } from './dom.js';
 import { state } from './session.js';
 import { bestOf, updateWallet } from './hud.js';
 
-export function showOver({ game, reason, isBest, dailyNote }) {
-	showResult({ game, reason, isBest, dailyNote });
+export function showOver({ game, reason, isBest }) {
+	showResult({ game, reason, isBest });
 	showStats(game);
 	showContinues(game, reason);
 	updateWallet();
@@ -16,13 +16,11 @@ export function showOver({ game, reason, isBest, dailyNote }) {
 	showModal('screen-over');
 }
 
-function showResult({ game, reason, isBest, dailyNote }) {
+function showResult({ game, reason, isBest }) {
 	$('over-reason').textContent = reason === 'time' ? 'Time is up' : 'No room left';
 	$('final-score').textContent = game.score.toLocaleString();
 	$('new-best').hidden = !isBest || game.score === 0;
 	$('over-best').textContent = bestOf(state.mode).toLocaleString();
-	$('over-daily').hidden = !dailyNote;
-	$('over-daily').textContent = dailyNote;
 }
 
 function showStats(game) {

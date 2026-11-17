@@ -92,7 +92,7 @@ function renderBoosts() {
 		el.setAttribute('aria-disabled', String(!pressed && !enabled));
 	};
 	const room = (cost) => canAddBoost(cost);
-	$('start-wallet').textContent = `✦ ${store.glints.toLocaleString()} Glints`;
+	$('start-wallet').textContent = `✦ ${store.glints.toLocaleString()} Plunks`;
 	const warm = document.querySelector('[data-action="start-warmup"]');
 	mark(warm, picked.warmup, room(WARMUP_COST));
 	$('cost-warmup').textContent = `✦ ${WARMUP_COST} · score and power-ups it earns are yours`;

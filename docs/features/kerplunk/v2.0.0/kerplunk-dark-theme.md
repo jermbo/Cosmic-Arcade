@@ -50,5 +50,6 @@ As the player, I want to buy the Dark theme with Glints and pick it, so that I c
 
 ## Architecture
 
+- [Game README](../../../../games/kerplunk/README.md)
 - [Spec, scope 4 b and 6](../../../initiatives/kerplunk/v2/spec.md)
 - [Decision log, D8](../../../initiatives/kerplunk/v2/decision-log.md)

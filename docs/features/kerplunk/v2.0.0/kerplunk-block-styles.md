@@ -47,5 +47,6 @@ As the player, I want to buy and pick a block style, so that the blocks look the
 
 ## Architecture
 
+- [Game README](../../../../games/kerplunk/README.md)
 - [Spec, scope 5 b and 5 d](../../../initiatives/kerplunk/v2/spec.md)
 - [Decision log, D4](../../../initiatives/kerplunk/v2/decision-log.md)

@@ -54,7 +54,20 @@ export function glintsForAllClear(chain, mult) {
 	return glintsFor(chain, mult) + GLINT_ALL_CLEAR;
 }
 
-export const TIMED_SECONDS = 90;
+// Timed mode: the clock starts at TIMED_SECONDS. A turn adds time for its longest chain,
+// and TIME_FOR_BIG_GROUP more when it clears a group of BIG_GROUP or more blocks.
+// These are drafts: the owner tunes them after play-tests.
+export const TIMED_SECONDS = 60;
+export const TIME_FOR_CHAIN = { 3: 3, 4: 10, 5: 15 }; // a chain longer than 5 adds the time of 5
+export const TIME_FOR_BIG_GROUP = 3;
+export const BIG_GROUP = 6;
+
+/** The seconds a Timed turn adds: by its longest chain, plus a bonus for a big group. */
+export function timeForTurn(chainLength, biggestGroup = 0) {
+	const top = Math.max(...Object.keys(TIME_FOR_CHAIN).map(Number));
+	const forChain = TIME_FOR_CHAIN[Math.min(chainLength, top)] || 0;
+	return forChain + (biggestGroup >= BIG_GROUP ? TIME_FOR_BIG_GROUP : 0);
+}
 export const LOW_TIME_SECONDS = 10; // the clock turns red and starts to tick
 export const LOUD_TICK_SECONDS = 5; // the tick gets louder
 export const MAX_COLORS = 5;
@@ -296,12 +309,22 @@ export class Game {
 		this.pieces[slot] = this.makePiece();
 	}
 
+	/**
+	 * A used slot stays empty while another slot has a piece. When every slot is used,
+	 * every slot gets a new piece at the same time. Returns the slots that got a piece.
+	 */
+	refillTray() {
+		if (this.pieces.some(Boolean)) return [];
+		this.pieces = this.pieces.map(() => this.makePiece());
+		return this.pieces.map((_, i) => i);
+	}
+
 	/** What the next reroll costs. */
 	get rerollCost() {
 		return REROLL_COST + REROLL_STEP * this.rerolls;
 	}
 
-	/** Swaps every piece in the tray for a new one. The caller takes the Glints. */
+	/** Swaps each piece in the tray for a new one. An empty slot stays empty. The caller takes the Plunks. */
 	reroll() {
 		this.rerolls++;
 		this.pieces = this.pieces.map((p) => (p ? this.makePiece() : p));
@@ -534,6 +557,74 @@ export class Game {
 		}
 		this.grid = next;
 		return moves;
+	}
+
+	// ---- power-ups that act by themselves (Timed) ----
+
+	/** True when an earned power-up acts at once, with no tap. */
+	get autoPowers() {
+		return this.mode === 'timed';
+	}
+
+	/** Blocks cleared if this piece drops at column x. */
+	clearedBy(piece, x) {
+		const c = this.clone();
+		c.pieces = [piece];
+		c.place(0, x, piece);
+		return c.resolveAll().reduce((n, step) => n + step.cleared.length, 0);
+	}
+
+	/**
+	 * The color for an automatic Prism: paint each tray piece in it, and find the drop of one
+	 * painted piece that clears the most blocks. The color with the biggest clear wins.
+	 * On a tie, the lowest color (Ember, Amber, Moss, Tide, Dusk) wins.
+	 */
+	bestPrismColor() {
+		let best = { color: 0, cleared: -1 };
+		for (let color = 0; color < this.colors; color++) {
+			let most = 0;
+			for (const piece of this.pieces) {
+				if (!piece) continue;
+				const painted = { ...piece, cells: piece.cells.map((c) => ({ ...c, color })) };
+				for (let x = 0; x <= this.cols - piece.w; x++) if (this.fits(painted, x)) most = Math.max(most, this.clearedBy(painted, x));
+			}
+			if (most > best.cleared) best = { color, cleared: most };
+		}
+		return best.color;
+	}
+
+	/** An automatic Prism paints every piece in the tray one color. Returns the color, or null. */
+	autoPrism() {
+		if (!this.pieces.some(Boolean) || !this.bag.includes('prism')) return null;
+		const color = this.bestPrismColor();
+		this.take('prism');
+		this.pieces = this.pieces.map((p) => (p ? { ...p, id: this.nextId++, cells: p.cells.map((c) => ({ ...c, color })) } : p));
+		return color;
+	}
+
+	/**
+	 * The center of the 3x3 area with the most blocks, for an automatic Blast.
+	 * On a tie, the area nearest the tray (the lowest row) wins. Null when the well is empty.
+	 */
+	bestBlastCell() {
+		let best = null;
+		for (let y = this.rows - 1; y >= 0; y--) {
+			for (let x = 0; x < this.cols; x++) {
+				const n = this.blastArea(x, y).length;
+				if (n && (!best || n > best.n)) best = { x, y, n };
+			}
+		}
+		return best && { x: best.x, y: best.y };
+	}
+
+	/** Uses a power-up from the bag at once, with no animation (the bot and the warm-up use this). */
+	autoUse(kind) {
+		if (kind === 'prism') return this.autoPrism() !== null;
+		if (kind === 'remix') return this.useRemix() !== null && (this.resolveAll(), true);
+		const cell = this.bestBlastCell();
+		if (!cell || !this.useBlast(cell.x, cell.y)) return false;
+		this.resolveAll();
+		return true;
 	}
 
 	/** True when the player may still buy the second wind this run (once per run, and there must be blocks). */

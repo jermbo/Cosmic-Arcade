@@ -3,7 +3,7 @@
 .settings {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	gap: 8px;
 }
 
 .toggle {
@@ -12,9 +12,10 @@
 	justify-content: space-between;
 	min-height: 44px;
 	padding: 4px 4px 4px 12px;
-	border-radius: 12px;
-	background: rgba(255, 255, 255, 0.05);
-	font-weight: 600;
+	border: 2px solid var(--ink);
+	border-radius: var(--r);
+	background: var(--bg);
+	font-weight: 700;
 	cursor: pointer;
 }
 
@@ -23,37 +24,39 @@
 	-webkit-appearance: none;
 	width: 52px;
 	height: 30px;
-	margin: 0 6px 0 0;
+	margin: 0 4px 0 0;
+	border: 2px solid var(--ink);
 	border-radius: 15px;
-	background: #3a3166;
+	background: var(--empty);
 	position: relative;
 	cursor: pointer;
-	transition: background 0.15s;
+	transition: background 0.12s;
 }
 
 .toggle__input::after {
 	content: '';
 	position: absolute;
-	top: 3px;
-	left: 3px;
-	width: 24px;
-	height: 24px;
+	top: 2px;
+	left: 2px;
+	width: 22px;
+	height: 22px;
+	border: 2px solid var(--ink);
 	border-radius: 50%;
-	background: #d8d0f0;
-	transition: transform 0.15s;
+	background: var(--card);
+	transition: transform 0.12s;
 }
 
 .toggle__input:checked {
-	background: var(--gold);
+	background: var(--accent);
 }
 
 .toggle__input:checked::after {
 	transform: translateX(22px);
-	background: #fff;
 }
 
 .toggle__input:focus-visible {
-	outline: 3px solid var(--gold-2);
+	outline: 3px solid var(--ink);
+	outline-offset: 2px;
 }
 
 .lab {
@@ -68,16 +71,17 @@
 	border: 0;
 	display: flex;
 	flex-wrap: wrap;
-	gap: 6px;
+	gap: 8px;
 }
 
 .seg__legend {
 	width: 100%;
 	padding: 0;
 	margin-bottom: 6px;
-	font-size: 0.85rem;
-	font-weight: 700;
-	color: var(--text);
+	font-family: var(--font-label);
+	font-size: 0.7rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
 }
 
 .seg__option {
@@ -98,20 +102,24 @@
 	justify-content: center;
 	min-height: 44px;
 	padding: 6px 8px;
-	border-radius: 10px;
-	border: 1.5px solid rgba(179, 168, 214, 0.3);
-	background: rgba(255, 255, 255, 0.04);
+	border: 2px solid var(--ink);
+	border-radius: var(--r);
+	background: var(--card);
+	box-shadow: 3px 3px 0 var(--shadow);
 	font-size: 0.85rem;
-	font-weight: 600;
+	font-weight: 700;
 	text-align: center;
+	transition: transform 0.08s, box-shadow 0.08s;
 }
 
 .seg__input:checked + .seg__label {
-	border-color: #b285ff;
-	background: rgba(178, 133, 255, 0.25);
-	color: #fff;
+	background: var(--accent);
+	color: var(--on-accent);
+	transform: translate(3px, 3px);
+	box-shadow: 0 0 0 var(--shadow);
 }
 
 .seg__input:focus-visible + .seg__label {
-	outline: 3px solid var(--gold-2);
+	outline: 3px solid var(--ink);
+	outline-offset: 2px;
 }

@@ -7,11 +7,32 @@ import { capturePointer } from './dom.js';
 import { parseArt, cleanShapes, MAX_SHAPE_WIDTH } from './shape-list.js';
 import { SHAPE_ART } from './shapes.js';
 import { loadCustomShapes, saveCustomShapes, clearCustomShapes } from './storage.js';
+import { store } from './storage.js';
+import { themeFor } from './themes.js';
+import { writeVariables } from './theme-vars.js';
+import { drawBlock, BLOCK_STYLES } from './sprites.js';
 
 const GRID_W = MAX_SHAPE_WIDTH;
 const GRID_H = 6;
 const $ = (id) => document.getElementById(id);
 const clone = (list) => list.map(({ weight, art }) => ({ weight, art: art.slice() }));
+
+// ---- the look ----
+
+/** The lab wears the theme and the block style of the game: each block color is an image in a CSS variable. */
+function showLooks() {
+	const theme = themeFor(store.looks);
+	const style = BLOCK_STYLES.includes(store.looks.style) ? store.looks.style : 'patterns';
+	writeVariables(theme);
+	const size = 64;
+	theme.blocks.forEach((base, color) => {
+		const c = document.createElement('canvas');
+		c.width = c.height = size;
+		drawBlock(c.getContext('2d'), { style, color, s: size, theme, base });
+		document.documentElement.style.setProperty(`--blk-c${color}`, `url(${c.toDataURL()})`);
+	});
+}
+showLooks();
 
 // ---- shape helpers ----
 

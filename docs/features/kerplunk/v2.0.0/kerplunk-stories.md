@@ -27,7 +27,7 @@ The scope and the decisions are in the [spec](../../../initiatives/kerplunk/v2/s
 | 10 | [The Random theme](kerplunk-random-theme.md) | 9 | ready |
 | 11 | [Buy and use Symbols, Dice pips and Silhouettes](kerplunk-block-styles.md) | 9 | ready |
 | 12 | [Buy and use Faces](kerplunk-faces.md) | 11 | ready |
-| 13 | [Rename the currency](kerplunk-rename-currency.md) | None | needs-info |
+| 13 | [Rename the currency](kerplunk-rename-currency.md) | None | ready |
 
 ## Steps of the work
 
@@ -39,7 +39,7 @@ The stories of one step can be built at the same time.
 4. Stories 10 and 11
 5. Story 12
 
-Story 13 waits for a name.
+Story 13 can go in any step.
 
 ## Notes for the builder
 

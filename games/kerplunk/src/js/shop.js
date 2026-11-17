@@ -1,29 +1,20 @@
-// What Glints buy that lasts: block color skins and a bigger power-up bag.
+// What Plunks buy that lasts: themes, block styles and a bigger power-up bag.
 // (Boosts for one game, rerolls and second wind are in boosts.js and second-chances.js. Their prices are in prices.js.)
 
-import { PALETTE } from './sprites.js';
-import { BAG_UPGRADE_COSTS } from './prices.js';
+import { BAG_UPGRADE_COSTS, THEME_PRICES, STYLE_PRICES } from './prices.js';
 
-/** Mixes a #rrggbb color toward a target color. t is 0 (the color) to 1 (the target). */
-function mixColor(hex, target, t) {
-	const n = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-	const a = n(hex);
-	const b = n(target);
-	return `#${a.map((v, i) => Math.round(v + (b[i] - v) * t).toString(16).padStart(2, '0')).join('')}`;
-}
-
-const fromBases = (names, bases) => bases.map((base, i) => ({ name: names[i], base, light: mixColor(base, '#ffffff', 0.62), dark: mixColor(base, '#000000', 0.5) }));
-
-// Classic is the palette the game starts with. The others only change the colors.
-const CLASSIC = PALETTE.map(({ name, base, light, dark }) => ({ name, base, light, dark }));
-
-export const SKINS = [
-	{ id: 'classic', name: 'Classic', price: 0, colors: CLASSIC },
-	{ id: 'sunset', name: 'Sunset', price: 100, colors: fromBases(['Rose', 'Flame', 'Gold', 'Orchid', 'Plum'], ['#ff4d6d', '#ff8a1c', '#ffd23f', '#d68cff', '#8a3fd1']) },
-	{ id: 'ocean', name: 'Ocean', price: 100, colors: fromBases(['Reef', 'Wave', 'Kelp', 'Deep', 'Pearl'], ['#4cc9f0', '#3a86ff', '#06d6a0', '#7b3fe4', '#f4efe6']) },
-	{ id: 'neon', name: 'Neon', price: 150, colors: fromBases(['Pink', 'Volt', 'Mint', 'Cyan', 'Ultra'], ['#ff2e93', '#f0ff00', '#00f5a0', '#00c2ff', '#a45cff']) },
+export const THEMES = [
+	{ id: 'light', name: 'Light', price: THEME_PRICES.light, text: 'Cream paper, black ink.' },
+	{ id: 'dark', name: 'Dark', price: THEME_PRICES.dark, text: 'Near black, off-white ink.' },
+	{ id: 'random', name: 'Random', price: THEME_PRICES.random, text: 'A new look each game.' },
 ];
 
-export const skinById = (id) => SKINS.find((s) => s.id === id) || SKINS[0];
+export const STYLES = [
+	{ id: 'patterns', name: 'Patterns', price: STYLE_PRICES.patterns, text: 'Stripes, dots, plain, checks, rings.' },
+	{ id: 'symbols', name: 'Symbols', price: STYLE_PRICES.symbols, text: 'A shape on each color.' },
+	{ id: 'pips', name: 'Dice pips', price: STYLE_PRICES.pips, text: 'One to five dots.' },
+	{ id: 'silhouettes', name: 'Silhouettes', price: STYLE_PRICES.silhouettes, text: 'Each color has its own outline.' },
+	{ id: 'faces', name: 'Faces', price: STYLE_PRICES.faces, text: 'Five moods. They blink.' },
+];
 
 export const BAG_MAX_UPGRADES = BAG_UPGRADE_COSTS.length;

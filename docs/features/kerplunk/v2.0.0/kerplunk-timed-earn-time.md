@@ -42,5 +42,6 @@ None.
 
 ## Architecture
 
+- [Game README](../../../../games/kerplunk/README.md)
 - [Spec, scope 8](../../../initiatives/kerplunk/v2/spec.md)
 - [Decision log, D6](../../../initiatives/kerplunk/v2/decision-log.md)

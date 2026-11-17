@@ -1,6 +1,6 @@
 // The life of a game: start it, pause it, and go back to the title.
 
-import { Game, TIMED_SECONDS, DEFAULT_LAB, BAG_SIZE, dailySeed } from './engine.js';
+import { Game, TIMED_SECONDS, BAG_SIZE } from './engine.js';
 import { autoPlay, WARMUP_ROUNDS } from './bot.js';
 import { audio } from './audio.js';
 import { store, labIsDefault } from './storage.js';
@@ -8,8 +8,10 @@ import { $, hideModals, showModal, showBanner } from './dom.js';
 import { app, state, view, cancelDrag, cancelPower } from './session.js';
 import { updateHud, updateWallet } from './hud.js';
 import { updateBestLabels } from './title.js';
-import { syncDaily, todayKey } from './daily.js';
 import { canOfferBoosts, openBoosts } from './boosts.js';
+import { actAuto } from './powers.js';
+import { rollForGame } from './looks.js';
+import { checkEnd } from './ending.js';
 import { openTutorial } from './tutorial.js';
 
 export function startGame(mode) {
@@ -18,7 +20,6 @@ export function startGame(mode) {
 		openTutorial();
 		return;
 	}
-	if (mode === 'daily') syncDaily();
 	state.pendingMode = mode;
 	// With Glints to spend, offer boosts for this game first.
 	if (canOfferBoosts()) {
@@ -33,19 +34,29 @@ export function beginGame(mode, boosts) {
 	$('screen-title').hidden = true;
 	$('banner').hidden = true;
 	state.mode = mode;
+	rollForGame(); // with Random in use, each new game gets a new look
 	state.game = createGame(mode, boosts);
 	resetRound(mode);
 	const warmedUp = Boolean(boosts && boosts.warmup);
 	showRound(mode, warmedUp);
+	if (state.game.autoPowers && state.game.bag.length) actStartPowers(state.game);
+}
+
+/** Timed: a "Start with a power-up" boost acts at the start of the game. */
+async function actStartPowers(game) {
+	state.busy = true;
+	while (state.game === game && game.bag.length) await actAuto(game.bag[0]);
+	if (state.game !== game) return;
+	state.busy = false;
+	checkEnd();
 }
 
 /** A new game, with the boosts the player bought. */
 function createGame(mode, boosts) {
-	const daily = mode === 'daily';
 	const game = new Game({
 		mode,
-		lab: daily ? DEFAULT_LAB : store.lab,
-		seed: daily ? dailySeed(todayKey()) : randomSeed(),
+		lab: store.lab,
+		seed: randomSeed(),
 		bagSize: BAG_SIZE + store.perks.bag,
 		banned: boosts && boosts.ban !== null ? boosts.ban : null,
 	});
@@ -62,7 +73,7 @@ function randomSeed() {
 function resetRound(mode) {
 	state.freeGlints = state.game.glints;
 	state.bankedGlints = state.game.glints;
-	state.usedLab = mode !== 'daily' && !labIsDefault();
+	state.usedLab = !labIsDefault();
 	state.screen = 'playing';
 	state.paused = false;
 	state.busy = false;

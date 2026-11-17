@@ -16,11 +16,10 @@
 	text-align: center;
 }
 
+/* No blur behind a modal: a flat veil of the background color. */
 .screen--modal {
-	background: rgba(8, 6, 20, 0.72);
-	-webkit-backdrop-filter: blur(6px);
-	backdrop-filter: blur(6px);
-	animation: fade-in 0.2s ease-out;
+	background: color-mix(in srgb, var(--bg) 78%, transparent);
+	animation: fade-in 0.12s ease-out;
 }
 
 @keyframes fade-in {
@@ -33,44 +32,53 @@
 	display: flex;
 	gap: 6px;
 	justify-content: center;
-	margin-bottom: 4px;
+	margin-bottom: 6px;
 }
 
 .logo__gem {
-	width: 44px;
-	height: 44px;
-	animation: gem-bob 2.4s ease-in-out infinite;
+	width: 40px;
+	height: 40px;
+	animation: gem-hop 2.4s ease-in-out infinite;
 }
 
-@keyframes gem-bob {
-	50% {
-		transform: translateY(-7px) rotate(4deg);
+@keyframes gem-hop {
+	0%,
+	70%,
+	100% {
+		transform: none;
+	}
+	80% {
+		transform: translate(-3px, -6px) rotate(-6deg);
+	}
+	90% {
+		transform: translate(0, 2px);
 	}
 }
 
 .logo__name {
 	margin: 0;
-	font-size: clamp(2.8rem, 14vw, 4.2rem);
-	font-weight: 900;
-	letter-spacing: 0.04em;
+	font-family: var(--font-display);
+	font-weight: 400;
+	font-size: clamp(2.8rem, 15vw, 4.4rem);
 	line-height: 1;
-	background: linear-gradient(180deg, #fff4d6 10%, var(--gold) 55%, #d98a4a 100%);
-	-webkit-background-clip: text;
-	background-clip: text;
-	color: transparent;
-	filter: drop-shadow(0 3px 0 var(--lead)) drop-shadow(0 0 18px rgba(242, 200, 121, 0.45));
+	letter-spacing: -0.02em;
+	color: var(--text);
+	text-shadow: var(--sh) var(--sh) 0 var(--accent);
+	transform: rotate(var(--tilt));
 }
 
 .logo__tag {
-	margin: 0 0 18px;
-	color: var(--muted);
-	font-size: 0.95rem;
+	margin: 4px 0 16px;
+	font-family: var(--font-label);
+	font-size: 0.78rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
 }
 
 .menu {
 	display: flex;
 	flex-direction: column;
-	gap: 10px;
+	gap: 12px;
 	width: min(100%, 300px);
 }
 
@@ -86,7 +94,7 @@
 
 .menu__row {
 	display: flex;
-	gap: 10px;
+	gap: 12px;
 }
 
 .menu__row > * {
@@ -97,35 +105,43 @@
 	display: inline-flex;
 	align-items: center;
 	min-height: 44px;
-	color: var(--muted);
+	color: var(--text);
+	font-weight: 700;
 	font-size: 0.9rem;
 	margin-top: 6px;
+	text-underline-offset: 3px;
 }
 
 .arcade-link:focus-visible {
-	outline: 3px solid var(--gold-2);
+	outline: 3px solid var(--ink);
 	outline-offset: 2px;
 }
 
 .version {
 	margin: 8px 0 0;
-	font-size: 0.72rem;
-	color: rgba(179, 168, 214, 0.75);
+	font-family: var(--font-label);
+	font-size: 0.7rem;
+	opacity: 0.7;
 }
 
 .wallet {
+	display: inline-block;
+	align-self: center;
 	margin: -4px 0 10px;
-	font-weight: 800;
-	color: #9fd8ff;
-	text-shadow: 0 0 12px rgba(69, 176, 255, 0.5);
-	letter-spacing: 0.04em;
+	padding: 4px 12px;
+	background: var(--accent2);
+	color: var(--on-accent2);
+	border: var(--bw) solid var(--ink);
+	border-radius: var(--r);
+	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	font-weight: 700;
 	text-align: center;
 }
 
 @container page (max-height: 640px) {
 	.logo__gem {
-		width: 34px;
-		height: 34px;
+		width: 32px;
+		height: 32px;
 	}
 	.logo__tag {
 		margin-bottom: 8px;
