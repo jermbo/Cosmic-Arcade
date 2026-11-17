@@ -1,0 +1,125 @@
+/* The settings: switches, and the Lab choices. */
+
+.settings {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.toggle {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	min-height: 44px;
+	padding: 4px 4px 4px 12px;
+	border: 2px solid var(--ink);
+	border-radius: var(--r);
+	background: var(--bg);
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.toggle__input {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 52px;
+	height: 30px;
+	margin: 0 4px 0 0;
+	border: 2px solid var(--ink);
+	border-radius: 15px;
+	background: var(--empty);
+	position: relative;
+	cursor: pointer;
+	transition: background 0.12s;
+}
+
+.toggle__input::after {
+	content: '';
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 22px;
+	height: 22px;
+	border: 2px solid var(--ink);
+	border-radius: 50%;
+	background: var(--card);
+	transition: transform 0.12s;
+}
+
+.toggle__input:checked {
+	background: var(--accent);
+}
+
+.toggle__input:checked::after {
+	transform: translateX(22px);
+}
+
+.toggle__input:focus-visible {
+	outline: 3px solid var(--ink);
+	outline-offset: 2px;
+}
+
+.lab {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.seg {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.seg__legend {
+	width: 100%;
+	padding: 0;
+	margin-bottom: 6px;
+	font-family: var(--font-label);
+	font-size: 0.7rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.seg__option {
+	flex: 1;
+	min-width: 0;
+	cursor: pointer;
+}
+
+.seg__input {
+	position: absolute;
+	opacity: 0;
+	pointer-events: none;
+}
+
+.seg__label {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 44px;
+	padding: 6px 8px;
+	border: 2px solid var(--ink);
+	border-radius: var(--r);
+	background: var(--card);
+	box-shadow: 3px 3px 0 var(--shadow);
+	font-size: 0.85rem;
+	font-weight: 700;
+	text-align: center;
+	transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.seg__input:checked + .seg__label {
+	background: var(--accent);
+	color: var(--on-accent);
+	transform: translate(3px, 3px);
+	box-shadow: 0 0 0 var(--shadow);
+}
+
+.seg__input:focus-visible + .seg__label {
+	outline: 3px solid var(--ink);
+	outline-offset: 2px;
+}

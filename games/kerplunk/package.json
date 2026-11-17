@@ -1,0 +1,25 @@
+{
+	"name": "kerplunk",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite src --open --port 4002",
+		"build": "node build.js",
+		"test": "node tools/engine-test.js && node tools/shape-list-test.js && node tools/bot-test.js && node tools/wallet-test.js && node tools/theme-test.js",
+		"sim": "node tools/sim.js",
+		"icons": "node tools/make-icons.js",
+		"fonts": "node tools/copy-fonts.js"
+	},
+	"arcade": {
+		"engine": "none",
+		"outDir": "dist"
+	},
+	"devDependencies": {
+		"@fontsource/archivo-black": "5.3.0",
+		"@fontsource/bricolage-grotesque": "5.3.0",
+		"@fontsource/dm-mono": "5.3.0",
+		"@fontsource/space-grotesk": "5.3.0",
+		"vite": "8.3.5"
+	}
+}

@@ -1,0 +1,188 @@
+/* A full screen over the game: the title, and the modals. */
+
+.screen {
+	position: absolute;
+	inset: 0;
+	padding: calc(var(--safe-top) + 16px) calc(var(--safe-right) + 18px) calc(var(--safe-bottom) + 16px) calc(var(--safe-left) + 18px);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	z-index: 5;
+}
+
+.screen--title {
+	gap: 10px;
+	text-align: center;
+}
+
+/* No blur behind a modal: a flat veil of the background color. */
+.screen--modal {
+	background: color-mix(in srgb, var(--bg) 78%, transparent);
+	animation: fade-in 0.12s ease-out;
+}
+
+@keyframes fade-in {
+	from {
+		opacity: 0;
+	}
+}
+
+/* The logo: one long piece of game blocks, a letter on each. The plain text is for screen readers. */
+.logo {
+	margin: 0;
+}
+
+.logo__text {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.logo__tiles {
+	--tile-size: clamp(34px, 10.4vw, 52px);
+	display: flex;
+	justify-content: center;
+	cursor: pointer;
+	touch-action: manipulation;
+	/* One hard shadow under the whole piece, not one for each block. */
+	filter: drop-shadow(3px 3px 0 var(--shadow));
+	transform: rotate(-2deg);
+}
+
+/* The block image comes from title.js: the game's own block, in the style in use. */
+.logo__tile {
+	display: grid;
+	place-items: center;
+	width: var(--tile-size);
+	aspect-ratio: 1;
+	padding-top: 0.06em;
+	background: center / 100% no-repeat;
+	font-family: var(--font-display);
+	font-weight: 400;
+	font-size: calc(var(--tile-size) * 0.66);
+	line-height: 1;
+	/* White with a thick outline in the ink of the blocks, so the letter reads on every block style and theme. */
+	color: #fff;
+	-webkit-text-stroke: 0.14em var(--block-ink);
+	paint-order: stroke fill;
+	/* The blocks drop in one after the other, then a hop runs along the name now and then. */
+	animation:
+		tile-drop 0.42s cubic-bezier(0.3, 1.5, 0.5, 1) both,
+		tile-hop 5s ease-in-out infinite;
+	animation-delay: calc(var(--i) * 60ms), calc(1.4s + var(--i) * 90ms);
+}
+
+.logo__tile.is-tapped {
+	animation: tile-tap 0.36s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+@keyframes tile-tap {
+	40% {
+		transform: translateY(-12px) scale(1.06);
+	}
+	75% {
+		transform: translateY(2px) scale(1.04, 0.94);
+	}
+}
+
+@keyframes tile-drop {
+	from {
+		transform: translateY(-40px);
+		opacity: 0;
+	}
+}
+
+@keyframes tile-hop {
+	0%,
+	12%,
+	100% {
+		transform: none;
+	}
+	5% {
+		transform: translateY(-8px);
+	}
+	9% {
+		transform: translateY(1px);
+	}
+}
+
+.logo__tag {
+	margin: 4px 0 16px;
+	font-family: var(--font-label);
+	font-size: 0.78rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.menu {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	width: min(100%, 300px);
+}
+
+.menu--row {
+	flex-direction: row;
+	justify-content: center;
+	width: 100%;
+}
+
+.menu--left {
+	align-items: flex-start;
+}
+
+.menu__row {
+	display: flex;
+	gap: 12px;
+}
+
+.menu__row > * {
+	flex: 1;
+}
+
+.arcade-link {
+	display: inline-flex;
+	align-items: center;
+	min-height: 44px;
+	color: var(--text);
+	font-weight: 700;
+	font-size: 0.9rem;
+	margin-top: 6px;
+	text-underline-offset: 3px;
+}
+
+.arcade-link:focus-visible {
+	outline: 3px solid var(--ink);
+	outline-offset: 2px;
+}
+
+.version {
+	margin: 8px 0 0;
+	font-family: var(--font-label);
+	font-size: 0.7rem;
+	opacity: 0.7;
+}
+
+.wallet {
+	display: inline-block;
+	align-self: center;
+	margin: -4px 0 10px;
+	padding: 4px 12px;
+	background: var(--accent2);
+	color: var(--on-accent2);
+	border: var(--bw) solid var(--ink);
+	border-radius: var(--r);
+	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	font-weight: 700;
+	text-align: center;
+}
+
+@container page (max-height: 640px) {
+	.logo__tag {
+		margin-bottom: 8px;
+	}
+}
