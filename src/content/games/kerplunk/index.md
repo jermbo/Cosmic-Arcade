@@ -1,9 +1,9 @@
 ---
-title: Glintwell
+title: Kerplunk
 tagline: Color-matching puzzle. Chain clears in the well, earn power-ups, play offline.
 status: playable
 kind: video
-build: "block-drop"
+build: "kerplunk"
 platforms: [desktop, mobile]
 inputs: [mouse, keyboard, touch]
 tags: [puzzle, pwa]
