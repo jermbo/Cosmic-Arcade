@@ -62,6 +62,22 @@ export function closeTutorial() {
 	}
 }
 
+let pictureFrame = 0;
+
+/** Draws the picture of the page each frame while the tutorial is open. With reduced motion, one still frame. */
+function animatePicture(ctx, draw) {
+	cancelAnimationFrame(pictureFrame);
+	const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+	const start = performance.now();
+	const frame = (now) => {
+		if ($('screen-tutorial').hidden) return;
+		ctx.clearRect(0, 0, PICTURE_WIDTH, PICTURE_HEIGHT);
+		draw(ctx, still ? 1.4 : (now - start) / 1000);
+		if (!still) pictureFrame = requestAnimationFrame(frame);
+	};
+	frame(start);
+}
+
 function renderTutorial() {
 	const page = TUTORIAL[tutorialPage];
 	const box = $('tutorial');
@@ -74,7 +90,7 @@ function renderTutorial() {
 	c.height = PICTURE_HEIGHT * dpr;
 	const ctx = c.getContext('2d');
 	ctx.scale(dpr, dpr);
-	page.draw(ctx);
+	animatePicture(ctx, page.draw);
 	$('tutorial-dots').innerHTML = TUTORIAL.map((_, i) => `<span class="tutorial__dot ${i === tutorialPage ? 'is-on' : ''}"></span>`).join('');
 	$('tutorial-next').textContent = tutorialPage === TUTORIAL.length - 1 ? (state.afterTutorial ? "Let's play" : 'Done') : 'Next';
 }

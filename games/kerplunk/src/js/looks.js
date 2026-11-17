@@ -34,10 +34,10 @@ export function applyLooks() {
 	for (const redraw of listeners) redraw();
 }
 
-/** With Random in use, a new game rolls a new look. It stays until the next game. */
+/** With Random in use, a new game rolls a new look. It stays until the next game. The shop can roll one too. */
 export function rollForGame() {
 	if (store.looks.theme !== 'random') return;
-	store.looks.roll = rollTheme();
+	store.looks.roll = rollTheme(Math.random, isTheme(store.looks.roll) ? store.looks.roll : null);
 	save();
 	applyLooks();
 }

@@ -88,10 +88,13 @@ export const RANDOM_SHADOWS = [4, 5, 6];
 export const RANDOM_CORNERS = [0, 6, 12];
 export const RANDOM_TILT = 2.5; // the score tilt is from -RANDOM_TILT to RANDOM_TILT degrees
 
-/** Rolls a Random look. rng gives a number from 0 up to (not including) 1. */
-export function rollTheme(rng = Math.random) {
+/**
+ * Rolls a Random look. rng gives a number from 0 up to (not including) 1.
+ * With a previous roll, the new one has another background, so each roll looks new.
+ */
+export function rollTheme(rng = Math.random, previous = null) {
 	const pick = (list) => list[Math.floor(rng() * list.length)];
-	const bg = pick(RANDOM_BACKGROUNDS);
+	const bg = pick(RANDOM_BACKGROUNDS.filter((c) => !previous || c !== previous.bg));
 	const cards = RANDOM_CARDS.filter((c) => c.toUpperCase() !== bg.toUpperCase());
 	const accent = pick(cards);
 	const accent2 = pick(cards.filter((c) => c !== accent));

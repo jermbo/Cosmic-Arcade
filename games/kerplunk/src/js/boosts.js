@@ -6,7 +6,7 @@ import { canAfford, boostsCost } from './wallet.js';
 import { audio } from './audio.js';
 import { PALETTE } from './sprites.js';
 import { store } from './storage.js';
-import { $, showModal } from './dom.js';
+import { $, showModal, setPlunkText } from './dom.js';
 import { save } from './session.js';
 import { onWalletUpdate } from './hud.js';
 
@@ -95,17 +95,17 @@ function renderBoosts() {
 	$('start-wallet').textContent = `✦ ${store.glints.toLocaleString()} Plunks`;
 	const warm = document.querySelector('[data-action="start-warmup"]');
 	mark(warm, picked.warmup, room(WARMUP_COST));
-	$('cost-warmup').textContent = `✦ ${WARMUP_COST} · score and power-ups it earns are yours`;
+	setPlunkText($('cost-warmup'), `✦ ${WARMUP_COST} · score and power-ups it earns are yours`);
 	for (const b of document.querySelectorAll('[data-action="start-power"]')) mark(b, picked.power === b.dataset.kind, picked.power !== null || room(START_POWER_COST));
-	$('cost-power').textContent = `✦ ${START_POWER_COST} for one`;
+	setPlunkText($('cost-power'), `✦ ${START_POWER_COST} for one`);
 	const ban = document.querySelector('[data-action="start-ban"]');
 	mark(ban, picked.ban !== null, room(BAN_COST));
 	const label = $('ban-label');
 	label.textContent = picked.ban === null ? 'Ban a shape from this game' : 'Banned shape (tap to change)';
 	if (picked.ban !== null && SHAPES[picked.ban]) label.append(' ', shapeThumb(SHAPES[picked.ban]));
-	$('cost-ban').textContent = `✦ ${BAN_COST}`;
+	setPlunkText($('cost-ban'), `✦ ${BAN_COST}`);
 	const total = pickedCost();
-	$('start-total').textContent = total ? `✦ ${total}` : 'Free';
+	setPlunkText($('start-total'), total ? `✦ ${total}` : 'Free');
 }
 
 function renderBanGrid() {

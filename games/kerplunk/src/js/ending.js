@@ -31,7 +31,7 @@ function endGame(reason) {
 		$('banner').hidden = true;
 		state.screen = 'over';
 		showOver({ game: g, reason, isBest });
-		if (isBest && g.score > 0) audio.best();
+		if (isBest && g.score > 0) setTimeout(() => audio.best(), 900);
 	}, OVER_DELAY_MS);
 }
 

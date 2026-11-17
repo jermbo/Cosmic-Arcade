@@ -27,6 +27,23 @@ export function showBanner(text, ms) {
 	if (ms) showBanner.timer = setTimeout(() => (b.hidden = true), ms);
 }
 
+/**
+ * Sets a text where each ✦ is a bold, bigger mark. In small label type a plain ✦ is so thin
+ * that it reads like a "+".
+ */
+export function setPlunkText(el, text) {
+	el.textContent = '';
+	text.split('✦').forEach((part, i) => {
+		if (i > 0) {
+			const mark = document.createElement('b');
+			mark.className = 'plunk-mark';
+			mark.textContent = '✦';
+			el.append(mark);
+		}
+		if (part) el.append(part);
+	});
+}
+
 /** Keeps the pointer events on an element while a finger or the mouse is down. */
 export function capturePointer(element, pointerId) {
 	try {

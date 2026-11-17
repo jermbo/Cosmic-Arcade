@@ -174,10 +174,20 @@ A "Start with a power-up" boost acts at the start of a Timed game. Power-ups tha
 
 Kerplunk has a neo-brutalist look: thick outlines, hard shadows with no blur, flat bold color, and bold type. Every screen uses it, the shape lab too.
 
+- The logo spells KERPLUNK in letter tiles, one block color each. The ink on a tile is black or white, whichever has more contrast, so the name reads in every theme. The tiles drop in, then a hop runs along the name now and then.
 - Cards and buttons have an outline and a hard shadow. A tap pushes a card into its shadow.
 - A panel opens with a short drop and a hard shadow, with no blur behind it.
 - The score card has a small tilt, like a sticker.
 - A clear: each block hops up and left, then falls and turns while it shrinks. The blocks go one after the other from the first block of the group. The points show on a tilted sticker that rises and fades.
+
+Small touches:
+
+- A tap on a logo tile makes it hop and play its note. With Random in use, a tap rolls a new look.
+- A dropped piece lands with a squash, a soft thud and a tiny shake of the well.
+- On the game over screen the score counts up. A new best gets a "New best" sticker stamped on the score card.
+- The pictures of How to play move: a piece rises and sticks, a group hops and clears, the power-ups hop, the warning pulses.
+- In small or mono type, the ✦ of Plunks is bold and a little bigger, so it does not read as a "+". The points sticker says "+2 Plunks" in words.
+- The sounds are wooden: a marimba note and a round "plunk" in place of glass bells.
 
 The look has two parts. The player picks one of each in the shop: a **theme** and a **block style**.
 
@@ -193,7 +203,7 @@ A theme is a set of design variables: the CSS custom properties on the page, whi
 
 Light values: outline 3px, hard shadow 4px right and 4px down, corner 6px. Block colors: Ember `#FF6B6B`, Amber `#FFD93D`, Moss `#6BCB77`, Tide `#4D96FF`, Dusk `#C084FC`. Dark keeps the same block colors.
 
-A Random roll picks a background, two card colors (never the same as the background, or the same as each other), a well color, one of four block color sets, the display type (Archivo Black or Bricolage Grotesque), the outline, shadow, corner and score tilt. Text on a colored card is black or white, whichever has more contrast. The ink is always `#111111`. When Random is in use, the title screen and the menus keep the look of the last game. The game rolls one look when it opens, if there is none yet.
+A Random roll picks a background, two card colors (never the same as the background, or the same as each other), a well color, one of four block color sets, the display type (Archivo Black or Bricolage Grotesque), the outline, shadow, corner and score tilt. Text on a colored card is black or white, whichever has more contrast. The ink is always `#111111`. When Random is in use, the title screen and the menus keep the look of the last game. The game rolls one look when it opens, if there is none yet. In the shop, Random in use has a **New look** button: each tap rolls a new look at once, for free. A new roll always has another background than the last one.
 
 ### Block styles
 

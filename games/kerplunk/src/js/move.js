@@ -16,6 +16,13 @@ const CLEAR_STAGGER = 0.035;
 /** Rows below the well where a piece starts when it is dropped without a drag. */
 export const DROP_START_BELOW_WELL = 0.4;
 
+// A dropped piece lands: a thud, a buzz and a tiny shake of the well.
+view.onLand = (count) => {
+	audio.land(count);
+	vibrate(6);
+	view.fx.shake(1.5);
+};
+
 export async function dropPiece({ slot, piece, col, left, top }) {
 	const g = state.game;
 	state.busy = true;
@@ -122,7 +129,7 @@ function popStepScore(step) {
 	const parts = [];
 	if (step.chain > 1) parts.push(`Chain ×${step.chain}`);
 	if (step.mult > 1) parts.push(`Group ×${step.mult}`);
-	if (step.glints > 0) parts.push(`+${step.glints} ✦`);
+	if (step.glints > 0) parts.push(`+${step.glints} ${step.glints === 1 ? 'Plunk' : 'Plunks'}`);
 	view.fx.pop({ x: center.x, y: center.y, text: `+${step.points.toLocaleString()}`, sub: parts.join(' · '), big: step.chain > 2 || step.mult > 1 });
 	bump($('score'));
 }

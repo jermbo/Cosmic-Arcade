@@ -28,43 +28,85 @@
 	}
 }
 
-.logo__gems {
-	display: flex;
-	gap: 6px;
-	justify-content: center;
-	margin-bottom: 6px;
-}
-
-.logo__gem {
-	width: 40px;
-	height: 40px;
-	animation: gem-hop 2.4s ease-in-out infinite;
-}
-
-@keyframes gem-hop {
-	0%,
-	70%,
-	100% {
-		transform: none;
-	}
-	80% {
-		transform: translate(-3px, -6px) rotate(-6deg);
-	}
-	90% {
-		transform: translate(0, 2px);
-	}
-}
-
-.logo__name {
+/* The logo: the name in letter tiles. The plain text is for screen readers. */
+.logo {
 	margin: 0;
+}
+
+.logo__text {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.logo__tiles {
+	display: flex;
+	cursor: pointer;
+	touch-action: manipulation;
+	justify-content: center;
+	gap: clamp(3px, 1.2vw, 6px);
+}
+
+.logo__tile {
+	display: grid;
+	place-items: center;
+	width: clamp(32px, 10vw, 46px);
+	aspect-ratio: 1;
+	padding-top: 0.06em;
+	background: var(--tile);
+	color: var(--tile-ink);
+	border: var(--bw) solid var(--ink);
+	border-radius: min(var(--r), 8px);
+	box-shadow: 3px 3px 0 var(--shadow);
 	font-family: var(--font-display);
 	font-weight: 400;
-	font-size: clamp(2.8rem, 15vw, 4.4rem);
+	font-size: clamp(1.25rem, 6.4vw, 1.8rem);
 	line-height: 1;
-	letter-spacing: -0.02em;
-	color: var(--text);
-	text-shadow: var(--sh) var(--sh) 0 var(--accent);
-	transform: rotate(var(--tilt));
+	transform: rotate(var(--turn));
+	/* The tiles drop in one after the other, then a hop runs along the name now and then. */
+	animation:
+		tile-drop 0.42s cubic-bezier(0.3, 1.5, 0.5, 1) both,
+		tile-hop 5s ease-in-out infinite;
+	animation-delay: calc(var(--i) * 60ms), calc(1.4s + var(--i) * 90ms);
+}
+
+.logo__tile.is-tapped {
+	animation: tile-tap 0.36s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+@keyframes tile-tap {
+	40% {
+		transform: translate(-3px, -12px) rotate(calc(var(--turn) * -2));
+		box-shadow: 7px 9px 0 var(--shadow);
+	}
+	75% {
+		transform: translateY(2px) scale(1.04, 0.94) rotate(var(--turn));
+		box-shadow: 1px 1px 0 var(--shadow);
+	}
+}
+
+@keyframes tile-drop {
+	from {
+		transform: translateY(-40px) rotate(0deg);
+		opacity: 0;
+	}
+}
+
+@keyframes tile-hop {
+	0%,
+	12%,
+	100% {
+		transform: rotate(var(--turn));
+	}
+	5% {
+		transform: translate(-2px, -8px) rotate(calc(var(--turn) * -1));
+	}
+	9% {
+		transform: translateY(1px) rotate(var(--turn));
+	}
 }
 
 .logo__tag {
@@ -139,10 +181,6 @@
 }
 
 @container page (max-height: 640px) {
-	.logo__gem {
-		width: 32px;
-		height: 32px;
-	}
 	.logo__tag {
 		margin-bottom: 8px;
 	}

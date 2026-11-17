@@ -3,8 +3,9 @@
 import { SECOND_WIND_COST, EXTEND_COST } from './prices.js';
 import { canAfford } from './wallet.js';
 import { store } from './storage.js';
-import { $, showModal } from './dom.js';
-import { state } from './session.js';
+import { $, showModal, setPlunkText } from './dom.js';
+import { audio } from './audio.js';
+import { state, vibrate } from './session.js';
 import { bestOf, updateWallet } from './hud.js';
 
 export function showOver({ game, reason, isBest }) {
@@ -18,9 +19,46 @@ export function showOver({ game, reason, isBest }) {
 
 function showResult({ game, reason, isBest }) {
 	$('over-reason').textContent = reason === 'time' ? 'Time is up' : 'No room left';
-	$('final-score').textContent = game.score.toLocaleString();
-	$('new-best').hidden = !isBest || game.score === 0;
+	$('new-best').hidden = true;
+	countUp(game.score, () => {
+		if (isBest && game.score > 0) stampNewBest();
+	});
 	$('over-best').textContent = bestOf(state.mode).toLocaleString();
+}
+
+const COUNT_TIME = 0.9; // seconds for the final score to count up
+
+/** The final score counts up from 0, fast at first and slow at the end. Then done() runs. */
+function countUp(score, done) {
+	const el = $('final-score');
+	const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+	if (still || score === 0) {
+		el.textContent = score.toLocaleString();
+		done();
+		return;
+	}
+	const start = performance.now();
+	let lastTick = 0;
+	const step = (now) => {
+		const k = Math.min(1, (now - start) / 1000 / COUNT_TIME);
+		const shown = Math.round(score * (1 - Math.pow(1 - k, 3)));
+		el.textContent = shown.toLocaleString();
+		if (now - lastTick > 70 && k < 1) {
+			lastTick = now;
+			audio.move();
+		}
+		if (k < 1) requestAnimationFrame(step);
+		else done();
+	};
+	requestAnimationFrame(step);
+}
+
+/** A new best: a sticker is stamped on the score card. */
+function stampNewBest() {
+	const el = $('new-best');
+	el.hidden = false;
+	audio.land(3);
+	vibrate([20, 40, 20]);
 }
 
 function showStats(game) {
@@ -45,5 +83,5 @@ function showContinues(game, reason) {
 function showPrice(id, cost, note) {
 	const ok = canAfford(store.glints, cost);
 	$(id).setAttribute('aria-disabled', String(!ok));
-	$(`${id}-cost`).textContent = ok ? `✦ ${cost}${note}` : `✦ ${cost} · you have ✦ ${store.glints}`;
+	setPlunkText($(`${id}-cost`), ok ? `✦ ${cost}${note}` : `✦ ${cost} · you have ✦ ${store.glints}`);
 }

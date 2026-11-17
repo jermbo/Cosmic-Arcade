@@ -158,12 +158,17 @@ class Audio {
 		src.stop(t + decay + 0.05);
 	}
 
-	/** A glassy bell: a few partials that are not quite in tune with each other. */
-	bell(freq, { at = 0, gain = 0.22, decay = 0.9, echo = 0.35 } = {}) {
-		this.tone({ freq, at, gain, decay, echo });
-		this.tone({ freq: freq * 2.76, at, gain: gain * 0.32, decay: decay * 0.45, echo });
-		this.tone({ freq: freq * 5.4, at, gain: gain * 0.12, decay: decay * 0.25 });
-		this.tone({ freq: freq * 2, type: 'triangle', at, gain: gain * 0.15, decay: decay * 0.6 });
+	/** A wooden bar, like a marimba: a warm note, a short knock above it, and a tiny click. */
+	bell(freq, { at = 0, gain = 0.22, decay = 0.9, echo = 0.15 } = {}) {
+		const d = Math.min(decay, 0.55);
+		this.tone({ freq, at, gain, decay: d, echo });
+		this.tone({ freq: freq * 4, at, gain: gain * 0.22, decay: d * 0.18 });
+		this.tone({ freq: freq * 10, type: 'triangle', at, attack: 0.002, gain: gain * 0.06, decay: 0.012 });
+	}
+
+	/** A "plunk": a round blip whose pitch jumps up, like a block that drops into water. */
+	pop(freq, { at = 0, gain = 0.2, decay = 0.11 } = {}) {
+		this.tone({ freq: freq * 0.62, at, gain, decay, slide: 1.8 });
 	}
 
 	// ---- game sounds ----
@@ -184,11 +189,12 @@ class Audio {
 		this.tone({ freq: 160, type: 'square', decay: 0.14, gain: 0.07, slide: 0.7 });
 	}
 
+	/** A piece lands: a soft wooden thud and a plunk. */
 	land(count = 1) {
-		const g = Math.min(0.32, 0.16 + count * 0.04);
-		this.tone({ freq: 140, decay: 0.14, gain: g, slide: 0.5 });
-		this.noise({ decay: 0.07, gain: g * 0.6, freq: 900, q: 0.8, type: 'lowpass' });
-		this.tone({ freq: 1900, type: 'triangle', decay: 0.04, gain: 0.04 });
+		const g = Math.min(0.34, 0.18 + count * 0.04);
+		this.tone({ freq: 120, decay: 0.12, gain: g, slide: 0.55 });
+		this.noise({ decay: 0.05, gain: g * 0.5, freq: 700, q: 0.8, type: 'lowpass' });
+		this.pop(330, { gain: g * 0.55 });
 	}
 
 	/** The chime for a cleared match. It climbs the scale with each chain step. */
@@ -197,19 +203,20 @@ class Audio {
 		const n = PENTA[Math.min(chain - 1, PENTA.length - 3)];
 		const notes = [root + n, root + PENTA[Math.min(chain + 1, PENTA.length - 1)]];
 		if (size >= 4) notes.push(root + n + 12);
-		notes.forEach((note, i) => this.bell(midi(note), { at: i * 0.055, gain: 0.2 - i * 0.03 }));
-		this.noise({ decay: 0.18, gain: 0.08, freq: 6000, q: 0.7, type: 'highpass' });
+		this.pop(midi(root + n - 12), { gain: 0.22 });
+		notes.forEach((note, i) => this.bell(midi(note), { at: 0.03 + i * 0.055, gain: 0.2 - i * 0.03 }));
 	}
 
 	forge(kind) {
 		const base = kind === 'nova' ? 84 : 79;
-		[0, 4, 7, 12].forEach((s, i) => this.bell(midi(base + s), { at: i * 0.05, gain: 0.12, decay: 0.5 }));
+		[0, 4, 7].forEach((s, i) => this.pop(midi(base - 12 + s), { at: i * 0.06, gain: 0.16 }));
+		this.bell(midi(base + 12), { at: 0.18, gain: 0.12, decay: 0.4 });
 	}
 
 	flare() {
 		this.tone({ freq: 90, decay: 0.45, gain: 0.45, slide: 0.4 });
 		this.noise({ decay: 0.45, gain: 0.32, freq: 2200, q: 0.6, type: 'lowpass', sweep: 0.15 });
-		this.bell(midi(91), { gain: 0.1, decay: 0.6 });
+		this.pop(midi(67), { at: 0.02, gain: 0.2, decay: 0.16 });
 	}
 
 	nova() {
@@ -243,6 +250,12 @@ class Audio {
 	/** Remix: a note as blocks land. The notes climb the scale as more blocks land. */
 	remixTick(n) {
 		this.bell(midi(79 + PENTA[Math.min(n, PENTA.length - 1)]), { gain: 0.09, decay: 0.4 });
+	}
+
+	/** A logo tile: one wooden note of the scale. */
+	tile(index) {
+		this.pop(midi(72 + PENTA[index % PENTA.length]), { gain: 0.14 });
+		this.bell(midi(72 + PENTA[index % PENTA.length]), { at: 0.02, gain: 0.14, decay: 0.35 });
 	}
 
 	tick(urgent) {

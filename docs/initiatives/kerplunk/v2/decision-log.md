@@ -136,3 +136,24 @@ parent: README.md
 **Choice:** No. The folder is `games/kerplunk/`, and the package is `kerplunk`. This replaces that part of D10.
 
 **Reason:** The docs, the URL and the entry all use `kerplunk`. One name for one game is easier to remember than a mapping. No one plays it but the owner, so nothing breaks.
+
+## D12. The logo is one long piece of game blocks
+
+**Date:** 2026-11-17
+
+**Question:** The title logo of today (eight loose letter tiles in flat colors) is dull. Which logo gives Kerplunk fun and character, reads as one word at a glance, and still feels like the game?
+
+**Options:** Three rounds of variants on the title screen, at 375px.
+
+- Round one: B, the name drawn in a pixel font of game cells, KER small over a big PLUNK. C, a comic sound word with a block that drops into the U. D, letter columns stuck under a ceiling. E, a small well emblem over a label strip.
+- Round two, on B: B2, the cells drawn with the game's block art. B3, letters built from joined pieces. B4, the name cut out of a wall of blocks. B5, B that clears its own letters now and then. All were too hard to read, and KER over PLUNK did not read as one word.
+- Round three, on one line: F, the pixel font of B2 on one line (too small). G, big bold letters filled with small blocks. H, one long piece. I, a big ink word that hangs under a row of blocks.
+
+**Choice:** H, one long piece. The eight letters of KERPLUNK sit on eight game blocks in one straight row, the blocks touching, the row turned about 2 degrees counter-clockwise, with one hard shadow under the whole row.
+
+- Each block is drawn by the game's own block drawing (`drawBlock` in `sprites.js`), in the theme and block style in use, so the logo changes with the shop. The colors run through the five block colors in order: K E R P L, then U N K start again.
+- Each letter is the display font, white, with a thick ink outline drawn behind the fill, about two thirds of the block size, so it reads on any block style.
+- The block size fits the screen: about 10.4% of the width, from 34px to 52px.
+- Motion: the blocks drop in one after the other on load. A tap on a block makes it hop and play its note, as the tiles of today do.
+
+**Reason:** It reads at once as one word, on a phone too. It looks like a piece from the game, with the real block art, so the logo shows the game and changes with what the player buys. The pixel-font variants had more character but cost too much to read.

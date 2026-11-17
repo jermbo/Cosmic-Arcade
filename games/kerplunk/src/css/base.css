@@ -62,7 +62,8 @@
 	--tilt: -1.5deg;
 	--font-display: 'Archivo Black', 'Arial Black', sans-serif;
 	--font-ui: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-	--font-label: 'DM Mono', ui-monospace, Menlo, monospace;
+	/* After DM Mono comes a sans font: DM Mono has no ✦, and a mono fallback draws it like a +. */
+	--font-label: 'DM Mono', 'Space Grotesk', system-ui, sans-serif;
 	--safe-top: env(safe-area-inset-top, 0px);
 	--safe-bottom: env(safe-area-inset-bottom, 0px);
 	--safe-left: env(safe-area-inset-left, 0px);
@@ -143,6 +144,15 @@ button {
 	border: var(--bw) solid var(--ink);
 	border-radius: var(--r);
 	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+}
+
+/* The ✦ of Plunks inside small or mono type: bold and a little bigger, so it does not read as a "+". */
+.plunk-mark {
+	font-family: var(--font-ui);
+	font-weight: 700;
+	font-size: 1.3em;
+	line-height: 0;
+	vertical-align: -0.08em;
 }
 
 /* A label: mono type, in capitals. */

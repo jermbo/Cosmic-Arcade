@@ -6,7 +6,7 @@ import { BAG_UPGRADE_COSTS, THEME_PRICES, STYLE_PRICES } from './prices.js';
 export const THEMES = [
 	{ id: 'light', name: 'Light', price: THEME_PRICES.light, text: 'Cream paper, black ink.' },
 	{ id: 'dark', name: 'Dark', price: THEME_PRICES.dark, text: 'Near black, off-white ink.' },
-	{ id: 'random', name: 'Random', price: THEME_PRICES.random, text: 'A new look each game.' },
+	{ id: 'random', name: 'Random', price: THEME_PRICES.random, text: 'A new look each game. Tap New look for another.' },
 ];
 
 export const STYLES = [

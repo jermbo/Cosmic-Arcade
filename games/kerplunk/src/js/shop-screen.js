@@ -46,7 +46,9 @@ function lookItem(item, listKey, activeKey, preview) {
 	head.append(makeElement('h4', 'shop__title', item.name), makeElement('span', 'shop__price', owned ? 'Owned' : `✦${item.price}`));
 	el.append(head, makeElement('div', 'shop__preview', ''), makeElement('p', 'shop__text', item.text));
 	el.querySelector('.shop__preview').append(preview);
-	if (active) el.append(stateButton('In use'));
+	// Random in use: each tap rolls a new look, free, as often as the player likes.
+	if (active && item.id === 'random') el.append(shopButton('New look', true, newRandomLook));
+	else if (active) el.append(stateButton('In use'));
 	else if (owned) el.append(shopButton('Use', true, () => useLook(activeKey, item.id)));
 	else el.append(shopButton(`Buy ✦${item.price}`, canAfford(store.glints, item.price), () => buy(item, listKey)));
 	return el;
@@ -71,20 +73,26 @@ function useLook(activeKey, id) {
 	renderShop();
 }
 
-/** A small picture of a theme: its paper, its two cards and a strip of its blocks. */
+function newRandomLook() {
+	rollForGame();
+	renderShop();
+}
+
+/** A small picture of a theme: its paper and its cards. Random in use shows its current roll. */
 function themePreview(item) {
 	const el = makeElement('div', 'theme-preview');
-	if (item.id === 'random') {
+	const rolled = item.id === 'random' && store.looks.theme === 'random';
+	if (item.id === 'random' && !rolled) {
 		el.classList.add('theme-preview--random');
 		el.style.background = `linear-gradient(90deg, ${RANDOM_BACKGROUNDS.slice(0, 5).join(', ')})`;
 		el.append(makeElement('span', 'theme-preview__mark', '?'));
 		return el;
 	}
-	const t = item.id === 'dark' ? DARK : LIGHT;
+	const t = rolled ? activeTheme() : item.id === 'dark' ? DARK : LIGHT;
 	el.style.backgroundColor = t.bg;
 	el.style.backgroundImage = `radial-gradient(${t.dot} 1.2px, transparent 1.4px)`;
 	el.style.borderColor = t.ink;
-	for (const color of [t.accent, t.accent2, t.card]) {
+	for (const color of rolled ? [t.accent, t.accent2, ...t.blocks.slice(0, 2)] : [t.accent, t.accent2, t.card]) {
 		const card = makeElement('i', 'theme-preview__card');
 		card.style.background = color;
 		card.style.borderColor = t.ink;

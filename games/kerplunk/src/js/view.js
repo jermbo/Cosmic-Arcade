@@ -160,7 +160,7 @@ export class View {
 	dropIn(placed, left, top) {
 		for (const p of placed) {
 			const y = Math.max(top + p.dy, p.y);
-			this.blockVisuals.set(p.block.id, { ...this.newVis(left + p.dx, y), vy: 4 });
+			this.blockVisuals.set(p.block.id, { ...this.newVis(left + p.dx, y), vy: 4, dropped: true });
 		}
 	}
 
@@ -347,7 +347,9 @@ export class View {
 		this.updateBlocks(dt, g);
 		this.updateRemix(dt);
 		this.updateChips(dt, g);
+		// Blocks of a dropped piece that hit the stack this frame: one thud for all of them.
 		if (this.landCount && this.onLand) this.onLand(this.landCount);
+		this.landCount = 0;
 		this.updateDying(dt);
 	}
 
@@ -388,7 +390,13 @@ export class View {
 			v.y -= v.vy * dt;
 			if (v.y <= row) {
 				v.y = row;
-				if (v.vy > 4) {
+				if (v.dropped) {
+					// A dropped piece lands hard: a bigger squash, and the view reports it for the thud.
+					v.dropped = false;
+					v.sy = 0.7;
+					v.sx = 1.2;
+					this.landCount = (this.landCount || 0) + 1;
+				} else if (v.vy > 4) {
 					v.sy = 0.78;
 					v.sx = 1.14;
 				}
@@ -709,7 +717,7 @@ export class View {
 
 	drawBarText(str, { x, y, size, color = this.theme.text }) {
 		const { ctx } = this;
-		ctx.font = `500 ${size}px 'DM Mono', ui-monospace, monospace`;
+		ctx.font = `500 ${size}px 'DM Mono', 'Space Grotesk', system-ui, sans-serif`;
 		ctx.textAlign = 'left';
 		ctx.textBaseline = 'middle';
 		ctx.fillStyle = color;

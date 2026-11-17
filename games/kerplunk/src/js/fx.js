@@ -82,7 +82,7 @@ export class Fx {
 			const subSize = Math.max(9, size * 0.42);
 			ctx.font = `${size}px '${th.display}', 'Arial Black', sans-serif`;
 			const mainW = ctx.measureText(t.text).width;
-			ctx.font = `500 ${subSize}px 'DM Mono', ui-monospace, monospace`;
+			ctx.font = `500 ${subSize}px 'DM Mono', 'Space Grotesk', system-ui, sans-serif`;
 			const subText = t.sub.toUpperCase();
 			const subW = t.sub ? ctx.measureText(subText).width : 0;
 			const padX = size * 0.4;
@@ -111,7 +111,7 @@ export class Fx {
 			const mainY = t.sub ? -h / 2 + size * 0.68 : 0;
 			ctx.fillText(t.text, 0, mainY + size * 0.04);
 			if (t.sub) {
-				ctx.font = `500 ${subSize}px 'DM Mono', ui-monospace, monospace`;
+				ctx.font = `500 ${subSize}px 'DM Mono', 'Space Grotesk', system-ui, sans-serif`;
 				ctx.fillText(subText, 0, h / 2 - subSize * 0.85);
 			}
 			ctx.restore();

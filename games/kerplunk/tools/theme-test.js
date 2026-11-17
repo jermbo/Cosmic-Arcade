@@ -43,6 +43,14 @@ for (let i = 0; i < 1000; i++) {
 assert.equal(seen.bg.size, RANDOM_BACKGROUNDS.length, 'every background shows up');
 assert.equal(seen.display.size, 2);
 
+// A roll after another one never has the same background.
+let last = rollTheme(rng);
+for (let i = 0; i < 200; i++) {
+	const next = rollTheme(rng, last);
+	assert.notEqual(next.bg, last.bg, 'each new roll has another background');
+	last = next;
+}
+
 // Two rolls can differ.
 assert.notDeepEqual(rollTheme(makeRng(1)), rollTheme(makeRng(2)));
 
