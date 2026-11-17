@@ -4,7 +4,7 @@ import { VERSION } from './version.js';
 import { store } from './storage.js';
 import { $ } from './dom.js';
 import { view } from './session.js';
-import { textOn } from './themes.js';
+import { drawBlock } from './sprites.js';
 import { onLooksChange, rollForGame } from './looks.js';
 import { audio } from './audio.js';
 
@@ -13,23 +13,37 @@ export function updateBestLabels() {
 	$('best-timed').textContent = `Best ${store.best.timed.toLocaleString()}`;
 }
 
-// The logo: each letter of the name sits on a block of its own color. The ink on each block is
-// black or white, whichever has more contrast, so the name reads in every theme.
+// The logo: one long piece. Each letter of the name sits on a game block, drawn in the theme and
+// block style in use, so the logo changes with the shop. The colors run through the five blocks.
 const LOGO = 'KERPLUNK';
-const LOGO_TILT = [-4, 3, -2, 4, -3, 2, -4, 3]; // degrees, one for each letter
+const LOGO_BLOCK_PX = 104; // twice the largest tile, so the block stays sharp on a 2x screen
+
+let logoImages = { key: '', urls: [] };
+
+/** The block image of each color, as data URLs. They are drawn again only when the look changes. */
+function logoBlockUrls() {
+	const { theme, style } = view;
+	const key = `${theme.id}|${style}|${theme.blocks.join()}`;
+	if (logoImages.key === key) return logoImages.urls;
+	const urls = theme.blocks.map((base, color) => {
+		const canvas = document.createElement('canvas');
+		canvas.width = canvas.height = LOGO_BLOCK_PX;
+		drawBlock(canvas.getContext('2d'), { style, color, s: LOGO_BLOCK_PX, theme, base });
+		return canvas.toDataURL();
+	});
+	logoImages = { key, urls };
+	return urls;
+}
 
 export function buildLogo() {
 	const box = $('logo-tiles');
 	box.textContent = '';
-	const { blocks } = view.theme;
+	const urls = logoBlockUrls();
 	[...LOGO].forEach((letter, i) => {
 		const tile = document.createElement('span');
 		tile.className = 'logo__tile';
 		tile.textContent = letter;
-		const base = blocks[i % blocks.length];
-		tile.style.setProperty('--tile', base);
-		tile.style.setProperty('--tile-ink', textOn(base));
-		tile.style.setProperty('--turn', `${LOGO_TILT[i]}deg`);
+		tile.style.backgroundImage = `url(${urls[i % urls.length]})`;
 		tile.style.setProperty('--i', i);
 		box.append(tile);
 	});
