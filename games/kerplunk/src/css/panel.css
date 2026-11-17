@@ -1,0 +1,154 @@
+/* The card in a modal, and the game over numbers. */
+
+.panel {
+	width: min(100%, 360px);
+	max-height: 100%;
+	padding: 20px 18px 20px;
+	background: var(--card);
+	color: var(--text);
+	border: var(--bw) solid var(--ink);
+	border-radius: var(--r);
+	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 12px;
+	text-align: center;
+	animation: panel-drop 0.18s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+/* A short drop. */
+@keyframes panel-drop {
+	from {
+		transform: translateY(-18px);
+		opacity: 0;
+	}
+}
+
+.panel--scroll {
+	overflow-y: auto;
+	touch-action: pan-y;
+	overscroll-behavior: contain;
+	align-items: stretch;
+	text-align: left;
+	/* Room for the hard shadows of the cards inside. */
+	padding-right: calc(18px + var(--sh));
+}
+
+.panel--scroll .panel__title,
+.panel--scroll > .menu {
+	align-self: center;
+}
+
+.panel__title {
+	margin: 0;
+	font-family: var(--font-display);
+	font-weight: 400;
+	font-size: 1.8rem;
+	line-height: 1.05;
+}
+
+.panel__kicker {
+	margin: 0;
+	padding: 2px 8px;
+	background: var(--danger);
+	color: #111111;
+	border: 2px solid var(--ink);
+	font-family: var(--font-label);
+	font-size: 0.72rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	transform: rotate(-2deg);
+}
+
+.panel__sub {
+	margin: 10px 0 0;
+	font-family: var(--font-label);
+	font-weight: 500;
+	font-size: 0.8rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.panel__note {
+	margin: 0;
+	font-size: 0.85rem;
+	opacity: 0.8;
+}
+
+.final {
+	margin: 0;
+	padding: 6px 16px 4px;
+	background: var(--accent);
+	color: var(--on-accent);
+	border: var(--bw) solid var(--ink);
+	border-radius: var(--r);
+	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	font-family: var(--font-display);
+	font-size: 2.6rem;
+	line-height: 1;
+	transform: rotate(var(--tilt));
+}
+
+.final-box {
+	position: relative;
+	margin: 4px 0 10px;
+}
+
+/* A sticker stamped on the corner of the score card. */
+.new-best {
+	position: absolute;
+	right: -40px;
+	bottom: -14px;
+	margin: 0;
+	padding: 3px 9px;
+	background: var(--danger);
+	color: #111111;
+	border: 2px solid var(--ink);
+	box-shadow: 3px 3px 0 var(--shadow);
+	font-family: var(--font-display);
+	font-size: 0.85rem;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+	white-space: nowrap;
+	transform: rotate(-6deg);
+	animation: stamp 0.32s cubic-bezier(0.2, 1.4, 0.5, 1);
+}
+
+@keyframes stamp {
+	from {
+		transform: rotate(-14deg) scale(2.6);
+		opacity: 0;
+	}
+	60% {
+		opacity: 1;
+	}
+}
+
+.stats {
+	margin: 0;
+	width: 100%;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 8px;
+}
+
+.stats__item {
+	padding: 6px 8px;
+	border: 2px solid var(--ink);
+	border-radius: var(--r);
+	background: var(--bg);
+}
+
+.stats__label {
+	font-family: var(--font-label);
+	font-size: 0.62rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.stats__value {
+	margin: 2px 0 0;
+	font-weight: 700;
+	font-size: 1.1rem;
+}
