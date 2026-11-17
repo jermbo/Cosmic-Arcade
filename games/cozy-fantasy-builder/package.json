@@ -1,0 +1,23 @@
+{
+	"name": "cozy-fantasy-builder",
+	"private": true,
+	"version": "0.1.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vite --open --port 4006",
+		"build": "tsc && vite build",
+		"preview": "vite preview --port 4007"
+	},
+	"arcade": {
+		"engine": "three",
+		"outDir": "dist"
+	},
+	"dependencies": {
+		"three": "0.187.0"
+	},
+	"devDependencies": {
+		"@types/three": "0.186.0",
+		"typescript": "7.0.2",
+		"vite": "8.3.6"
+	}
+}
