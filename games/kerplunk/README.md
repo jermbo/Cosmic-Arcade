@@ -61,7 +61,7 @@ Server notes:
 
 ## Release an update
 
-1. Change `VERSION` in `src/sw.js` and in `src/js/app/version.js` (keep them the same). This version is `2.0.0`.
+1. Change `VERSION` in `src/sw.js`, `src/js/app/version.js`, and `"version"` in `package.json` (keep all three the same). The release is **2.0.0**.
 2. If you add a file, add it to the `FILES` list in `src/sw.js`.
 3. Upload the new files.
 

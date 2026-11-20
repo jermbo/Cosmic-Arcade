@@ -1,4 +1,4 @@
-// Offline cache for Kerplunk. Bump VERSION (and js/app/version.js) for each release.
+// Offline cache for Kerplunk. Bump VERSION, js/app/version.js, and package.json "version" together each release.
 // A new VERSION makes a new cache; the page then shows "Update ready, tap to reload".
 // FILES lists every file the game needs offline. The labs (labs/) are not cached.
 
