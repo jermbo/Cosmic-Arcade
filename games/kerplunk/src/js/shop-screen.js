@@ -1,4 +1,4 @@
-// The shop: themes, block styles, and the power-up bag upgrade.
+// The shop: themes, block styles, sound profiles, animation styles, and the power-up bag upgrade.
 
 import { BAG_UPGRADE_COSTS } from './prices.js';
 import { BAG_SIZE } from './engine.js';
@@ -12,6 +12,7 @@ import { $, showModal } from './dom.js';
 import { save } from './session.js';
 import { bumpWallet, onWalletUpdate } from './hud.js';
 import { applyLooks, activeTheme, rollForGame } from './looks.js';
+import { SOUND_PROFILES, MOTION_STYLES, withSound, motionValues } from './feels.js';
 
 export function openShop() {
 	renderShop();
@@ -30,13 +31,18 @@ function renderShop() {
 	for (const theme of THEMES) body.append(lookItem(theme, 'themes', 'theme', themePreview(theme)));
 	body.append(makeElement('h3', 'shop__section', 'Block styles'));
 	for (const style of STYLES) body.append(lookItem(style, 'styles', 'style', blockStrip({ style: style.id, theme: activeTheme(), size: 22 })));
+	body.append(makeElement('h3', 'shop__section', 'Sounds'));
+	for (const profile of SOUND_PROFILES) body.append(lookItem(profile, 'sounds', 'sound', soundPreview(profile)));
+	body.append(makeElement('h3', 'shop__section', 'Animation'));
+	for (const style of MOTION_STYLES) body.append(lookItem(style, 'motions', 'motion', motionPreview(style)));
 	body.append(makeElement('h3', 'shop__section', 'Upgrades'));
 	body.append(bagItem());
 }
 
 /**
- * One theme or block style: its preview, its price or "Owned", and Buy, Use or In use.
- * listKey is the owned list in the save ('themes' or 'styles'); activeKey is the one in use ('theme' or 'style').
+ * One look (a theme, block style, sound profile or animation style): its preview, its price or "Owned", and Buy, Use or In use.
+ * listKey is the owned list in the save ('themes', 'styles', 'sounds' or 'motions'); activeKey is the one in use
+ * ('theme', 'style', 'sound' or 'motion').
  */
 function lookItem(item, listKey, activeKey, preview) {
 	const owned = store.looks[listKey].includes(item.id);
@@ -100,6 +106,154 @@ function themePreview(item) {
 		el.append(card);
 	}
 	return el;
+}
+
+// ---- the feel: sound profiles and animation styles ----
+
+const HEAR_STEPS = [
+	[0, () => audio.land(2)],
+	[450, () => audio.clear(1, 3)],
+	[800, () => audio.clear(2, 3)],
+	[1150, () => audio.clear(3, 5)],
+	[1750, () => audio.forge('flare')],
+];
+
+/** A sound profile: a button that plays a drop, a chain of 3 and a power-up with it. */
+function soundPreview(profile) {
+	const b = makeElement('button', 'button button--small shop-hear', '▶ Hear it');
+	b.type = 'button';
+	b.setAttribute('aria-label', `Hear ${profile.name}`);
+	b.addEventListener('click', (e) => {
+		e.stopPropagation();
+		audio.unlock();
+		for (const [ms, play] of HEAR_STEPS) setTimeout(() => withSound(profile.id, play), ms);
+	});
+	return b;
+}
+
+const PREVIEW_CELL = 13; // px
+const GAME_CELL = 44; // the hop and fall sizes are in pixels of a game cell about this big
+
+/**
+ * An animation style: a tiny well where a block rises, lands between two blocks of its color,
+ * and the three clear, with the numbers of this style. It loops while the shop shows it.
+ */
+function motionPreview(style) {
+	const m = motionValues(style.id);
+	const canvas = makeElement('canvas', 'motion-preview');
+	const w = PREVIEW_CELL * 7;
+	const h = PREVIEW_CELL * 3.4;
+	const dpr = Math.min(window.devicePixelRatio || 1, 2);
+	canvas.width = Math.round(w * dpr);
+	canvas.height = Math.round(h * dpr);
+	canvas.style.width = `${w}px`;
+	canvas.style.height = `${h}px`;
+	canvas.setAttribute('aria-hidden', 'true');
+	const ctx = canvas.getContext('2d');
+	const theme = activeTheme();
+	const px = PREVIEW_CELL / GAME_CELL;
+	const s = { phase: 'rise', t: 0, y: 2.6, vy: m.dropSpeed, sx: 1, sy: 1, shake: 0 };
+	let last = performance.now();
+
+	function block(x, y, size = 1, rot = 0, alpha = 1) {
+		const c = PREVIEW_CELL;
+		ctx.save();
+		ctx.globalAlpha = alpha;
+		ctx.translate(x, y);
+		ctx.rotate(rot);
+		ctx.fillStyle = theme.blocks[2];
+		ctx.strokeStyle = theme.ink;
+		ctx.lineWidth = 1.5;
+		const bw = c * size;
+		ctx.fillRect(-bw / 2, -bw / 2, bw, bw);
+		ctx.strokeRect(-bw / 2, -bw / 2, bw, bw);
+		ctx.restore();
+	}
+
+	function frame(now) {
+		if (!canvas.isConnected) return;
+		const dt = Math.min(0.05, (now - last) / 1000);
+		last = now;
+		s.t += dt;
+		s.shake *= Math.pow(0.5, dt / Math.max(0.01, m.shakeTime));
+		s.sx += (1 - s.sx) * Math.min(1, dt * m.squashSpring);
+		s.sy += (1 - s.sy) * Math.min(1, dt * m.squashSpring);
+		if (s.phase === 'rise') {
+			s.vy += m.gravity * dt;
+			s.y -= s.vy * dt;
+			if (s.y <= 0) {
+				s.y = 0;
+				s.sy = 1 - m.landSquash;
+				s.sx = 1 + m.landSquash * 0.67;
+				s.shake = m.landShake * px * 2;
+				s.phase = 'land';
+				s.t = 0;
+			}
+		} else if (s.phase === 'land' && s.t > 0.35) {
+			s.phase = 'clear';
+			s.t = 0;
+		} else if (s.phase === 'clear' && s.t > m.clearTime + m.clearStagger * 2 + 0.6) {
+			Object.assign(s, { phase: 'rise', t: 0, y: 2.6, vy: m.dropSpeed, sx: 1, sy: 1 });
+		}
+
+		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+		ctx.clearRect(0, 0, w, h);
+		const ox = (Math.random() * 2 - 1) * s.shake;
+		const oy = (Math.random() * 2 - 1) * s.shake;
+		ctx.save();
+		ctx.translate(ox, oy);
+		// The ceiling of the well.
+		ctx.fillStyle = theme.ink;
+		ctx.fillRect(0, 0, w, 2);
+		const c = PREVIEW_CELL;
+		const left = (w - c * 3) / 2;
+		const cx = (col) => left + c * (col + 0.5);
+		const top = 2 + c / 2;
+		if (s.phase !== 'clear') {
+			block(cx(0), top);
+			block(cx(2), top);
+			// The landing block squashes against the ceiling.
+			const bx = cx(1);
+			ctx.save();
+			ctx.translate(bx, top + s.y * c - (c * (1 - s.sy)) / 2);
+			ctx.scale(s.sx, s.sy);
+			block(0, 0);
+			ctx.restore();
+		} else {
+			// The clear: each block hops up and left, then falls and turns while it shrinks.
+			[0, 1, 2].forEach((col, i) => {
+				const k = Math.min(1, Math.max(0, (s.t - i * m.clearStagger) / Math.max(0.01, m.clearTime)));
+				if (k >= 1) return;
+				const hopPart = Math.min(0.95, Math.max(0.01, m.hopPart));
+				const hop = m.hopSize * px;
+				const big = 1 + m.clearGrow;
+				let dx;
+				let dy;
+				let size;
+				let rot = 0;
+				let alpha = 1;
+				if (k < hopPart) {
+					const u = k / hopPart;
+					dx = -hop * u;
+					dy = -hop * u;
+					size = 1 + (big - 1) * u;
+				} else {
+					const u = (k - hopPart) / (1 - hopPart);
+					const e = Math.pow(u, m.fallEase);
+					dx = -hop + hop * e;
+					dy = -hop + m.fallSize * px * e;
+					size = big - (big - m.clearEnd) * e;
+					rot = m.fallSpin * e;
+					alpha = 1 - e;
+				}
+				block(cx(col) + dx, top + dy, size, rot, alpha);
+			});
+		}
+		ctx.restore();
+		requestAnimationFrame(frame);
+	}
+	requestAnimationFrame(frame);
+	return canvas;
 }
 
 function bagItem() {

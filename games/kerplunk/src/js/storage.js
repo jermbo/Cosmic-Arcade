@@ -11,8 +11,9 @@ const DEFAULTS = {
 	lab: { ...DEFAULT_LAB },
 	glints: 0,
 	perks: { bag: 0 },
-	// The looks: the owned and the active theme and block style, and the last Random roll.
-	looks: { themes: ['light'], theme: 'light', styles: ['patterns'], style: 'patterns', roll: null },
+	// The looks: the owned and the active theme, block style, sound profile (feels.js) and animation style,
+	// and the last Random roll.
+	looks: { themes: ['light'], theme: 'light', styles: ['patterns'], style: 'patterns', roll: null, sounds: ['wooden'], sound: 'wooden', motions: ['classic'], motion: 'classic' },
 	tutorialDone: false,
 	iosHintDismissed: false,
 };

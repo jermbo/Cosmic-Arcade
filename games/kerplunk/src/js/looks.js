@@ -6,6 +6,7 @@ import { writeVariables } from './theme-vars.js';
 import { paintPalette, BLOCK_STYLES } from './sprites.js';
 import { store } from './storage.js';
 import { view, save } from './session.js';
+import { applyFeel } from './feels.js';
 
 const listeners = [];
 
@@ -31,6 +32,8 @@ export function applyLooks() {
 	loadFonts(theme.display);
 	paintPalette(theme.blocks);
 	view.setLooks(theme, activeStyle());
+	// The feel goes with the look: the sound profile and the animation style in use.
+	applyFeel(store.looks.sound, store.looks.motion);
 	for (const redraw of listeners) redraw();
 }
 

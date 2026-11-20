@@ -176,3 +176,14 @@
 	font-size: 1.1rem;
 	color: #111111;
 }
+
+/* A sound profile's preview: a button that plays it. */
+.shop-hear {
+	padding: 4px 10px;
+	font-size: 0.8rem;
+}
+
+/* An animation style's preview: a tiny well that loops the style. */
+.motion-preview {
+	display: block;
+}

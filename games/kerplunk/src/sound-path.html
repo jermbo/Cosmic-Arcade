@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<meta name="robots" content="noindex, nofollow" />
+		<meta name="theme-color" content="#FFF8E7" />
+		<title>Kerplunk sound path</title>
+		<link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+		<link rel="stylesheet" href="css/base.css" />
+		<link rel="stylesheet" href="css/shape-lab.css" />
+		<link rel="stylesheet" href="css/sound-path.css" />
+	</head>
+	<body>
+		<header>
+			<div>
+				<h1>Sound path</h1>
+				<p class="sub">One sound at a time. Each choice shapes the next. <a href="index.html">Back to the game</a> · <a href="feel-lab.html">Feel lab</a></p>
+			</div>
+		</header>
+
+		<nav class="steps" id="steps" aria-label="Steps"></nav>
+
+		<div class="scope-card" aria-hidden="true">
+			<canvas id="scope"></canvas>
+			<span class="scope-label scope-label--wave">Wave</span>
+			<span class="scope-label scope-label--low">Low</span>
+			<span class="scope-label scope-label--high">High</span>
+		</div>
+
+		<main>
+			<section class="intro">
+				<h2 id="stepTitle"></h2>
+				<p id="stepIntro"></p>
+				<p class="built-on" id="builtOn" hidden></p>
+			</section>
+			<section class="moods" id="moodBox" hidden>
+				<h2>Mood</h2>
+				<div class="mood-row" id="moods" role="radiogroup" aria-label="Mood"></div>
+				<p class="hint" id="moodHint"></p>
+			</section>
+			<div id="groups"></div>
+		</main>
+
+		<div class="lockbar" id="lockbar">
+			<p><span class="label">Your pick</span> <b id="pickName">None yet</b></p>
+			<div class="lockbar-buttons">
+				<button class="primary" id="lock" type="button" disabled>Lock it in</button>
+				<button id="next" type="button" hidden>Next →</button>
+			</div>
+		</div>
+
+		<div class="toast" id="toast" role="status" hidden></div>
+		<script type="module" src="js/sound-path.js"></script>
+	</body>
+</html>

@@ -3,7 +3,7 @@
 import { audio } from './audio.js';
 import { POWER_NAMES } from './view.js';
 import { canvas, state, view, vibrate, waitFor, setPower } from './session.js';
-import { showBanner, capturePointer } from './dom.js';
+import { capturePointer } from './dom.js';
 import { resolveChain } from './move.js';
 import { checkEnd } from './ending.js';
 
@@ -15,24 +15,6 @@ export function activatePower(index) {
 	if (kind === 'remix') useRemix();
 	else setPower({ kind, stage: kind === 'prism' ? 'color' : 'aim', color: null });
 }
-
-view.onRemix = (event, value, sound) => {
-	if (event === 'charge') {
-		if (!value) return; // a style with no wind-up
-		if (sound === 'rattle') audio.remixRattle(value);
-		else audio.remixCharge();
-		vibrate([20, 40, 30, 40, 40, 40, 60]);
-	} else if (event === 'boom') {
-		audio.remixBoom();
-		vibrate([60, 30, 80]);
-		showBanner('REMIX!', 1100);
-	} else if (event === 'rattle') {
-		audio.remixRattle(value);
-		vibrate([30, 30, 30, 30, 30, 30, 30]);
-	} else if (event === 'tick') {
-		audio.remixTick(Math.floor(value / 2));
-	}
-};
 
 export async function useRemix() {
 	const g = state.game;

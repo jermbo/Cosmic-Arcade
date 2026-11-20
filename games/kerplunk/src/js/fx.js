@@ -2,8 +2,9 @@
 
 import { LIGHT } from './themes.js';
 import { roundRect } from './sprites.js';
+import { tuning } from './tuning.js';
 
-const STICKER_TILT = (-4 * Math.PI) / 180;
+const M = tuning.motion;
 
 export class Fx {
 	constructor() {
@@ -40,7 +41,7 @@ export class Fx {
 
 	/** A sticker that rises and fades. fill is the score-card color unless given. */
 	pop({ x, y, text, sub = '', big = false, fill = null }) {
-		this.pops.push({ x, y, text, sub, big, fill, life: 0, max: big ? 1.5 : 1.1 });
+		this.pops.push({ x, y, text, sub, big, fill, life: 0, max: M.stickerTime * (big ? 1.36 : 1) });
 	}
 
 	update(dt) {
@@ -49,7 +50,7 @@ export class Fx {
 		for (const t of this.pops) t.life += dt;
 		this.pops = this.pops.filter((t) => t.life < t.max);
 		this.flash = Math.max(0, this.flash - dt * 2.5);
-		this.shakeAmp *= Math.pow(0.0015, dt);
+		this.shakeAmp *= Math.pow(0.5, dt / Math.max(0.01, M.shakeTime));
 		if (this.shakeAmp < 0.3) this.shakeAmp = 0;
 		this.shakeX = (Math.random() * 2 - 1) * this.shakeAmp;
 		this.shakeY = (Math.random() * 2 - 1) * this.shakeAmp;
@@ -76,8 +77,9 @@ export class Fx {
 		ctx.textBaseline = 'middle';
 		for (const t of this.pops) {
 			const k = t.life / t.max;
-			const rise = (1 - Math.pow(1 - Math.min(1, k * 1.6), 3)) * unit * 0.9;
-			const grow = k < 0.12 ? 0.6 + (k / 0.12) * 0.55 : k < 0.22 ? 1.15 - ((k - 0.12) / 0.1) * 0.15 : 1;
+			const rise = (1 - Math.pow(1 - Math.min(1, k * 1.6), 3)) * unit * M.stickerRise;
+			const pop = M.stickerPop;
+			const grow = k < 0.12 ? 0.6 + (k / 0.12) * (0.4 + pop) : k < 0.22 ? 1 + pop - ((k - 0.12) / 0.1) * pop : 1;
 			const size = unit * (t.big ? 0.56 : 0.42);
 			const subSize = Math.max(9, size * 0.42);
 			ctx.font = `${size}px '${th.display}', 'Arial Black', sans-serif`;
@@ -91,7 +93,7 @@ export class Fx {
 			ctx.save();
 			ctx.globalAlpha = k > 0.7 ? 1 - (k - 0.7) / 0.3 : 1;
 			ctx.translate(t.x, t.y - rise);
-			ctx.rotate(STICKER_TILT);
+			ctx.rotate((M.stickerTilt * Math.PI) / 180);
 			ctx.scale(grow, grow);
 			const fill = t.fill || th.accent;
 			const bw = Math.min(th.bw, 3);

@@ -4,12 +4,12 @@ import { buildSprites, roundRect, PALETTE, BLINK_EVERY, BLINK_TIME } from './spr
 import { LIGHT } from './themes.js';
 import { Fx } from './fx.js';
 import { REMIX_STYLES } from './remix-styles.js';
+import { tuning } from './tuning.js';
 
-const GRAVITY = 70; // cells per second squared, pulling blocks up to the ceiling
+// The motion numbers (gravity, squash, the clear hop) live in tuning.js, so the Feel Lab can change them.
+const M = tuning.motion;
 const TRAY_SCALE = 0.62;
 const MAX_CELL = 66;
-const CLEAR_TIME = 0.34; // a cleared block hops, then falls and turns while it shrinks
-const HOP_PART = 0.3; // the part of CLEAR_TIME spent on the hop
 const BAR_SPACE = 0.95; // height of the power-up bar, in cells
 
 export const POWER_NAMES = { prism: 'Prism', blast: 'Blast', remix: 'Remix' };
@@ -33,7 +33,7 @@ export class View {
 		this.lastBag = 0;
 		this.time = 0;
 		this.onRemix = null; // (event, value) for sound and haptics
-		this.remixStyle = 'scatter'; // a key of REMIX_STYLES
+		this.remixStyle = M.remixStyle; // a key of REMIX_STYLES
 		this.remix = null;
 		this.previewCache = { key: '', cells: null, ghost: new Set() };
 		this.appear = [];
@@ -160,7 +160,7 @@ export class View {
 	dropIn(placed, left, top) {
 		for (const p of placed) {
 			const y = Math.max(top + p.dy, p.y);
-			this.blockVisuals.set(p.block.id, { ...this.newVis(left + p.dx, y), vy: 4, dropped: true });
+			this.blockVisuals.set(p.block.id, { ...this.newVis(left + p.dx, y), vy: M.dropSpeed, dropped: true });
 		}
 	}
 
@@ -336,7 +336,7 @@ export class View {
 	update(dt) {
 		this.time += dt;
 		this.fx.update(dt);
-		this.appear = this.appear.map((a) => Math.min(1, a + dt * 4));
+		this.appear = this.appear.map((a) => Math.min(1, a + dt / Math.max(0.01, M.trayPop)));
 		if (this.returning) {
 			this.returning.t += dt / 0.18;
 			if (this.returning.t >= 1) this.returning = null;
@@ -376,8 +376,8 @@ export class View {
 			v.x += (gx - v.x) * Math.min(1, dt * 20);
 			if (Math.abs(gx - v.x) < 0.01) v.x = gx;
 			if (!this.holdFalls) this.riseBlock(v, gy, dt);
-			v.sx += (1 - v.sx) * Math.min(1, dt * 16);
-			v.sy += (1 - v.sy) * Math.min(1, dt * 16);
+			v.sx += (1 - v.sx) * Math.min(1, dt * M.squashSpring);
+			v.sy += (1 - v.sy) * Math.min(1, dt * M.squashSpring);
 			v.forge = Math.max(0, v.forge - dt * 1.8);
 		}
 		for (const id of this.blockVisuals.keys()) if (!alive.has(id)) this.blockVisuals.delete(id);
@@ -386,19 +386,19 @@ export class View {
 	/** One block rises toward its row, and squashes when it lands hard. */
 	riseBlock(v, row, dt) {
 		if (v.y > row) {
-			v.vy += GRAVITY * dt;
+			v.vy += M.gravity * dt;
 			v.y -= v.vy * dt;
 			if (v.y <= row) {
 				v.y = row;
 				if (v.dropped) {
 					// A dropped piece lands hard: a bigger squash, and the view reports it for the thud.
 					v.dropped = false;
-					v.sy = 0.7;
-					v.sx = 1.2;
+					v.sy = 1 - M.landSquash;
+					v.sx = 1 + M.landSquash * 0.67;
 					this.landCount = (this.landCount || 0) + 1;
 				} else if (v.vy > 4) {
-					v.sy = 0.78;
-					v.sx = 1.14;
+					v.sy = 1 - M.settleSquash;
+					v.sx = 1 + M.settleSquash * 0.64;
 				}
 				v.vy = 0;
 			}
@@ -421,7 +421,7 @@ export class View {
 			}
 			d.t += dt;
 		}
-		this.dying = this.dying.filter((d) => d.t < CLEAR_TIME);
+		this.dying = this.dying.filter((d) => d.t < M.clearTime);
 	}
 
 	// ---- drawing ----
@@ -549,24 +549,27 @@ export class View {
 				this.drawBlock(d.block, d.x, d.y);
 				continue;
 			}
-			const k = Math.min(1, d.t / CLEAR_TIME);
+			const k = Math.min(1, d.t / Math.max(0.01, M.clearTime));
+			const hopPart = Math.min(0.95, Math.max(0.01, M.hopPart));
+			const hop = M.hopSize;
+			const top = 1 + (face ? 0.3 : M.clearGrow);
 			let dx;
 			let dy;
 			let scale;
 			let rot = 0;
 			let alpha = 1;
-			if (k < HOP_PART) {
-				const u = k / HOP_PART;
-				dx = -3 * u;
-				dy = -3 * u;
-				scale = 1 + (face ? 0.3 : 0.06) * u;
+			if (k < hopPart) {
+				const u = k / hopPart;
+				dx = -hop * u;
+				dy = -hop * u;
+				scale = 1 + (top - 1) * u;
 			} else {
-				const u = (k - HOP_PART) / (1 - HOP_PART);
-				const e = u * u;
-				dx = -3 + 3 * e;
-				dy = -3 + 17 * e;
-				scale = (face ? 1.3 : 1.06) - (face ? 0.9 : 0.66) * e;
-				rot = 0.25 * e;
+				const u = (k - hopPart) / (1 - hopPart);
+				const e = Math.pow(u, M.fallEase);
+				dx = -hop + hop * e;
+				dy = -hop + M.fallSize * e;
+				scale = top - (top - M.clearEnd) * e;
+				rot = M.fallSpin * e;
 				alpha = 1 - e;
 			}
 			const c = this.cellCenter(d.x, d.y);

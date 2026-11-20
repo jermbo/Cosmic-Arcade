@@ -1,0 +1,349 @@
+/* The Sound Path page (sound-path.html). It builds on the page, buttons and panels of shape-lab.css. */
+
+/* The page scrolls, not the body, so the sound picture can stick to the top. */
+body {
+	overflow: visible;
+	padding-bottom: 110px;
+}
+
+main {
+	max-width: 1100px;
+}
+
+/* The steps: done ones have a tick, the one you are on is filled, later ones are dashed. */
+.steps {
+	display: flex;
+	gap: 8px;
+	margin: 0 0 14px;
+	padding: 0 4px 6px 0;
+	overflow-x: auto;
+	scrollbar-width: none;
+}
+
+.steps button {
+	flex: none;
+	padding: 6px 10px;
+	font-family: var(--font-label);
+	font-size: 0.75rem;
+	font-weight: 500;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+.steps button.now {
+	background: var(--accent);
+	color: var(--on-accent);
+}
+
+.steps button.done {
+	background: var(--accent2);
+	color: var(--on-accent2);
+}
+
+.steps button:disabled {
+	border-style: dashed;
+	box-shadow: none;
+	opacity: 0.55;
+}
+
+.built-on {
+	display: inline-block;
+	margin-top: 8px;
+	padding: 3px 8px;
+	border: 2px solid var(--ink);
+	border-radius: var(--r);
+	background: var(--accent2);
+	color: var(--on-accent2);
+	font-family: var(--font-label);
+	font-size: 0.72rem;
+	text-transform: uppercase;
+}
+
+.moods {
+	margin-top: 16px;
+}
+
+.mood-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.mood-row button[aria-checked='true'] {
+	background: var(--accent);
+	color: var(--on-accent);
+}
+
+.lockbar-buttons {
+	display: flex;
+	gap: 10px;
+}
+
+/* The live picture of the sound. */
+.scope-card {
+	position: sticky;
+	top: 0;
+	z-index: 5;
+	height: 132px;
+	max-width: 1100px;
+	padding: 8px 10px;
+	margin-bottom: 16px;
+	background: var(--card);
+	border: var(--bw) solid var(--ink);
+	border-radius: var(--r);
+	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+}
+
+.scope-card canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+.scope-label {
+	position: absolute;
+	font-family: var(--font-label);
+	font-size: 0.62rem;
+	text-transform: uppercase;
+	opacity: 0.6;
+}
+
+.scope-label--wave {
+	top: 6px;
+	left: 10px;
+}
+
+.scope-label--low {
+	bottom: 4px;
+	left: 10px;
+}
+
+.scope-label--high {
+	bottom: 4px;
+	right: 10px;
+}
+
+.intro {
+	margin-bottom: 8px;
+}
+
+.intro h2 {
+	font-family: var(--font-display);
+	font-weight: 400;
+	font-size: 1.3rem;
+	letter-spacing: 0;
+	text-transform: none;
+	margin-bottom: 6px;
+}
+
+.intro p {
+	max-width: 60ch;
+	line-height: 1.45;
+}
+
+.body-group {
+	margin-top: 22px;
+}
+
+.body-grid {
+	display: grid;
+	gap: 14px;
+	grid-template-columns: 1fr;
+}
+
+@media (min-width: 620px) {
+	.body-grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+
+@media (min-width: 980px) {
+	.body-grid {
+		grid-template-columns: repeat(3, 1fr);
+	}
+}
+
+.body-card {
+	padding: 12px;
+	background: var(--card);
+	border: var(--bw) solid var(--ink);
+	border-radius: var(--r);
+	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	cursor: pointer;
+	transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.body-card:active {
+	transform: translate(3px, 3px);
+	box-shadow: 1px 1px 0 var(--shadow);
+}
+
+.body-card:focus-visible {
+	outline: 3px solid var(--ink);
+	outline-offset: 3px;
+}
+
+.body-card.on {
+	background: var(--accent);
+	color: var(--on-accent);
+}
+
+.body-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.body-head h3 {
+	margin: 0;
+	font-family: var(--font-display);
+	font-weight: 400;
+	font-size: 1.15rem;
+}
+
+.badge {
+	padding: 2px 6px;
+	background: var(--accent2);
+	color: var(--on-accent2);
+	border: 2px solid var(--ink);
+	border-radius: var(--r);
+	font-family: var(--font-label);
+	font-size: 0.62rem;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+.blurb {
+	margin-top: 4px;
+	font-size: 0.9rem;
+	line-height: 1.35;
+	min-height: 2.7em;
+}
+
+.shape {
+	display: block;
+	width: 100%;
+	height: 48px;
+	margin-top: 8px;
+}
+
+.tags {
+	margin-top: 6px;
+	font-size: 0.68rem;
+	letter-spacing: 0.06em;
+}
+
+.hear {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 10px;
+}
+
+.hear button {
+	flex: 1 1 28%;
+	padding: 7px 4px;
+	font-size: 0.85rem;
+	white-space: nowrap;
+}
+
+/* The bar at the bottom: what you picked, and the button that locks it in. */
+.lockbar {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 8;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 12px max(16px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+	background: var(--card);
+	border-top: var(--bw) solid var(--ink);
+}
+
+.lockbar p {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.lockbar b {
+	font-family: var(--font-display);
+	font-weight: 400;
+	font-size: 1.1rem;
+}
+
+.toast {
+	bottom: 90px;
+}
+
+/* Your sound: what each step locked in, and a demo of all of it. */
+.summary {
+	max-width: 640px;
+	margin-top: 16px;
+	padding: 14px;
+	background: var(--card);
+	border: var(--bw) solid var(--ink);
+	border-radius: var(--r);
+	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+}
+
+.summary dl {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 10px 14px;
+	align-items: center;
+	margin: 0;
+}
+
+.summary dt {
+	font-family: var(--font-label);
+	font-size: 0.72rem;
+	text-transform: uppercase;
+}
+
+.summary dd {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	margin: 0;
+}
+
+.summary dd b {
+	font-family: var(--font-display);
+	font-weight: 400;
+}
+
+.summary dd button {
+	padding: 4px 10px;
+	font-size: 0.82rem;
+}
+
+.summary-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin-top: 16px;
+}
+
+.button-link {
+	display: inline-block;
+	padding: 8px 12px;
+	color: var(--text);
+	background: var(--card);
+	border: 2px solid var(--ink);
+	border-radius: var(--r);
+	box-shadow: 3px 3px 0 var(--shadow);
+	font-weight: 700;
+	text-decoration: none;
+}
+
+.summary .hint {
+	margin-top: 12px;
+	font-size: 0.85rem;
+	line-height: 1.4;
+}
