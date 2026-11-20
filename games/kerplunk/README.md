@@ -13,13 +13,42 @@ src/
   index.html             the page
   manifest.webmanifest   name, icons, portrait, standalone
   sw.js                  service worker: caches every file on the first visit
-  css/                   styles, one file for each block
+  css/                   styles, one file for each block (css/labs/ for the lab pages)
   fonts/                 the woff2 files of the four fonts (see "Fonts")
-  js/                    game code (ES modules)
+  js/                    game code (ES modules, see "The code")
   icons/                 192, 512, maskable 192 and 512, Apple touch icon, favicons
+  labs/                  the secret lab pages: shape lab, feel lab, sound path
 ```
 
 `npm run build` copies `src/` to `dist/` for the arcade site. The files are the same.
+
+`src/` is not the usual "source code to build" folder. This game has no build step, so `src/` is the website itself, as it goes on the host.
+
+## The code
+
+The game starts in `src/js/main.js`. Each folder of `src/js/` has one job:
+
+| Folder     | What it does                                                                                     | Start with           |
+| ---------- | ------------------------------------------------------------------------------------------------ | -------------------- |
+| `rules/`   | The game rules. No page code, so they also run in Node for the tests and the sim.                | `game.js`            |
+| `play/`    | A game running in the page: the session, one move, power-ups, second chances, the end of a game. | `move.js`            |
+| `view/`    | Drawing the game on the canvas, and the animations.                                              | `view.js`            |
+| `screens/` | The HTML screens: title, HUD, boosts, shop, settings, tutorial, game over.                       | `title.js`           |
+| `input/`   | Touch and mouse, keyboard, buttons, and the cheats.                                              | `pointer.js`         |
+| `audio/`   | Every sound, made in the browser with the Web Audio API.                                         | `sound-player.js`    |
+| `feel/`    | The numbers behind the motion and the sound, and the sound and animation styles the shop sells.  | `default-tuning.js`  |
+| `looks/`   | The themes, and putting the theme on the page.                                                   | `themes.js`          |
+| `shop/`    | Prices, the wallet rules and the shop items.                                                     | `prices.js`          |
+| `app/`     | Page plumbing: storage, install, updates, small DOM helpers, the version.                        | `storage.js`         |
+| `labs/`    | The code of the three lab pages. It is not part of the game.                                     | `lab-page.js`        |
+
+A good path to learn the game: `rules/game.js` (the board and a turn), then `play/move.js` (one move in the page, step by step), then `view/view.js` (how it is drawn).
+
+The code follows the rules in [code-rules.md](code-rules.md).
+
+### The doors for the tests
+
+The 11 files at the top of `src/js/` (`engine.js`, `bot.js`, `feels.js`, `tuning.js`, `bodies.js`, `shape-list.js`, `shapes.js`, `themes.js`, `prices.js`, `shop.js`, `wallet.js`) hold no code. Each one only passes on the code of a folder. The tests in `tools/` import from these paths, so the files stay until the tests move to the new paths. The game itself never imports them, and the offline cache skips them.
 
 ## Host it on a static HTTPS site
 
@@ -36,7 +65,7 @@ Server notes:
 
 ## Release an update
 
-1. Change `VERSION` in `src/sw.js` and in `src/js/version.js` (keep them the same). This version is `2.0.0`.
+1. Change `VERSION` in `src/sw.js` and in `src/js/app/version.js` (keep them the same). This version is `2.0.0`.
 2. If you add a file, add it to the `FILES` list in `src/sw.js`.
 3. Upload the new files.
 
@@ -93,7 +122,7 @@ The tray holds 2 pieces (3 with the Lab setting). A slot that you use stays empt
 
 Pieces never turn, and they move as one rigid shape. A piece rises until any block of it touches the ceiling or a stack. It fits only if the whole shape fits, so a shape with a stem needs room for the stem under every part of it. Once it has landed, any block left with a gap above it rises to close the gap.
 
-The shapes live in `src/js/shapes.js` as ASCII art (`#` is a block) with a weight for how often each shows up. There are 14 shapes. Each has 3 or more blocks. Rows are split by `/`.
+The shapes live in `src/js/rules/shapes/shape-art.js` as ASCII art (`#` is a block) with a weight for how often each shows up. There are 14 shapes. Each has 3 or more blocks. Rows are split by `/`.
 
 | Group  | Shapes                                                                         | Weight |
 | ------ | ------------------------------------------------------------------------------ | ------ |
@@ -105,19 +134,19 @@ The final list and weights can change after a sim run. This table holds the list
 
 ### The secret shape lab
 
-Open `shape-lab.html` on the same site as the game, or tap the version number on the title screen 7 times. Its page title is "Kerplunk shape lab". It is a visual editor:
+Open `labs/shape-lab.html` on the same site as the game, or tap the version number on the title screen 7 times. Its page title is "Kerplunk shape lab". It is a visual editor:
 
 - Pick a shape, then press or drag squares to add and remove blocks. Flip, turn, add all turns or add the mirror.
 - Set the weight and see the chance it shows up.
 - The drop test shows where the rigid shape rests on a random board, and shows when it does not fit. Click to drop it and watch the loose blocks rise.
 - **Save to game** keeps your list in this browser, and the game uses it the next time it starts. **Back to built-in shapes** removes it.
-- **Copy code** or **Download shapes.js** gives you a file to paste over `src/js/shapes.js`, to make the shapes part of the game for everyone.
+- **Copy code** or **Download shape-art.js** gives you a file to paste over `src/js/rules/shapes/shape-art.js`, to make the shapes part of the game for everyone.
 
 The lab keeps its list in `glintwell.shapes.v1`. That key keeps its old name, so a list made before 2.0.0 still loads.
 
 ### The sound path
 
-Open `sound-path.html`, or follow the link in the feel lab. Its page title is "Kerplunk sound path". It builds the sound of the game one decision at a time. Each step plays its options with what the steps before it locked in.
+Open `labs/sound-path.html`, or follow the link in the feel lab. Its page title is "Kerplunk sound path". It builds the sound of the game one decision at a time. Each step plays its options with what the steps before it locked in.
 
 - The step buttons at the top show where you are. A step opens when the step before it is locked in. After **Lock it in**, **Next →** goes on. The page keeps which steps are done in `kerplunk.soundpath.v1`. A "Built on" tag shows what the earlier steps locked in.
 - **Step 1, the drop:** pick the instrument body. Each card has a picture of a real drop, a few words for it (how long it rings, how bright it is), and buttons to hear a drop, a clear and a chain.
@@ -129,13 +158,13 @@ Open `sound-path.html`, or follow the link in the feel lab. Its page title is "K
 - The picture at the top shows the sound live: the wave, and the spectrum from low to high notes. The card pictures come from playing the real sound into a buffer.
 - **Lock it in** saves the pick in this browser (in `kerplunk.tuning.v1`), and the game plays with it.
 
-The styles, sets and moods live in `src/js/tuning.js` (`CLEAR_STYLES`, `CHAIN_STYLES`, `POWER_STYLES`, `SMALL_STYLES`, `MOODS`). The sounds of the sets are in `src/js/audio.js` (`planClear`, `POWER`, `SMALL`). The Feel Lab's Sound tab has the same picks.
+The styles, sets and moods live in `src/js/feel/sound-styles.js` (`CLEAR_STYLES`, `CHAIN_STYLES`, `POWER_STYLES`, `SMALL_STYLES`, `MOODS`). The notes of a clear are planned in `src/js/audio/clear-chime.js` (`planClear`), and the sounds of the sets are in `src/js/audio/power-sound-sets.js` and `src/js/audio/small-sound-sets.js`. The Feel Lab's Sound tab has the same picks.
 
-The bodies live in `src/js/bodies.js`. Each one is a short recipe of layered tones, noise and plucked strings. "Wooden (now)" is the built-in sound. The others: Bubble, Woodblock, Soft pluck, Glass bell, Kalimba, Tongue drum, Music box, Steel drum, Vibraphone, Felt piano, Koto, Raindrop, Toy piano, Ocarina and Clay pot, and the cartoon ones: Space laser, Zap, Whap, Boing, Cork pop, Squeak, Slide whistle and Coin blip.
+The bodies live in `src/js/audio/instrument-bodies.js`. Each one is a short recipe of layered tones, noise and plucked strings. "Wooden (now)" is the built-in sound. The others: Bubble, Woodblock, Soft pluck, Glass bell, Kalimba, Tongue drum, Music box, Steel drum, Vibraphone, Felt piano, Koto, Raindrop, Toy piano, Ocarina and Clay pot, and the cartoon ones: Space laser, Zap, Whap, Boing, Cork pop, Squeak, Slide whistle and Coin blip.
 
 ### The secret feel lab
 
-Open `feel-lab.html`, or follow the link in the shape lab. Its page title is "Kerplunk feel lab". It tunes how the game moves and sounds:
+Open `labs/feel-lab.html`, or follow the link in the shape lab. Its page title is "Kerplunk feel lab". It tunes how the game moves and sounds:
 
 - **The stage** plays one moment of the game again and again: Drop, Clear, Chain, Big group, Blast, Remix or Power-up. It uses the real view, engine and effects, so what you see is what the game does. Play it at 1×, ½× or ¼× (the sound stays at normal speed), and pick a block style. Tap the stage, or press Space, to play it again. **New board** finds a new board for the scene.
 - **Motion** has knobs for the landing, the clear, the shake, the stickers and the Remix style.
@@ -143,11 +172,11 @@ Open `feel-lab.html`, or follow the link in the shape lab. Its page title is "Ke
 - Each tab has presets (Motion: Snappy, Bouncy, Heavy, Floaty. Sound: Glassy, Soft, Punchy, Chiptune, Dreamy) and **Compare with built-in**, which swaps between your values and the built-in ones.
 - A changed value is marked. Tap it to put that knob back.
 - **Save to game** keeps your feel in this browser, and the game uses it the next time it starts. **Back to built-in** removes it.
-- **Copy settings** gives the changed values as JSON. Put them in `DEFAULT_TUNING` in `src/js/tuning.js` to make them the feel for everyone.
+- **Copy settings** gives the changed values as JSON. Put them in `DEFAULT_TUNING` in `src/js/feel/default-tuning.js` to make them the feel for everyone.
 
 The Sound tab has a live picture of the sound, and its **Body** menu picks the instrument (see "The sound path").
 
-All the numbers live in `src/js/tuning.js`. The sounds, shakes and stickers of a move live in `src/js/juice.js`, which the game and the lab share. The lab keeps your feel in `kerplunk.tuning.v1`. The labs are not cached for offline play.
+All the numbers live in `src/js/feel/default-tuning.js`. The sounds, shakes and stickers of a move live in `src/js/play/juice.js`, which the game and the lab share. The lab keeps your feel in `kerplunk.tuning.v1`. The labs are not cached for offline play.
 
 ## Scoring
 
@@ -170,7 +199,7 @@ A Timed game starts with 60 seconds. Each turn adds time:
 | Its longest chain is 5 or more    | 15            |
 | It cleared a group of 6 or more   | 3 more        |
 
-The clock shows a "+Ns" sticker when it gets time. The time bar fills to 60 seconds at most; the number shows the real time. The seconds are `TIMED_SECONDS` and `TIME_FOR_CHAIN` and `TIME_FOR_BIG_GROUP` in `src/js/engine.js`.
+The clock shows a "+Ns" sticker when it gets time. The time bar fills to 60 seconds at most; the number shows the real time. The seconds are `TIMED_SECONDS` and `TIME_FOR_CHAIN` and `TIME_FOR_BIG_GROUP` in `src/js/rules/timed-mode.js`.
 
 ## Power-ups
 
@@ -182,7 +211,7 @@ A turn earns one power-up if it makes a chain of 3 or more steps, or clears one 
 | Blast | Clears a 3×3 area of the well. |
 | Remix | The blocks rattle and glow, then every block flies on its own curve to a new cell. The same cells stay filled and every block keeps its color. It avoids leaving a match when it can. |
 
-The numbers are `REWARD_CHAIN`, `REWARD_GROUP`, `GROUP_MULT_FROM` and `GROUP_MULT_MAX` in `src/js/engine.js`.
+The numbers are `REWARD_CHAIN` and `REWARD_GROUP` in `src/js/rules/power-ups.js`, and `GROUP_MULT_FROM` and `GROUP_MULT_MAX` in `src/js/rules/scoring.js`.
 
 ### In Endless: you tap them
 
@@ -227,7 +256,7 @@ The look has two parts. The player picks one of each in the shop: a **theme** an
 
 ### Themes
 
-A theme is a set of design variables: the CSS custom properties on the page, which the canvas also reads. A new theme changes only the values. The themes live in `src/js/themes.js`.
+A theme is a set of design variables: the CSS custom properties on the page, which the canvas also reads. A new theme changes only the values. The themes live in `src/js/looks/themes.js`.
 
 | Theme  | What it is                                                                                    | Price |
 | ------ | --------------------------------------------------------------------------------------------- | ----- |
@@ -241,7 +270,7 @@ A Random roll picks a background, two card colors (never the same as the backgro
 
 ### Block styles
 
-Each style gives each color a second clue, so the five colors stay different in grayscale. Each block has a 2.5px ink outline. A mark on a block is black or white, whichever has more contrast on that block. The well, the tray, How to play, the shop and the shape lab show the active style. The styles live in `src/js/sprites.js`.
+Each style gives each color a second clue, so the five colors stay different in grayscale. Each block has a 2.5px ink outline. A mark on a block is black or white, whichever has more contrast on that block. The well, the tray, How to play, the shop and the shape lab show the active style. The styles live in `src/js/view/sprites/` (`block-sprites.js` draws a block, `block-marks.js` draws the mark of each style).
 
 | Style       | Ember | Amber | Moss | Tide | Dusk | Price |
 | ----------- | ----- | ----- | ---- | ---- | ---- | ----- |
@@ -255,7 +284,7 @@ Silhouettes have no mark: the outline of the block is the clue. Each face blinks
 
 ### Sound profiles
 
-A sound profile is a whole matched set: the instrument of every note, how a clear plays, the mood (the scale), how a chain builds, the power-up sounds and the small sounds. The player picks one in the shop, like a theme. **▶ Hear it** plays a drop, a chain of 3 and a power-up earned. The profiles live in `src/js/feels.js`, and their parts in `src/js/bodies.js`, `src/js/tuning.js` and `src/js/audio.js` (see "The sound path").
+A sound profile is a whole matched set: the instrument of every note, how a clear plays, the mood (the scale), how a chain builds, the power-up sounds and the small sounds. The player picks one in the shop, like a theme. **▶ Hear it** plays a drop, a chain of 3 and a power-up earned. The profiles live in `src/js/feel/sound-profiles.js`, and their parts in `src/js/audio/` and `src/js/feel/sound-styles.js` (see "The sound path").
 
 | Profile     | Instrument  | Clear   | Mood   | Chain | Power-ups       | Small sounds | Price |
 | ----------- | ----------- | ------- | ------ | ----- | --------------- | ------------ | ----- |
@@ -276,7 +305,7 @@ Wooden plays the tuning the game loaded: the built-in sound, or what the Sound P
 
 ### Animation styles
 
-An animation style sets how blocks move: how fast they rise, how much they squash, how a clear hops and falls, and how much the well shakes. The player picks one in the shop. Its preview is a tiny well that loops a block landing and a clear in that style. The styles live in `src/js/feels.js`, and the feel lab uses them as its motion presets.
+An animation style sets how blocks move: how fast they rise, how much they squash, how a clear hops and falls, and how much the well shakes. The player picks one in the shop. Its preview is a tiny well that loops a block landing and a clear in that style. The styles live in `src/js/feel/motion-styles.js`, and the feel lab uses them as its motion presets.
 
 | Style   | What it is | Price |
 | ------- | ---------- | ----- |
@@ -327,7 +356,7 @@ A shop item shows a small preview, its price or "Owned", and "Use" or "In use". 
 
 When you have Plunks to spend, starting any game opens a "Before you start" box with the three boosts. Pick what you want and press Start, or choose No thanks.
 
-All prices and amounts are constants in `src/js/prices.js`. The prices of the looks are drafts. `npm run sim` prints Plunks earned per 100 turns.
+All prices and amounts are constants in `src/js/shop/prices.js`. The prices of the looks are drafts. `npm run sim` prints Plunks earned per 100 turns.
 
 ## The save
 
@@ -337,7 +366,7 @@ The game does not read the Glintwell save (`glintwell.save.v1`). A player who pl
 
 ## The daily challenge (hidden)
 
-The title screen has no Daily button, and no game pays a daily bonus. The seed code (`dailySeed` in `src/js/engine.js`) stays for a later puzzle mode.
+The title screen has no Daily button, and no game pays a daily bonus. The seed code (`dailySeed` in `src/js/rules/random.js`) stays for a later puzzle mode.
 
 ## Tools
 

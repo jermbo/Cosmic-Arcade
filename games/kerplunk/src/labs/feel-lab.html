@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<meta name="robots" content="noindex, nofollow" />
+		<meta name="theme-color" content="#FFF8E7" />
+		<title>Kerplunk feel lab</title>
+		<link rel="icon" href="../icons/favicon.svg" type="image/svg+xml" />
+		<link rel="stylesheet" href="../css/base.css" />
+		<link rel="stylesheet" href="../css/labs/shape-lab.css" />
+		<link rel="stylesheet" href="../css/labs/feel-lab.css" />
+	</head>
+	<body>
+		<header>
+			<div>
+				<h1>Feel lab</h1>
+				<p class="sub">Tune how Kerplunk moves and sounds. <a href="../index.html">Back to the game</a> · <a href="sound-path.html">Sound path</a> · <a href="shape-lab.html">Shape lab</a></p>
+			</div>
+			<div class="bar">
+				<span class="dirty" id="dirty" hidden>Not saved to the game yet</span>
+				<button class="primary" id="save" type="button">Save to game</button>
+				<button id="copy" type="button">Copy settings</button>
+				<button class="danger" id="reset" type="button">Back to built-in</button>
+			</div>
+		</header>
+
+		<main class="feel">
+			<section class="panel stage-panel" aria-label="The stage">
+				<div class="stage-box" id="stageBox">
+					<canvas class="stage" id="stage" aria-label="A small well that plays a moment of the game. Tap it to play again."></canvas>
+					<div class="banner" id="banner" hidden></div>
+				</div>
+				<div class="scenes" id="scenes" role="group" aria-label="Scene"></div>
+				<div class="row row--tight">
+					<button id="play" type="button">▶ Play</button>
+					<button id="loop" type="button" aria-pressed="true">Loop</button>
+					<button id="newBoard" type="button" title="Find a new board for this scene">New board</button>
+					<button id="music" type="button" aria-pressed="false">Music</button>
+				</div>
+				<div class="row row--tight">
+					<div class="speeds" id="speeds" role="group" aria-label="Speed"></div>
+					<label class="select">Blocks <select id="blockStyle"></select></label>
+				</div>
+			</section>
+
+			<section class="panel knobs-panel" aria-label="Knobs">
+				<div class="tabs" role="tablist">
+					<button id="tab-motion" role="tab" type="button" aria-selected="true">Motion</button>
+					<button id="tab-sound" role="tab" type="button" aria-selected="false">Sound</button>
+				</div>
+
+				<div id="pane-motion" role="tabpanel">
+					<div class="presets" id="motionPresets"></div>
+					<button class="compare" id="motionCompare" type="button" aria-pressed="false">Compare with built-in</button>
+					<div id="motionKnobs"></div>
+				</div>
+
+				<div id="pane-sound" role="tabpanel" hidden>
+					<div class="scope-mini" aria-hidden="true"><canvas id="scope"></canvas></div>
+					<div class="presets" id="soundPresets"></div>
+					<button class="compare" id="soundCompare" type="button" aria-pressed="false">Compare with built-in</button>
+					<div class="row row--tight">
+						<button class="primary" id="climb" type="button">▶ Chain climb 1 to 8</button>
+					</div>
+					<div id="soundKnobs"></div>
+					<h2 class="sound-head">Each sound</h2>
+					<p class="hint">Tap a name to hear it. Pitch is in semitones: 12 is one octave.</p>
+					<div id="soundList"></div>
+				</div>
+			</section>
+		</main>
+
+		<section class="panel panel--export" id="exportPanel" hidden>
+			<h2>Your settings</h2>
+			<p class="stats">Send this to Claude to make it the feel for everyone, or paste it into <b>DEFAULT_TUNING</b> in <b>src/js/tuning.js</b>.</p>
+			<textarea id="code" readonly spellcheck="false"></textarea>
+		</section>
+
+		<div class="toast" id="toast" role="status" hidden></div>
+		<script type="module" src="../js/labs/feel-lab/feel-lab.js"></script>
+	</body>
+</html>

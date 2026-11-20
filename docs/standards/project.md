@@ -103,7 +103,7 @@ These are the layers of the site. Each game project has its own layers.
 | -------------- | ---------------------------------------------------------------- |
 | Branch form    | `feature/<project>-v<version>`                                   |
 | Version folder | The project and version in the branch name: `feature/kerplunk-v2.0.0` gives `docs/features/kerplunk/v2.0.0/`. |
-| Game version   | A game keeps its own version in its code (Kerplunk: `src/js/version.js` and `src/sw.js`). The version folder uses the same number. |
+| Game version   | A game keeps its own version in its code (Kerplunk: `src/js/app/version.js` and `src/sw.js`). The version folder uses the same number. |
 
 ## Test data
 
