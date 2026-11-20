@@ -9,10 +9,10 @@ inputs: [mouse, keyboard, touch]
 tags: [puzzle, pwa]
 ---
 
-Drag glass pieces from the tray into the well. Link three or more blocks of one color (side to side, bends allowed) and chain clears for power-ups.
+Drag pieces from the tray up into the well. They rise and stick to the ceiling. Pieces never turn. Link three or more blocks of one color (side to side, bends allowed, never diagonal) and chain clears for Prism, Blast, and Remix.
 
 ## How to play
 
-- Drag a piece from the tray into the well, or tap to rotate.
-- Keyboard: arrows to move and turn, **Space** to drop, **P** or **Esc** to pause.
-- Long chains unlock Prism, Blast, and Remix. Works offline after the first load (PWA).
+- Touch or mouse: drag a piece from the tray into the well.
+- Keyboard: **←** **→** move along the well, **↓** or **Tab** next piece, **1** **2** **3** pick a slot, **Space** or **Enter** drop, **P** or **Esc** pause.
+- **Endless** or **Timed** modes; earn Plunks (✦) for unlocks in the shop. Works offline after the first load (PWA).

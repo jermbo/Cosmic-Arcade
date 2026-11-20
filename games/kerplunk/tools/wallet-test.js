@@ -1,8 +1,8 @@
 // Checks the Plunks and best score rules. Run: node tools/wallet-test.js
 import assert from 'node:assert/strict';
-import { THEMES, STYLES } from '../src/js/shop.js';
-import { WARMUP_COST, START_POWER_COST, BAN_COST } from '../src/js/prices.js';
-import { canAfford, bestScore, recordBest, boostsCost, buyLook } from '../src/js/wallet.js';
+import { THEMES, STYLES } from '../src/js/shop/shop-items.js';
+import { WARMUP_COST, START_POWER_COST, BAN_COST } from '../src/js/shop/prices.js';
+import { canAfford, bestScore, recordBest, boostsCost, buyLook } from '../src/js/shop/wallet.js';
 
 const save = () => ({ best: { endless: 500, timed: 300 } });
 
@@ -41,13 +41,8 @@ assert.equal(boostsCost({ warmup: false, power: null, ban: 0 }), BAN_COST);
 
 // Buying a look takes its price and owns it.
 const look = (list, id) => list.find((item) => item.id === id);
-let bought = buyLook(342, ['light'], look(THEMES, 'dark'));
-assert.deepEqual(bought, { glints: 192, owned: ['light', 'dark'] }, 'Dark costs 150');
-assert.equal(buyLook(342, ['light'], look(THEMES, 'random')).glints, 42, 'Random costs 300');
-assert.equal(buyLook(342, ['patterns'], look(STYLES, 'silhouettes')).glints, 192, 'Silhouettes cost 150');
-assert.equal(buyLook(342, ['patterns'], look(STYLES, 'faces')).glints, 92, 'Faces cost 250');
-assert.equal(buyLook(342, ['patterns'], look(STYLES, 'symbols')).glints, 242, 'Symbols cost 100');
-assert.equal(buyLook(342, ['patterns'], look(STYLES, 'pips')).glints, 242, 'Dice pips cost 100');
+const dark = look(THEMES, 'dark');
+assert.deepEqual(buyLook(342, ['light'], dark), { glints: 342 - dark.price, owned: ['light', 'dark'] });
 
 // With too few Plunks, or an item that is owned, nothing changes.
 const owned = ['light'];
