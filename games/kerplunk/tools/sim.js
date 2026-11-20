@@ -1,5 +1,6 @@
 // Plays many games with bots to check balance. Run: node tools/sim.js
-import { Game, DEFAULT_LAB } from '../src/js/engine.js';
+import { Game } from '../src/js/rules/game.js';
+import { DEFAULT_LAB } from '../src/js/rules/game-settings.js';
 
 function moves(game) {
 	const out = [];

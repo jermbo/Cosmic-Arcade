@@ -46,10 +46,6 @@ A good path to learn the game: `rules/game.js` (the board and a turn), then `pla
 
 The code follows the rules in [code-rules.md](code-rules.md).
 
-### The doors for the tests
-
-The 11 files at the top of `src/js/` (`engine.js`, `bot.js`, `feels.js`, `tuning.js`, `bodies.js`, `shape-list.js`, `shapes.js`, `themes.js`, `prices.js`, `shop.js`, `wallet.js`) hold no code. Each one only passes on the code of a folder. The tests in `tools/` import from these paths, so the files stay until the tests move to the new paths. The game itself never imports them, and the offline cache skips them.
-
 ## Host it on a static HTTPS site
 
 Service workers and install need HTTPS (or `localhost`). Any static host works: GitHub Pages, Netlify, Cloudflare Pages, Vercel, S3, or your own server.

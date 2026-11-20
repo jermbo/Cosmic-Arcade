@@ -1,7 +1,11 @@
 // Checks the match, chain and power-up rules on hand-made boards. Run: node tools/engine-test.js
 import assert from 'node:assert/strict';
-import { Game, timeForTurn, TIME_FOR_CHAIN, TIME_FOR_BIG_GROUP, BIG_GROUP, dailySeed, SECOND_WIND_ROWS, POWER_KINDS, REWARD_CHAIN, REWARD_GROUP, BAG_SIZE } from '../src/js/engine.js';
-import { REROLL_COST, REROLL_STEP } from '../src/js/prices.js';
+import { Game } from '../src/js/rules/game.js';
+import { dailySeed } from '../src/js/rules/random.js';
+import { POWER_KINDS, REWARD_CHAIN, REWARD_GROUP, BAG_SIZE } from '../src/js/rules/power-ups.js';
+import { SECOND_WIND_ROWS } from '../src/js/rules/second-wind.js';
+import { timeForTurn, TIME_FOR_CHAIN, TIME_FOR_BIG_GROUP, BIG_GROUP } from '../src/js/rules/timed-mode.js';
+import { REROLL_COST, REROLL_STEP } from '../src/js/shop/prices.js';
 
 /** rows are listed from the ceiling down: '.' empty, a digit is a color. */
 function board(rows, lab = {}) {

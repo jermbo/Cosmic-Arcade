@@ -1,8 +1,12 @@
 // Checks the sound profiles and animation styles of the shop. Run: node tools/feels-test.js
 import assert from 'node:assert/strict';
-import { SOUND_PROFILES, MOTION_STYLES, applyFeel, withSound, soundValues, PROFILE_KEYS } from '../src/js/feels.js';
-import { tuning, DEFAULT_TUNING, SCALES, CLEAR_STYLES, CHAIN_STYLES, POWER_STYLES, SMALL_STYLES } from '../src/js/tuning.js';
-import { BODIES } from '../src/js/bodies.js';
+import { SOUND_PROFILES, PROFILE_KEYS } from '../src/js/feel/sound-profiles.js';
+import { MOTION_STYLES } from '../src/js/feel/motion-styles.js';
+import { applyFeel, withSound, soundValues } from '../src/js/feel/player-feel.js';
+import { tuning } from '../src/js/feel/tuning.js';
+import { DEFAULT_TUNING } from '../src/js/feel/default-tuning.js';
+import { SCALES, CLEAR_STYLES, CHAIN_STYLES, POWER_STYLES, SMALL_STYLES } from '../src/js/feel/sound-styles.js';
+import { BODIES } from '../src/js/audio/instrument-bodies.js';
 
 const ids = (list) => list.map((item) => item.id);
 

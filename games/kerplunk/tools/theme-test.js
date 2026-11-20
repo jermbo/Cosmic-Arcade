@@ -1,7 +1,7 @@
 // Checks the theme values and the Random roll. Run: node tools/theme-test.js
 import assert from 'node:assert/strict';
-import { LIGHT, DARK, rollTheme, textOn, isTheme, INK } from '../src/js/themes.js';
-import { makeRng } from '../src/js/engine.js';
+import { LIGHT, DARK, rollTheme, textOn, isTheme, INK } from '../src/js/looks/themes.js';
+import { makeRng } from '../src/js/rules/random.js';
 
 // The Dark theme keeps the block colors, so a color means the same thing in both.
 assert.deepEqual(DARK.blocks, LIGHT.blocks);

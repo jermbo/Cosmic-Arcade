@@ -1,8 +1,8 @@
 // Checks the list of shapes and how a shape is picked. Run: node tools/shape-list-test.js
 import assert from 'node:assert/strict';
-import { SHAPES, parseArt, cleanShapes, pickShape, setShapes, MAX_SHAPE_WIDTH } from '../src/js/shape-list.js';
-import { SHAPE_ART } from '../src/js/shapes.js';
-import { GRID_SIZES } from '../src/js/engine.js';
+import { SHAPES, parseArt, cleanShapes, pickShape, setShapes, MAX_SHAPE_WIDTH } from '../src/js/rules/shapes/shape-list.js';
+import { SHAPE_ART } from '../src/js/rules/shapes/shape-art.js';
+import { GRID_SIZES } from '../src/js/rules/game-settings.js';
 
 // ASCII art turns into cells. A hole inside a column is fine (the shape lab can make them).
 assert.deepEqual(parseArt(['#', '.', '#']), [[0, 0], [0, 2]]);

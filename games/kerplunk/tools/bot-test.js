@@ -1,7 +1,7 @@
 // Checks the warm-up bot. Run: node tools/bot-test.js
 import assert from 'node:assert/strict';
-import { Game } from '../src/js/engine.js';
-import { chooseMove, autoPlay, WARMUP_ROUNDS } from '../src/js/bot.js';
+import { Game } from '../src/js/rules/game.js';
+import { chooseMove, autoPlay, WARMUP_ROUNDS } from '../src/js/rules/bot.js';
 
 // The warm-up plays rounds for the player, keeps the stack legal, and keeps the run total of glints.
 let g = new Game({ lab: { grid: 'medium' }, seed: 21 });

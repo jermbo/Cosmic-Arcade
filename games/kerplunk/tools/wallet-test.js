@@ -1,8 +1,8 @@
 // Checks the Plunks and best score rules. Run: node tools/wallet-test.js
 import assert from 'node:assert/strict';
-import { THEMES, STYLES } from '../src/js/shop.js';
-import { WARMUP_COST, START_POWER_COST, BAN_COST } from '../src/js/prices.js';
-import { canAfford, bestScore, recordBest, boostsCost, buyLook } from '../src/js/wallet.js';
+import { THEMES, STYLES } from '../src/js/shop/shop-items.js';
+import { WARMUP_COST, START_POWER_COST, BAN_COST } from '../src/js/shop/prices.js';
+import { canAfford, bestScore, recordBest, boostsCost, buyLook } from '../src/js/shop/wallet.js';
 
 const save = () => ({ best: { endless: 500, timed: 300 } });
 
