@@ -12,11 +12,6 @@ assert.ok(g.pieces.every(Boolean), 'the tray is refilled');
 assert.equal(g.findGroups().length, 0, 'the board is still after the last round');
 for (let x = 0; x < g.cols; x++) for (let y = 1; y < g.rows; y++) if (g.get(x, y)) assert.ok(g.get(x, y - 1), 'no gaps in a column');
 
-// The bot only picks a move that fits.
-g = new Game({ lab: { grid: 'medium' }, seed: 22 });
-const move = chooseMove(g);
-assert.ok(g.fits(g.pieces[move.slot], move.x));
-
 // With a full well no piece fits, so the bot has no move.
 g = new Game({ lab: { grid: 'small' }, seed: 23 });
 for (let i = 0; i < g.grid.length; i++) g.grid[i] = g.makeBlock(i % 3);

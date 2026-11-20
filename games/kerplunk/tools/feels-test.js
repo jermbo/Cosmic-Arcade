@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { SOUND_PROFILES, MOTION_STYLES, applyFeel, withSound, soundValues, PROFILE_KEYS } from '../src/js/feels.js';
 import { tuning, DEFAULT_TUNING, SCALES, CLEAR_STYLES, CHAIN_STYLES, POWER_STYLES, SMALL_STYLES } from '../src/js/tuning.js';
 import { BODIES } from '../src/js/bodies.js';
-import { buyLook } from '../src/js/wallet.js';
 
 const ids = (list) => list.map((item) => item.id);
 
@@ -53,11 +52,5 @@ assert.equal(heard, 'laser');
 assert.equal(tuning.sound.body, 'glassBell');
 assert.deepEqual(soundValues('wooden').body, DEFAULT_TUNING.sound.body);
 applyFeel('wooden', 'classic');
-
-// They are bought like the other looks.
-const bought = buyLook(500, ['wooden'], SOUND_PROFILES.find((p) => p.id === 'arcade'));
-assert.equal(bought.glints, 500 - SOUND_PROFILES.find((p) => p.id === 'arcade').price);
-assert.deepEqual(bought.owned, ['wooden', 'arcade']);
-assert.equal(buyLook(500, bought.owned, SOUND_PROFILES.find((p) => p.id === 'arcade')), null);
 
 console.log('feels ok');

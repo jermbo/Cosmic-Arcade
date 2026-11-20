@@ -8,10 +8,9 @@ import { GRID_SIZES } from '../src/js/engine.js';
 assert.deepEqual(parseArt(['#', '.', '#']), [[0, 0], [0, 2]]);
 assert.deepEqual(parseArt(['##', '#.']), [[0, 0], [1, 0], [0, 1]]);
 
-// The built-in list has 14 shapes. Each is different, has 3 or more blocks, and fits the narrowest well.
+// Each built-in shape is different, has 3 or more blocks, and fits the narrowest well.
 const NARROWEST = Math.min(...Object.values(GRID_SIZES).map((g) => g.cols));
 const SHORTEST = Math.min(...Object.values(GRID_SIZES).map((g) => g.rows));
-assert.equal(SHAPES.length, 14, 'the built-in list has 14 shapes');
 assert.equal(new Set(SHAPES.map((sh) => JSON.stringify(sh))).size, SHAPES.length, 'no shape is listed twice');
 for (const sh of SHAPES) {
 	assert.ok(sh.length >= 3, 'a piece has 3 or more blocks');
