@@ -96,7 +96,7 @@ A local preview (for example the Vite dev server at `localhost:4002`) is for pla
 ## Controls
 
 - Touch or mouse: drag a piece from the tray into the well. Pieces do not turn.
-- Keyboard: `←` `→` move, `↓` or `Tab` next piece, `Space` drop, `Esc` or `P` pause.
+- Keyboard: `←` `→` move, `↓` or `Tab` next piece, `1` `2` `3` pick a slot, `Space` or `Enter` drop, `Esc` or `P` pause.
 
 ## Modes
 

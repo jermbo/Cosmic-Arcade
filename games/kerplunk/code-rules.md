@@ -40,4 +40,4 @@ The goal of every rule: a person who reads the code can learn how the game works
 ## Behavior
 
 - A rewrite for readability does not change how the game plays. Check it with `npm test` and `npm run sim` before and after.
-- The tests in `tools/` import from fixed paths in `src/js/`. A small "door" file at that path passes on the real code (see the README).
+- The tests in `tools/` import straight from the module under test in `src/js/` (for example `rules/game.js`, `shop/wallet.js`). See the README folder map.
