@@ -1,0 +1,235 @@
+.hud {
+	position: sticky;
+	top: 0;
+	z-index: 40;
+	display: grid;
+	grid-template-columns: auto minmax(180px, 1fr) auto;
+	align-items: center;
+	gap: 10px 22px;
+	padding: 10px var(--gutter);
+	padding-top: max(10px, env(safe-area-inset-top));
+	background: rgb(10 8 6 / 0.92);
+	border-bottom: 1px solid var(--line);
+	backdrop-filter: blur(6px);
+	font-size: 0.78rem;
+	letter-spacing: 0.1em;
+}
+
+.hud[hidden] {
+	display: none;
+}
+
+.hud::after {
+	content: '';
+	position: absolute;
+	inset: auto 0 -3px 0;
+	height: 2px;
+	background: var(--hatch);
+	opacity: 0.6;
+}
+
+.hud__where {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 4px 14px;
+}
+
+.hud__layer {
+	font: 700 0.85rem/1 var(--font-display);
+	letter-spacing: 0.14em;
+	color: var(--coral);
+}
+
+.hud__stat {
+	color: var(--dim);
+}
+
+.hud__stat b {
+	color: var(--text);
+}
+
+.hud__seed {
+	color: var(--dim);
+	opacity: 0.6;
+}
+
+.hud__right {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.hud__cycles {
+	color: var(--dim);
+	padding: 4px 8px;
+	border: 1px solid var(--line);
+	white-space: nowrap;
+}
+
+.hud__cycles b {
+	color: var(--gold);
+	font-size: 0.95rem;
+}
+
+.hud__cycles.is-bump {
+	animation: bump 0.5s var(--ease-out);
+}
+
+@keyframes bump {
+	30% {
+		transform: scale(1.12);
+		border-color: var(--gold);
+	}
+}
+
+.hud__mods {
+	display: flex;
+	gap: 4px;
+}
+
+/* Trace meter */
+
+.trace {
+	--p: 0;
+	--tone: var(--coral);
+	display: grid;
+	grid-template-columns: auto 1fr auto;
+	align-items: center;
+	gap: 10px;
+}
+
+.trace[data-level='low'] {
+	--tone: var(--green);
+}
+.trace[data-level='mid'] {
+	--tone: var(--gold);
+}
+.trace[data-level='high'] {
+	--tone: var(--coral);
+}
+.trace[data-level='crit'] {
+	--tone: var(--red);
+}
+
+.trace__label {
+	font-weight: 700;
+	color: var(--tone);
+}
+
+.trace__track {
+	position: relative;
+	height: 16px;
+	border: 1px solid var(--line-strong);
+	background: var(--hatch), var(--bg);
+	overflow: hidden;
+}
+
+.trace__fill {
+	position: absolute;
+	inset: 0;
+	transform-origin: left;
+	transform: scaleX(var(--p));
+	background: linear-gradient(90deg, color-mix(in srgb, var(--tone) 50%, transparent), var(--tone));
+	box-shadow: 0 0 16px var(--tone);
+	transition:
+		transform 0.45s var(--ease-out),
+		background 0.3s;
+}
+
+.trace__ghost {
+	position: absolute;
+	inset: 0;
+	left: calc(var(--ghost-from, 0) * 100%);
+	right: calc((1 - var(--ghost-to, 0)) * 100%);
+	opacity: 0;
+	transition: opacity 0.15s;
+}
+
+.trace.has-ghost .trace__ghost {
+	opacity: 1;
+	animation: blink 0.8s steps(2, jump-none) infinite;
+}
+
+.trace[data-ghost='up'] .trace__ghost {
+	background: repeating-linear-gradient(-45deg, var(--red) 0 3px, transparent 3px 6px);
+}
+
+.trace[data-ghost='down'] .trace__ghost {
+	background: repeating-linear-gradient(-45deg, var(--bg) 0 3px, var(--green) 3px 6px);
+}
+
+.trace__ticks {
+	position: absolute;
+	inset: 0;
+	background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgb(10 8 6 / 0.8) calc(10% - 1px) 10%);
+}
+
+.trace__value {
+	font: 700 1.05rem/1 var(--font-display);
+	color: var(--tone);
+	min-width: 4.5ch;
+	text-align: right;
+}
+
+.trace__value small {
+	font-size: 0.7rem;
+	color: var(--dim);
+}
+
+.trace[data-level='crit'] .trace__track {
+	animation: crit 0.9s ease-in-out infinite;
+}
+
+@keyframes crit {
+	50% {
+		box-shadow: 0 0 0 2px var(--red), 0 0 18px var(--red);
+	}
+}
+
+.trace.is-rising .trace__value {
+	animation: rise 0.6s var(--ease-out);
+}
+
+@keyframes rise {
+	30% {
+		transform: scale(1.25);
+		color: var(--red);
+	}
+}
+
+.trace.is-falling .trace__value {
+	animation: fall 0.6s var(--ease-out);
+}
+
+@keyframes fall {
+	30% {
+		transform: scale(1.2);
+		color: var(--green);
+	}
+}
+
+@media (max-width: 1080px) {
+	.hud__seed {
+		display: none;
+	}
+}
+
+@media (max-width: 900px) {
+	.hud {
+		grid-template-columns: 1fr auto;
+		gap: 8px 12px;
+		font-size: 0.7rem;
+	}
+
+	.trace {
+		grid-column: 1 / -1;
+		grid-row: 2;
+	}
+}
+
+@media (max-width: 560px) {
+	.hud__mods {
+		display: none;
+	}
+}
