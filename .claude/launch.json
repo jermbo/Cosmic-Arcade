@@ -1,0 +1,10 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "planet-hop",
+      "url": "http://localhost:4009",
+      "port": 4009
+    }
+  ]
+}
