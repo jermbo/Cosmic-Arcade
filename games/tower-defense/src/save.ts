@@ -59,11 +59,12 @@ export function resetProgress(): void {
 }
 
 /** Records a finished map. Returns true when the score is a new best. */
-export function recordResult(map: MapId, index: number, stars: number, score: number): boolean {
+/** Records a finished map. Returns true when the score is a new best. Campaign maps also unlock the next one. */
+export function recordResult(map: MapId, index: number, stars: number, score: number, campaign = true): boolean {
 	save.stars[map] = Math.max(save.stars[map] ?? 0, stars);
 	const best = score > (save.best[map] ?? 0);
 	if (best) save.best[map] = score;
-	if (stars > 0) save.unlocked = Math.max(save.unlocked, index + 2);
+	if (campaign && stars > 0 && index >= 0) save.unlocked = Math.max(save.unlocked, index + 2);
 	persist();
 	return best;
 }

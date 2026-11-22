@@ -5,6 +5,7 @@ export class Stage {
 	readonly renderer: THREE.WebGLRenderer;
 	readonly scene = new THREE.Scene();
 	readonly camera = new THREE.PerspectiveCamera(32, 1, 0.1, 200);
+	static readonly defaultMargins = { top: 0.12, bottom: 0.14, left: 0.03, right: 0.03 };
 	readonly sun = new THREE.DirectionalLight(0xfff3e0, 2.4);
 	shakeEnabled = true;
 	/** Turns the camera around the board. The title screen sets it straight; play uses turn(). */
@@ -89,8 +90,8 @@ export class Stage {
 
 	resize(): void {
 		const canvas = this.renderer.domElement;
-		const width = canvas.clientWidth || innerWidth;
-		const height = canvas.clientHeight || innerHeight;
+		const width = Math.max(2, canvas.clientWidth || innerWidth);
+		const height = Math.max(2, canvas.clientHeight || innerHeight);
 		this.renderer.setSize(width, height, false);
 		this.camera.aspect = width / height;
 		this.camera.updateProjectionMatrix();

@@ -1,0 +1,373 @@
+[
+	{
+		"id": "meadow",
+		"name": "Meadow",
+		"blurb": "Easy · One winding road.",
+		"theme": "grass",
+		"w": 14,
+		"h": 9,
+		"paths": [[[0, 1], [3, 1], [3, 6], [7, 6], [7, 2], [11, 2], [11, 6], [13, 6]]],
+		"rivers": [],
+		"decorSeed": 7,
+		"decorDensity": 0.3,
+		"startGold": 200,
+		"hpScale": 1,
+		"hpGrowth": 0.13,
+		"waves": [
+			[{ "type": "scout", "count": 8, "gap": 1.1, "delay": 0 }],
+			[{ "type": "scout", "count": 12, "gap": 0.85, "delay": 0 }],
+			[{ "type": "scout", "count": 8, "gap": 0.8, "delay": 0 }, { "type": "tank", "count": 2, "gap": 3, "delay": 5 }],
+			[{ "type": "scout", "count": 12, "gap": 0.6, "delay": 0 }, { "type": "tank", "count": 2, "gap": 2.5, "delay": 4 }],
+			[{ "type": "splitter", "count": 4, "gap": 1.8, "delay": 0 }, { "type": "scout", "count": 8, "gap": 0.65, "delay": 5 }],
+			[{ "type": "tank", "count": 5, "gap": 1.8, "delay": 0 }, { "type": "scout", "count": 14, "gap": 0.45, "delay": 3 }],
+			[{ "type": "skimmer", "count": 4, "gap": 1.6, "delay": 0 }, { "type": "scout", "count": 10, "gap": 0.55, "delay": 4 }],
+			[{ "type": "scout", "count": 10, "gap": 0.55, "delay": 0 }, { "type": "boss", "count": 1, "gap": 0, "delay": 4 }, { "type": "tank", "count": 4, "gap": 2, "delay": 7 }]
+		]
+	},
+	{
+		"id": "lane",
+		"name": "Open Lane",
+		"blurb": "Easy · A long straight march.",
+		"theme": "grass",
+		"w": 13,
+		"h": 7,
+		"paths": [[[0, 3], [12, 3]]],
+		"rivers": [],
+		"decorSeed": 12,
+		"decorDensity": 0.25,
+		"startGold": 190,
+		"hpScale": 0.95,
+		"hpGrowth": 0.12,
+		"waves": [
+			[{ "type": "scout", "count": 10, "gap": 1, "delay": 0 }],
+			[{ "type": "scout", "count": 14, "gap": 0.75, "delay": 0 }],
+			[{ "type": "tank", "count": 2, "gap": 3, "delay": 0 }, { "type": "scout", "count": 8, "gap": 0.8, "delay": 4 }],
+			[{ "type": "scout", "count": 16, "gap": 0.6, "delay": 0 }],
+			[{ "type": "splitter", "count": 3, "gap": 2, "delay": 0 }],
+			[{ "type": "scout", "count": 20, "gap": 0.5, "delay": 0 }, { "type": "tank", "count": 2, "gap": 2.5, "delay": 6 }],
+			[{ "type": "skimmer", "count": 3, "gap": 1.8, "delay": 0 }],
+			[{ "type": "boss", "count": 1, "gap": 0, "delay": 3 }, { "type": "scout", "count": 12, "gap": 0.55, "delay": 0 }]
+		]
+	},
+	{
+		"id": "orchard",
+		"name": "Orchard Bend",
+		"blurb": "Easy · One corner, lots of space.",
+		"theme": "grass",
+		"w": 13,
+		"h": 8,
+		"paths": [[[0, 6], [4, 6], [4, 2], [12, 2]]],
+		"rivers": [],
+		"decorSeed": 19,
+		"decorDensity": 0.35,
+		"startGold": 210,
+		"hpScale": 0.98,
+		"hpGrowth": 0.13,
+		"waves": [
+			[{ "type": "scout", "count": 9, "gap": 1, "delay": 0 }],
+			[{ "type": "scout", "count": 11, "gap": 0.85, "delay": 0 }, { "type": "tank", "count": 1, "gap": 0, "delay": 5 }],
+			[{ "type": "tank", "count": 3, "gap": 2.2, "delay": 0 }],
+			[{ "type": "scout", "count": 14, "gap": 0.65, "delay": 0 }, { "type": "splitter", "count": 3, "gap": 2, "delay": 5 }],
+			[{ "type": "scout", "count": 18, "gap": 0.5, "delay": 0 }],
+			[{ "type": "tank", "count": 4, "gap": 2, "delay": 0 }, { "type": "skimmer", "count": 3, "gap": 1.6, "delay": 6 }],
+			[{ "type": "splitter", "count": 6, "gap": 1.4, "delay": 0 }],
+			[{ "type": "scout", "count": 8, "gap": 0.6, "delay": 0 }, { "type": "boss", "count": 1, "gap": 0, "delay": 3 }, { "type": "tank", "count": 3, "gap": 2, "delay": 6 }]
+		]
+	},
+	{
+		"id": "switchback",
+		"name": "Switchback",
+		"blurb": "Easy · S-curve before the crystal.",
+		"theme": "grass",
+		"w": 14,
+		"h": 9,
+		"paths": [[[0, 7], [3, 7], [3, 4], [10, 4], [10, 1], [13, 1]]],
+		"rivers": [],
+		"decorSeed": 3,
+		"decorDensity": 0.28,
+		"startGold": 220,
+		"hpScale": 1,
+		"hpGrowth": 0.14,
+		"waves": [
+			[{ "type": "scout", "count": 10, "gap": 0.95, "delay": 0 }],
+			[{ "type": "scout", "count": 12, "gap": 0.8, "delay": 0 }, { "type": "tank", "count": 2, "gap": 3, "delay": 4 }],
+			[{ "type": "scout", "count": 10, "gap": 0.7, "delay": 0 }, { "type": "splitter", "count": 4, "gap": 1.8, "delay": 5 }],
+			[{ "type": "tank", "count": 4, "gap": 2, "delay": 0 }],
+			[{ "type": "scout", "count": 16, "gap": 0.55, "delay": 0 }, { "type": "skimmer", "count": 4, "gap": 1.5, "delay": 5 }],
+			[{ "type": "splitter", "count": 5, "gap": 1.5, "delay": 0 }, { "type": "tank", "count": 2, "gap": 2.5, "delay": 6 }],
+			[{ "type": "scout", "count": 22, "gap": 0.4, "delay": 0 }],
+			[{ "type": "tank", "count": 4, "gap": 1.8, "delay": 0 }, { "type": "boss", "count": 1, "gap": 0, "delay": 5 }, { "type": "scout", "count": 10, "gap": 0.5, "delay": 8 }]
+		]
+	},
+	{
+		"id": "river",
+		"name": "River Fork",
+		"blurb": "Medium · Split around the water.",
+		"theme": "grass",
+		"w": 15,
+		"h": 10,
+		"paths": [
+			[[0, 4], [3, 4], [3, 1], [11, 1], [11, 4], [14, 4]],
+			[[0, 4], [3, 4], [3, 8], [11, 8], [11, 4], [14, 4]]
+		],
+		"rivers": [[[6, -1], [6, 4], [8, 4], [8, 10]]],
+		"decorSeed": 21,
+		"decorDensity": 0.32,
+		"startGold": 260,
+		"hpScale": 1.05,
+		"hpGrowth": 0.15,
+		"waves": [
+			[{ "type": "scout", "count": 10, "gap": 0.9, "delay": 0 }],
+			[{ "type": "scout", "count": 10, "gap": 0.7, "delay": 0 }, { "type": "splitter", "count": 3, "gap": 2, "delay": 6 }],
+			[{ "type": "tank", "count": 4, "gap": 2.2, "delay": 0 }, { "type": "scout", "count": 10, "gap": 0.6, "delay": 3 }],
+			[{ "type": "skimmer", "count": 6, "gap": 1.3, "delay": 0 }, { "type": "scout", "count": 10, "gap": 0.5, "delay": 4 }],
+			[{ "type": "splitter", "count": 8, "gap": 1.2, "delay": 0 }, { "type": "tank", "count": 3, "gap": 2.5, "delay": 6 }],
+			[{ "type": "scout", "count": 24, "gap": 0.3, "delay": 0 }, { "type": "skimmer", "count": 4, "gap": 1.5, "delay": 5 }],
+			[{ "type": "tank", "count": 8, "gap": 1.4, "delay": 0 }, { "type": "splitter", "count": 6, "gap": 1.5, "delay": 6 }, { "type": "scout", "count": 4, "gap": 1, "delay": 3, "elite": true }],
+			[{ "type": "skimmer", "count": 10, "gap": 0.9, "delay": 0 }, { "type": "tank", "count": 3, "gap": 2.5, "delay": 6, "elite": true }],
+			[{ "type": "scout", "count": 28, "gap": 0.28, "delay": 0 }, { "type": "splitter", "count": 6, "gap": 1.1, "delay": 5 }],
+			[{ "type": "boss", "count": 1, "gap": 0, "delay": 4 }, { "type": "scout", "count": 18, "gap": 0.35, "delay": 0 }, { "type": "tank", "count": 5, "gap": 1.8, "delay": 8 }, { "type": "skimmer", "count": 6, "gap": 1.1, "delay": 12 }]
+		]
+	},
+	{
+		"id": "canyon",
+		"name": "Canyon Bridge",
+		"blurb": "Medium · Two roads, one river.",
+		"theme": "grass",
+		"w": 16,
+		"h": 10,
+		"paths": [
+			[[0, 2], [5, 2], [5, 7], [14, 7], [14, 5], [15, 5]],
+			[[0, 8], [5, 8], [5, 3], [12, 3], [12, 5], [15, 5]]
+		],
+		"rivers": [[[8, -1], [8, 3], [8, 7], [8, 10]]],
+		"decorSeed": 33,
+		"decorDensity": 0.3,
+		"startGold": 280,
+		"hpScale": 1.06,
+		"hpGrowth": 0.15,
+		"waves": [
+			[{ "type": "scout", "count": 8, "gap": 1, "delay": 0, "path": 0 }, { "type": "scout", "count": 8, "gap": 1, "delay": 1, "path": 1 }],
+			[{ "type": "scout", "count": 12, "gap": 0.75, "delay": 0 }],
+			[{ "type": "tank", "count": 3, "gap": 2.2, "delay": 0 }, { "type": "splitter", "count": 4, "gap": 1.8, "delay": 5 }],
+			[{ "type": "skimmer", "count": 5, "gap": 1.4, "delay": 0 }, { "type": "scout", "count": 12, "gap": 0.55, "delay": 4 }],
+			[{ "type": "scout", "count": 20, "gap": 0.4, "delay": 0 }, { "type": "tank", "count": 3, "gap": 2.3, "delay": 6 }],
+			[{ "type": "splitter", "count": 7, "gap": 1.3, "delay": 0 }, { "type": "skimmer", "count": 5, "gap": 1.2, "delay": 7 }],
+			[{ "type": "tank", "count": 6, "gap": 1.5, "delay": 0 }, { "type": "scout", "count": 8, "gap": 0.5, "delay": 4, "elite": true }],
+			[{ "type": "scout", "count": 26, "gap": 0.3, "delay": 0 }, { "type": "splitter", "count": 5, "gap": 1.2, "delay": 6 }],
+			[{ "type": "skimmer", "count": 10, "gap": 0.85, "delay": 0 }, { "type": "tank", "count": 4, "gap": 2, "delay": 6 }],
+			[{ "type": "boss", "count": 1, "gap": 0, "delay": 5 }, { "type": "scout", "count": 16, "gap": 0.4, "delay": 0 }, { "type": "tank", "count": 5, "gap": 1.6, "delay": 7 }, { "type": "splitter", "count": 5, "gap": 1.4, "delay": 11 }]
+		]
+	},
+	{
+		"id": "delta",
+		"name": "Delta",
+		"blurb": "Medium · Three roads become one.",
+		"theme": "grass",
+		"w": 15,
+		"h": 10,
+		"paths": [
+			[[0, 1], [5, 1], [5, 5], [13, 5]],
+			[[0, 5], [5, 5], [13, 5]],
+			[[0, 9], [5, 9], [5, 5], [13, 5]]
+		],
+		"rivers": [],
+		"decorSeed": 44,
+		"decorDensity": 0.33,
+		"startGold": 300,
+		"hpScale": 1.07,
+		"hpGrowth": 0.16,
+		"waves": [
+			[{ "type": "scout", "count": 6, "gap": 1.1, "delay": 0, "path": 0 }, { "type": "scout", "count": 6, "gap": 1.1, "delay": 0.5, "path": 1 }, { "type": "scout", "count": 6, "gap": 1.1, "delay": 1, "path": 2 }],
+			[{ "type": "scout", "count": 14, "gap": 0.7, "delay": 0 }],
+			[{ "type": "tank", "count": 4, "gap": 2, "delay": 0 }, { "type": "splitter", "count": 4, "gap": 2, "delay": 5 }],
+			[{ "type": "skimmer", "count": 6, "gap": 1.2, "delay": 0 }, { "type": "scout", "count": 14, "gap": 0.5, "delay": 4 }],
+			[{ "type": "scout", "count": 22, "gap": 0.35, "delay": 0 }, { "type": "tank", "count": 3, "gap": 2.2, "delay": 6 }],
+			[{ "type": "splitter", "count": 9, "gap": 1.1, "delay": 0 }, { "type": "skimmer", "count": 4, "gap": 1.4, "delay": 7 }],
+			[{ "type": "tank", "count": 7, "gap": 1.4, "delay": 0 }, { "type": "scout", "count": 6, "gap": 0.55, "delay": 5, "elite": true }],
+			[{ "type": "scout", "count": 30, "gap": 0.28, "delay": 0 }, { "type": "skimmer", "count": 8, "gap": 1, "delay": 8 }],
+			[{ "type": "splitter", "count": 8, "gap": 1, "delay": 0 }, { "type": "tank", "count": 4, "gap": 2, "delay": 6, "elite": true }],
+			[{ "type": "boss", "count": 1, "gap": 0, "delay": 4 }, { "type": "scout", "count": 20, "gap": 0.35, "delay": 0 }, { "type": "splitter", "count": 6, "gap": 1.2, "delay": 8 }, { "type": "skimmer", "count": 8, "gap": 0.9, "delay": 12 }]
+		]
+	},
+	{
+		"id": "crossroads",
+		"name": "Crossroads",
+		"blurb": "Medium · Opposite spawns, shared finish.",
+		"theme": "grass",
+		"w": 16,
+		"h": 11,
+		"paths": [
+			[[0, 2], [6, 2], [6, 5], [13, 5]],
+			[[0, 9], [6, 9], [6, 5], [13, 5]]
+		],
+		"rivers": [[[10, -1], [10, 3], [10, 8], [10, 11]]],
+		"decorSeed": 51,
+		"decorDensity": 0.31,
+		"startGold": 290,
+		"hpScale": 1.06,
+		"hpGrowth": 0.155,
+		"waves": [
+			[{ "type": "scout", "count": 9, "gap": 0.95, "delay": 0, "path": 0 }, { "type": "scout", "count": 9, "gap": 0.95, "delay": 2, "path": 1 }],
+			[{ "type": "scout", "count": 12, "gap": 0.75, "delay": 0 }, { "type": "tank", "count": 2, "gap": 2.8, "delay": 4 }],
+			[{ "type": "splitter", "count": 5, "gap": 1.7, "delay": 0 }],
+			[{ "type": "skimmer", "count": 7, "gap": 1.2, "delay": 0 }, { "type": "scout", "count": 12, "gap": 0.5, "delay": 5 }],
+			[{ "type": "tank", "count": 5, "gap": 1.9, "delay": 0 }, { "type": "scout", "count": 18, "gap": 0.4, "delay": 4 }],
+			[{ "type": "scout", "count": 24, "gap": 0.32, "delay": 0 }, { "type": "splitter", "count": 6, "gap": 1.3, "delay": 6 }],
+			[{ "type": "skimmer", "count": 10, "gap": 0.9, "delay": 0 }, { "type": "tank", "count": 3, "gap": 2.2, "delay": 6, "elite": true }],
+			[{ "type": "splitter", "count": 10, "gap": 1, "delay": 0 }, { "type": "scout", "count": 10, "gap": 0.45, "delay": 7 }],
+			[{ "type": "tank", "count": 8, "gap": 1.3, "delay": 0 }, { "type": "skimmer", "count": 8, "gap": 1, "delay": 7 }],
+			[{ "type": "scout", "count": 14, "gap": 0.4, "delay": 0, "elite": true }, { "type": "boss", "count": 1, "gap": 0, "delay": 5 }, { "type": "splitter", "count": 6, "gap": 1.2, "delay": 9 }]
+		]
+	},
+	{
+		"id": "frost",
+		"name": "Frost Pass",
+		"blurb": "Hard · Twin spawns in the snow.",
+		"theme": "snow",
+		"w": 17,
+		"h": 11,
+		"paths": [
+			[[0, 1], [6, 1], [6, 4], [10, 4], [10, 1], [14, 1], [14, 5], [16, 5]],
+			[[0, 9], [3, 9], [3, 6], [8, 6], [8, 9], [12, 9], [12, 7], [14, 7], [14, 5], [16, 5]]
+		],
+		"rivers": [[[15, 11], [15, 8], [17, 8]]],
+		"decorSeed": 5,
+		"decorDensity": 0.32,
+		"startGold": 340,
+		"hpScale": 1.1,
+		"hpGrowth": 0.18,
+		"waves": [
+			[{ "type": "scout", "count": 8, "gap": 1, "delay": 0, "path": 0 }, { "type": "scout", "count": 8, "gap": 1, "delay": 2, "path": 1 }],
+			[{ "type": "splitter", "count": 4, "gap": 1.8, "delay": 0 }, { "type": "scout", "count": 12, "gap": 0.6, "delay": 3 }],
+			[{ "type": "tank", "count": 5, "gap": 2, "delay": 0 }, { "type": "skimmer", "count": 4, "gap": 1.6, "delay": 6 }],
+			[{ "type": "scout", "count": 20, "gap": 0.4, "delay": 0 }, { "type": "tank", "count": 4, "gap": 2, "delay": 6 }],
+			[{ "type": "splitter", "count": 10, "gap": 1, "delay": 0 }, { "type": "skimmer", "count": 6, "gap": 1.2, "delay": 6 }],
+			[{ "type": "tank", "count": 8, "gap": 1.3, "delay": 0 }, { "type": "scout", "count": 16, "gap": 0.35, "delay": 4 }],
+			[{ "type": "skimmer", "count": 12, "gap": 0.8, "delay": 0 }, { "type": "splitter", "count": 6, "gap": 1.2, "delay": 6 }],
+			[{ "type": "scout", "count": 28, "gap": 0.24, "delay": 0 }, { "type": "tank", "count": 2, "gap": 3, "delay": 6, "elite": true }],
+			[{ "type": "tank", "count": 10, "gap": 1.1, "delay": 0 }, { "type": "splitter", "count": 8, "gap": 1, "delay": 6 }, { "type": "skimmer", "count": 8, "gap": 1, "delay": 10 }],
+			[{ "type": "boss", "count": 1, "gap": 0, "delay": 0, "path": 0 }, { "type": "scout", "count": 18, "gap": 0.4, "delay": 0, "path": 1 }, { "type": "tank", "count": 6, "gap": 1.5, "delay": 8 }],
+			[{ "type": "splitter", "count": 10, "gap": 0.85, "delay": 0 }, { "type": "skimmer", "count": 10, "gap": 0.75, "delay": 7 }],
+			[{ "type": "scout", "count": 35, "gap": 0.2, "delay": 0 }, { "type": "tank", "count": 8, "gap": 1.1, "delay": 6 }],
+			[
+				{ "type": "boss", "count": 1, "gap": 0, "delay": 5, "path": 0 },
+				{ "type": "boss", "count": 1, "gap": 0, "delay": 5, "path": 1 },
+				{ "type": "tank", "count": 10, "gap": 1, "delay": 3 },
+				{ "type": "scout", "count": 25, "gap": 0.28, "delay": 8 },
+				{ "type": "skimmer", "count": 10, "gap": 0.7, "delay": 12 }
+			]
+		]
+	},
+	{
+		"id": "blizzard",
+		"name": "Blizzard Run",
+		"blurb": "Hard · Long cold highways.",
+		"theme": "snow",
+		"w": 18,
+		"h": 11,
+		"paths": [
+			[[0, 3], [7, 3], [7, 8], [14, 8], [14, 5], [17, 5]],
+			[[0, 7], [4, 7], [4, 2], [11, 2], [11, 5], [17, 5]]
+		],
+		"rivers": [[[9, -1], [9, 5], [9, 11]]],
+		"decorSeed": 88,
+		"decorDensity": 0.34,
+		"startGold": 360,
+		"hpScale": 1.12,
+		"hpGrowth": 0.19,
+		"waves": [
+			[{ "type": "scout", "count": 10, "gap": 0.9, "delay": 0, "path": 0 }, { "type": "scout", "count": 10, "gap": 0.9, "delay": 1.5, "path": 1 }],
+			[{ "type": "tank", "count": 4, "gap": 2, "delay": 0 }, { "type": "scout", "count": 14, "gap": 0.55, "delay": 4 }],
+			[{ "type": "splitter", "count": 6, "gap": 1.5, "delay": 0 }, { "type": "skimmer", "count": 5, "gap": 1.3, "delay": 6 }],
+			[{ "type": "scout", "count": 24, "gap": 0.35, "delay": 0 }, { "type": "tank", "count": 4, "gap": 2, "delay": 6 }],
+			[{ "type": "skimmer", "count": 12, "gap": 0.85, "delay": 0 }, { "type": "splitter", "count": 6, "gap": 1.2, "delay": 7 }],
+			[{ "type": "tank", "count": 8, "gap": 1.3, "delay": 0 }, { "type": "scout", "count": 10, "gap": 0.45, "delay": 5, "elite": true }],
+			[{ "type": "splitter", "count": 12, "gap": 0.95, "delay": 0 }, { "type": "skimmer", "count": 8, "gap": 1, "delay": 8 }],
+			[{ "type": "scout", "count": 32, "gap": 0.25, "delay": 0 }, { "type": "tank", "count": 5, "gap": 1.8, "delay": 7 }],
+			[{ "type": "tank", "count": 3, "gap": 2, "delay": 0, "elite": true }, { "type": "tank", "count": 7, "gap": 1.2, "delay": 4 }, { "type": "skimmer", "count": 12, "gap": 0.75, "delay": 9 }],
+			[{ "type": "splitter", "count": 10, "gap": 0.9, "delay": 0 }, { "type": "scout", "count": 16, "gap": 0.4, "delay": 8, "elite": true }],
+			[{ "type": "boss", "count": 1, "gap": 0, "delay": 4, "path": 0 }, { "type": "boss", "count": 1, "gap": 0, "delay": 4, "path": 1 }, { "type": "tank", "count": 8, "gap": 1.1, "delay": 7 }],
+			[
+				{ "type": "scout", "count": 30, "gap": 0.22, "delay": 0 },
+				{ "type": "splitter", "count": 12, "gap": 0.8, "delay": 6 },
+				{ "type": "skimmer", "count": 14, "gap": 0.65, "delay": 12 },
+				{ "type": "tank", "count": 6, "gap": 1.3, "delay": 16, "elite": true }
+			]
+		]
+	},
+	{
+		"id": "siege",
+		"name": "Grand Siege",
+		"blurb": "Hard · One choke, endless waves.",
+		"theme": "grass",
+		"w": 17,
+		"h": 11,
+		"paths": [[[0, 5], [4, 5], [4, 2], [12, 2], [12, 8], [8, 8], [8, 5], [16, 5]]],
+		"rivers": [[[6, 0], [6, 6], [6, 10]]],
+		"decorSeed": 62,
+		"decorDensity": 0.28,
+		"startGold": 380,
+		"hpScale": 1.14,
+		"hpGrowth": 0.19,
+		"waves": [
+			[{ "type": "scout", "count": 12, "gap": 0.85, "delay": 0 }],
+			[{ "type": "scout", "count": 16, "gap": 0.65, "delay": 0 }, { "type": "tank", "count": 2, "gap": 2.5, "delay": 4 }],
+			[{ "type": "splitter", "count": 6, "gap": 1.6, "delay": 0 }],
+			[{ "type": "tank", "count": 6, "gap": 1.8, "delay": 0 }, { "type": "scout", "count": 14, "gap": 0.5, "delay": 5 }],
+			[{ "type": "skimmer", "count": 10, "gap": 1, "delay": 0 }, { "type": "splitter", "count": 5, "gap": 1.4, "delay": 7 }],
+			[{ "type": "scout", "count": 28, "gap": 0.32, "delay": 0 }, { "type": "tank", "count": 4, "gap": 2, "delay": 6, "elite": true }],
+			[{ "type": "splitter", "count": 10, "gap": 1.05, "delay": 0 }, { "type": "skimmer", "count": 8, "gap": 1, "delay": 7 }],
+			[{ "type": "tank", "count": 10, "gap": 1.15, "delay": 0 }, { "type": "scout", "count": 12, "gap": 0.45, "delay": 6 }],
+			[{ "type": "scout", "count": 20, "gap": 0.35, "delay": 0, "elite": true }, { "type": "splitter", "count": 8, "gap": 1.1, "delay": 7 }],
+			[{ "type": "skimmer", "count": 14, "gap": 0.75, "delay": 0 }, { "type": "tank", "count": 6, "gap": 1.5, "delay": 8 }],
+			[{ "type": "splitter", "count": 12, "gap": 0.85, "delay": 0 }, { "type": "boss", "count": 1, "gap": 0, "delay": 6 }],
+			[
+				{ "type": "boss", "count": 1, "gap": 0, "delay": 0 },
+				{ "type": "scout", "count": 35, "gap": 0.22, "delay": 4 },
+				{ "type": "tank", "count": 10, "gap": 1, "delay": 8 },
+				{ "type": "splitter", "count": 10, "gap": 0.9, "delay": 14 },
+				{ "type": "skimmer", "count": 12, "gap": 0.7, "delay": 18 }
+			]
+		]
+	},
+	{
+		"id": "bastion",
+		"name": "Last Bastion",
+		"blurb": "Hard · Final stand at the crystal.",
+		"theme": "snow",
+		"w": 18,
+		"h": 12,
+		"paths": [
+			[[0, 1], [5, 1], [5, 6], [11, 6], [11, 3], [15, 3], [15, 6], [17, 6]],
+			[[0, 10], [4, 10], [4, 6], [11, 6], [11, 9], [15, 9], [15, 6], [17, 6]],
+			[[0, 5], [8, 5], [8, 6], [11, 6], [15, 6], [17, 6]]
+		],
+		"rivers": [[[13, 12], [13, 8], [16, 8]]],
+		"decorSeed": 101,
+		"decorDensity": 0.35,
+		"startGold": 400,
+		"hpScale": 1.18,
+		"hpGrowth": 0.2,
+		"waves": [
+			[{ "type": "scout", "count": 6, "gap": 1, "delay": 0, "path": 0 }, { "type": "scout", "count": 6, "gap": 1, "delay": 0.5, "path": 1 }, { "type": "scout", "count": 8, "gap": 0.9, "delay": 1, "path": 2 }],
+			[{ "type": "scout", "count": 14, "gap": 0.7, "delay": 0 }, { "type": "tank", "count": 3, "gap": 2.2, "delay": 5 }],
+			[{ "type": "splitter", "count": 6, "gap": 1.5, "delay": 0 }, { "type": "skimmer", "count": 6, "gap": 1.2, "delay": 6 }],
+			[{ "type": "tank", "count": 6, "gap": 1.7, "delay": 0 }, { "type": "scout", "count": 20, "gap": 0.4, "delay": 5 }],
+			[{ "type": "skimmer", "count": 12, "gap": 0.9, "delay": 0 }, { "type": "splitter", "count": 8, "gap": 1.1, "delay": 7 }],
+			[{ "type": "scout", "count": 30, "gap": 0.3, "delay": 0 }, { "type": "tank", "count": 2, "gap": 2.8, "delay": 6, "elite": true }],
+			[{ "type": "splitter", "count": 10, "gap": 1, "delay": 0 }, { "type": "tank", "count": 6, "gap": 1.4, "delay": 7 }],
+			[{ "type": "skimmer", "count": 14, "gap": 0.75, "delay": 0 }, { "type": "scout", "count": 12, "gap": 0.45, "delay": 6, "elite": true }],
+			[{ "type": "tank", "count": 10, "gap": 1.1, "delay": 0 }, { "type": "splitter", "count": 10, "gap": 0.95, "delay": 7 }],
+			[{ "type": "scout", "count": 25, "gap": 0.3, "delay": 0, "elite": true }, { "type": "skimmer", "count": 12, "gap": 0.7, "delay": 8 }],
+			[{ "type": "boss", "count": 1, "gap": 0, "delay": 3, "path": 0 }, { "type": "boss", "count": 1, "gap": 0, "delay": 3, "path": 1 }, { "type": "tank", "count": 8, "gap": 1.2, "delay": 7 }],
+			[
+				{ "type": "boss", "count": 1, "gap": 0, "delay": 5, "path": 2 },
+				{ "type": "splitter", "count": 12, "gap": 0.85, "delay": 4 },
+				{ "type": "skimmer", "count": 16, "gap": 0.6, "delay": 10 },
+				{ "type": "scout", "count": 30, "gap": 0.25, "delay": 14 },
+				{ "type": "tank", "count": 8, "gap": 1.1, "delay": 18, "elite": true }
+			]
+		]
+	}
+]

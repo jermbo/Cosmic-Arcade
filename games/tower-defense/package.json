@@ -6,6 +6,7 @@
 	"scripts": {
 		"dev": "vite --open --port 4001",
 		"build": "tsc && vite build",
+		"validate-maps": "node scripts/validate-official.mjs",
 		"preview": "vite preview"
 	},
 	"arcade": {
