@@ -18,6 +18,7 @@ A UFO fleet wants your Heart Crystal. Build towers along the road and stop them 
 - Earn gold for each UFO you shoot down. Spend it on more towers and upgrades.
 - At level 3, each tower picks one of two branches. The choice is final.
 - Win a map to unlock the next one. Keep all 20 lives for 3 stars.
+- The campaign has **12 official maps** (4 easy, 4 medium, 4 hard).
 
 ## Towers
 
