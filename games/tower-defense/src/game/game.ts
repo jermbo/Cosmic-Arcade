@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { model, ownMaterials } from '../assets';
 import { sound } from '../audio';
 import { ENEMIES, type EnemyId } from '../data/enemies';
-import { BALANCE, mapById, waveHpScale, type MapDef, type MapId } from '../data/maps';
+import { BALANCE, waveHpScale, type MapDef, type MapId } from '../data/maps';
 import { TOWERS, type Branch, type TowerId } from '../data/towers';
 import type { Stage } from '../stage';
 import { Board, TOP, type Cell } from './board';
@@ -121,11 +121,11 @@ export class Game {
 	private readonly flyArrows: THREE.InstancedMesh;
 	private readonly arrowSlots: { route: number; d: number; fly: boolean }[] = [];
 
-	constructor(stage: Stage, mapId: MapId, emit: (event: GameEvent) => void, demo = false) {
+	constructor(stage: Stage, map: MapDef, emit: (event: GameEvent) => void, demo = false) {
 		this.stage = stage;
 		this.emit = emit;
 		this.demo = demo;
-		this.map = mapById(mapId);
+		this.map = map;
 		this.gold = this.map.startGold;
 		this.board = new Board(this.map);
 		this.fx = new Effects(stage, document.getElementById('world-ui')!);
