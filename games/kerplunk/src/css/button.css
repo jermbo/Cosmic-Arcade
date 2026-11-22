@@ -1,0 +1,110 @@
+/* Buttons: cards that push into their shadow on a tap. */
+
+.button {
+	position: relative;
+	min-height: 46px;
+	padding: 9px 16px;
+	border: var(--bw) solid var(--ink);
+	border-radius: var(--r);
+	background: var(--card);
+	color: var(--text);
+	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	font-weight: 700;
+	font-size: 1rem;
+	cursor: pointer;
+	transition: transform 0.08s, box-shadow 0.08s;
+}
+
+.button:active {
+	transform: translate(var(--sh), var(--sh));
+	box-shadow: 0 0 0 var(--shadow);
+}
+
+.button:focus-visible {
+	outline: 3px solid var(--ink);
+	outline-offset: 3px;
+}
+
+.button__note {
+	font-family: var(--font-label);
+	font-size: 0.66rem;
+	font-weight: 500;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	opacity: 0.8;
+}
+
+.button--big {
+	min-height: 58px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 2px;
+	background: var(--accent);
+	color: var(--on-accent);
+	font-family: var(--font-display);
+	font-weight: 400;
+	font-size: 1.2rem;
+	letter-spacing: 0.01em;
+}
+
+.button--small {
+	min-height: 44px;
+	font-size: 0.9rem;
+	padding: 8px 14px;
+}
+
+.button--danger {
+	background: var(--danger);
+	color: #111111;
+}
+
+.button--install {
+	background: var(--accent2);
+	color: var(--on-accent2);
+}
+
+.button.button--perk,
+.button.button--stack {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+}
+
+.button.button--perk[aria-pressed='true'] {
+	background: var(--accent2);
+	color: var(--on-accent2);
+}
+
+.button.button--perk[aria-pressed='true']::after {
+	content: '✓';
+	position: absolute;
+	top: -10px;
+	right: -10px;
+	width: 22px;
+	height: 22px;
+	display: grid;
+	place-items: center;
+	border: 2px solid var(--ink);
+	border-radius: 50%;
+	background: var(--card);
+	color: var(--text);
+	font-size: 0.75rem;
+}
+
+.button[aria-disabled='true'] {
+	opacity: 0.45;
+}
+
+.button[aria-disabled='true']:active {
+	transform: none;
+	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+}
+
+@container page (max-height: 640px) {
+	.button--big {
+		min-height: 50px;
+	}
+}

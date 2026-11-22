@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import { allModelNames, loadModels } from './assets';
 import { sound } from './audio';
 import { ENEMIES } from './data/enemies';
-import { BALANCE, MAPS } from './data/maps';
+import { loadCustomMaps, addCustomMap } from './data/customMaps';
+import { MAPS, loadOfficialMaps, BALANCE, type MapDef } from './data/maps';
+import { decodeMap, encodeMap, takePlaytest } from './data/mapShare';
 import { TOWER_ORDER, TOWERS, type Branch, type Targeting, type TowerId, type TowerStats } from './data/towers';
 import type { Cell } from './game/board';
 import { Game, type GameEvent, type Result } from './game/game';
@@ -35,7 +37,10 @@ export class App {
 	private readonly input = new Input();
 	private game: Game | null = null;
 	private playing = false;
-	private mapIndex = 0;
+	private mapIndex = -1;
+	private campaign = true;
+	private customMaps: MapDef[] = [];
+	private layoutRaf = 0;
 	private screen: Screen = 'loading';
 	private settingsBack: Screen = 'title';
 	private placing: TowerId | null = null;
@@ -135,10 +140,30 @@ export class App {
 			const bar = this.screenEl.querySelector<HTMLElement>('.bar i');
 			if (bar) bar.style.width = `${(done / total) * 100}%`;
 		});
+		await loadOfficialMaps();
+		this.customMaps = loadCustomMaps();
 		makeIcons();
 		this.buildBar();
 		this.startDemo();
-		this.showTitle();
+		const params = new URLSearchParams(location.search);
+		const playtest = params.has('playtest') ? takePlaytest() : null;
+		if (playtest) {
+			this.showTitle();
+			this.beginMap(playtest, -1, false);
+		} else if (params.has('map')) {
+			try {
+				const shared = decodeMap(params.get('map') ?? '');
+				addCustomMap(shared);
+				this.customMaps = loadCustomMaps();
+				this.showTitle();
+				this.beginMap(shared, -1, false);
+			} catch (error) {
+				this.showTitle();
+				this.showMapError(error instanceof Error ? error.message : 'Could not read shared map.');
+			}
+		} else {
+			this.showTitle();
+		}
 		requestAnimationFrame(() => this.frame());
 	}
 
@@ -173,7 +198,7 @@ export class App {
 	private startDemo(): void {
 		this.game?.dispose();
 		this.playing = false;
-		const game = new Game(this.stage, 'meadow', () => {}, true);
+		const game = new Game(this.stage, MAPS[0], () => {}, true);
 		game.gold = 1e9;
 		const picks: [TowerId, number, Branch | null][] = [
 			['ballista', 2, null],
@@ -205,22 +230,37 @@ export class App {
 		this.stage.setQuarter(0);
 		this.stage.margins = { top: 0.05, bottom: 0.05, left: 0.02, right: 0.02 };
 		this.stage.resize();
+		this.scheduleLayout();
 		sound.music('menu');
 	}
 
 	private startMap(index: number): void {
+		const map = MAPS[index];
+		if (!map) return;
+		this.beginMap(map, index, true);
+	}
+
+	private startCustomMap(id: string): void {
+		const map = this.customMaps.find((entry) => entry.id === id);
+		if (map) this.beginMap(map, -1, false);
+	}
+
+	private beginMap(map: MapDef, index: number, campaign: boolean): void {
 		this.game?.dispose();
 		this.mapIndex = index;
+		this.campaign = campaign;
 		this.playing = true;
 		this.setPlacing(null);
 		this.stage.setQuarter(0);
-		const map = MAPS[index];
-		this.game = new Game(this.stage, map.id, (event) => this.onGameEvent(event));
+		this.stage.margins = { ...Stage.defaultMargins };
+		this.game = new Game(this.stage, map, (event) => this.onGameEvent(event));
 		if (this.debug) this.game.gold = 99999;
 		this.shownGold = this.game.gold;
 		this.closeScreen();
 		this.hud.hidden = false;
+		void this.hud.offsetHeight;
 		this.layout();
+		this.scheduleLayout();
 		el(this.hud, '[data-total]').textContent = String(this.game.totalWaves);
 		this.updateHud();
 		this.updateSpeed();
@@ -229,11 +269,11 @@ export class App {
 		this.showBanner(map.name, 'Defend the Heart Crystal');
 		this.tutorial = -1;
 		this.hideTip();
-		if (map.id === 'meadow' && !save.tutorialDone) this.setTutorial(0);
+		if (campaign && map.id === 'meadow' && !save.tutorialDone) this.setTutorial(0);
 	}
 
 	private endGame(result: Result): void {
-		const best = result.won ? recordResult(result.map, this.mapIndex, result.stars, result.score) : false;
+		const best = result.won ? recordResult(result.map, this.mapIndex, result.stars, result.score, this.campaign) : false;
 		this.hidePopup();
 		this.hideTip();
 		this.showResults(result, best);
@@ -405,6 +445,17 @@ export class App {
 		el(this.hud, '[data-gold]').textContent = String(Math.round(this.shownGold));
 	}
 
+	/** Re-measures the HUD after the browser has laid out the screen (fixes tiny board after map changes). */
+	private scheduleLayout(): void {
+		if (this.layoutRaf) cancelAnimationFrame(this.layoutRaf);
+		this.layoutRaf = requestAnimationFrame(() => {
+			this.layoutRaf = requestAnimationFrame(() => {
+				this.layoutRaf = 0;
+				this.layout();
+			});
+		});
+	}
+
 	/** Keeps the board clear of the HUD, and puts the tutorial tip in a free spot. */
 	private layout(): void {
 		if (this.playing && !this.hud.hidden) {
@@ -416,13 +467,17 @@ export class App {
 			const top = el(this.hud, '.hud-top').getBoundingClientRect();
 			const bar = el(this.hud, '.build-bar').getBoundingClientRect();
 			const wave = el(this.hud, '.wave-box').getBoundingClientRect();
-			const bottom = Math.max(side ? 0 : h - bar.top, h - wave.top);
-			this.stage.margins = {
-				top: (top.bottom + 4) / h,
-				bottom: (bottom + 4) / h,
-				left: side ? (bar.right + 6) / w : 0.02,
-				right: 0.02,
-			};
+			if (top.height < 2 || (!side && bar.height < 2)) {
+				this.stage.margins = { ...Stage.defaultMargins };
+			} else {
+				const bottom = Math.max(side ? 0 : h - bar.top, h - wave.top);
+				this.stage.margins = {
+					top: (top.bottom + 4) / h,
+					bottom: (bottom + 4) / h,
+					left: side ? (bar.right + 6) / w : 0.02,
+					right: 0.02,
+				};
+			}
 			this.placeTip();
 		}
 		this.stage.resize();
@@ -1019,6 +1074,7 @@ export class App {
 					<button class="btn primary big" data-play>Play</button>
 					<button class="btn" data-settings>Settings</button>
 					<button class="btn" data-credits>Credits</button>
+					<a class="btn" href="editor.html">Map editor</a>
 					<a class="btn ghost" href="../">Back to the arcade</a>
 				</div>
 				<p class="foot">3D models by Kenney (kenney.nl)</p>
@@ -1043,22 +1099,114 @@ export class App {
 				<span class="best">${best ? `Best ${best.toLocaleString('en-US')}` : locked ? 'Locked' : 'Not played yet'}</span>
 			</button>`;
 		}).join('');
+		const customCards = this.customMaps
+			.map(
+				(map) => `<button class="map-card custom ${map.theme}" data-custom="${map.id}">
+				<span class="name">${map.name}</span>
+				<span class="blurb">${map.blurb || 'Custom map'}</span>
+				<span class="meta">${map.waves.length} waves · shareable</span>
+			</button>`,
+			)
+			.join('');
 		this.openScreen(
 			'maps',
 			`<div class="center wide">
 				<h1>Choose a map</h1>
 				<div class="maps">${cards}</div>
-				<div class="menu row"><button class="btn" data-back>Back</button></div>
+				${this.customMaps.length ? `<h2 class="maps-sub">Custom maps</h2><div class="maps custom-maps">${customCards}</div>` : ''}
+				<div class="menu row">
+					<button class="btn" data-import>Import share code</button>
+					<a class="btn" href="editor.html">Map editor</a>
+					<button class="btn" data-back>Back</button>
+				</div>
 			</div>`,
 		);
 		this.screenEl.querySelectorAll<HTMLButtonElement>('[data-map]').forEach((button) => {
 			button.addEventListener('click', () => this.startMap(Number(button.dataset.map)));
 		});
+		this.screenEl.querySelectorAll<HTMLButtonElement>('[data-custom]').forEach((button) => {
+			button.addEventListener('click', () => this.startCustomMap(button.dataset.custom!));
+		});
+		this.on('[data-import]', () => this.showImportMap());
 		this.on('[data-back]', () => this.showTitle());
 		if (this.input.source !== 'mouse' && this.input.source !== 'touch') {
 			const index = Math.min(save.unlocked, MAPS.length) - 1;
 			this.screenEl.querySelector<HTMLElement>(`[data-map="${index}"]`)?.focus();
 		}
+	}
+
+	private showImportMap(): void {
+		this.openScreen(
+			'maps',
+			`<div class="center panel import-panel">
+				<h1>Import a map</h1>
+				<p class="muted">Paste a share code from the map editor or a friend.</p>
+				<textarea class="map-code" data-code rows="6" spellcheck="false" placeholder="cs1:…"></textarea>
+				<div class="menu row">
+					<button class="btn primary" data-save-import>Save and play</button>
+					<button class="btn" data-play-import>Play once</button>
+					<button class="btn" data-back>Back</button>
+				</div>
+				<p class="muted small">“Play once” does not add the map to your list.</p>
+			</div>`,
+		);
+		this.on('[data-back]', () => this.showMaps());
+		this.on('[data-save-import]', () => this.importMapCode(true));
+		this.on('[data-play-import]', () => this.importMapCode(false));
+		this.screenEl.querySelector<HTMLTextAreaElement>('[data-code]')?.focus();
+	}
+
+	private importMapCode(save: boolean): void {
+		const text = this.screenEl.querySelector<HTMLTextAreaElement>('[data-code]')?.value ?? '';
+		try {
+			const map = decodeMap(text);
+			if (save) {
+				addCustomMap(map);
+				this.customMaps = loadCustomMaps();
+			}
+			this.beginMap(map, -1, false);
+		} catch (error) {
+			this.showMapError(error instanceof Error ? error.message : 'Invalid share code.');
+		}
+	}
+
+	private showMapError(message: string): void {
+		this.openScreen(
+			'maps',
+			`<div class="center panel">
+				<h1>Map error</h1>
+				<p class="bad">${message}</p>
+				<div class="menu row"><button class="btn primary" data-back>Back</button></div>
+			</div>`,
+		);
+		this.on('[data-back]', () => this.showMaps());
+	}
+
+	private shareCurrentCustomMap(): void {
+		const map = this.game?.map;
+		if (!map) return;
+		const code = encodeMap(map);
+		this.openScreen(
+			'pause',
+			`<div class="center panel import-panel">
+				<h1>Share this map</h1>
+				<p class="muted">Copy this code. Friends can import it from the map list.</p>
+				<textarea class="map-code" readonly rows="5" spellcheck="false">${code}</textarea>
+				<div class="menu row">
+					<button class="btn primary" data-copy>Copy</button>
+					<button class="btn" data-back>Back</button>
+				</div>
+			</div>`,
+		);
+		this.on('[data-copy]', async () => {
+			try {
+				await navigator.clipboard.writeText(code);
+				sound.play('click');
+			} catch {
+				/* selection still works */
+			}
+		});
+		this.on('[data-back]', () => this.openPause());
 	}
 
 	private showSettings(back: Screen): void {
@@ -1142,10 +1290,11 @@ export class App {
 			'pause',
 			`<div class="center panel">
 				<h1>Paused</h1>
-				<p class="muted">${MAPS[this.mapIndex].name} · Wave ${this.game.wave} of ${this.game.totalWaves}</p>
+				<p class="muted">${(this.campaign && this.mapIndex >= 0 ? MAPS[this.mapIndex] : this.game.map).name} · Wave ${this.game.wave} of ${this.game.totalWaves}</p>
 				<div class="menu">
 					<button class="btn primary big" data-resume>Resume</button>
 					<button class="btn" data-restart>Restart map</button>
+					${!this.campaign ? '<button class="btn" data-share-code>Share code</button>' : ''}
 					<button class="btn" data-settings>Settings</button>
 					<button class="btn" data-maps>Quit to maps</button>
 					<a class="btn ghost" href="../">Back to the arcade</a>
@@ -1159,9 +1308,15 @@ export class App {
 		);
 		this.on('[data-resume]', () => this.resume());
 		this.on('[data-back]', () => this.resume());
-		this.on('[data-restart]', () => this.startMap(this.mapIndex));
+		this.on('[data-restart]', () => this.restartCurrentMap());
+		this.on('[data-share-code]', () => this.shareCurrentCustomMap());
 		this.on('[data-settings]', () => this.showSettings('pause'));
 		this.on('[data-maps]', () => this.quitToMaps());
+	}
+
+	private restartCurrentMap(): void {
+		if (this.campaign && this.mapIndex >= 0) this.startMap(this.mapIndex);
+		else if (this.game) this.beginMap(this.game.map, -1, this.campaign);
 	}
 
 	private resume(): void {
@@ -1171,8 +1326,9 @@ export class App {
 
 	private showResults(result: Result, best: boolean): void {
 		this.banner.className = 'banner';
-		const next = MAPS[this.mapIndex + 1];
-		const map = MAPS[this.mapIndex];
+		const map = this.campaign && this.mapIndex >= 0 ? MAPS[this.mapIndex] : this.game?.map;
+		if (!map) return;
+		const next = this.campaign && this.mapIndex >= 0 ? MAPS[this.mapIndex + 1] : undefined;
 		this.openScreen(
 			'results',
 			`<div class="center panel ${result.won ? 'won' : 'lost'}">
@@ -1193,7 +1349,7 @@ export class App {
 			</div>`,
 		);
 		this.on('[data-next]', () => this.startMap(this.mapIndex + 1));
-		this.on('[data-retry]', () => this.startMap(this.mapIndex));
+		this.on('[data-retry]', () => this.restartCurrentMap());
 		this.on('[data-back]', () => this.quitToMaps());
 		this.screenEl.querySelectorAll<HTMLElement>('.big-stars i.earn').forEach((star, i) => {
 			setTimeout(() => {

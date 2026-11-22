@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+		<meta name="theme-color" content="#070a14" />
+		<meta name="description" content="Mine planets, build belt factories and fly the cargo home. An idle space game that plays offline." />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<link rel="icon" type="image/svg+xml" href="icons/favicon.svg" />
+		<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+		<link rel="manifest" href="manifest.webmanifest" />
+		<title>Idle Orbit</title>
+	</head>
+	<body>
+		<canvas id="stage" aria-label="Game view"></canvas>
+
+		<div class="ui">
+			<!-- Dock: player status, goal and planet header. A top stack in portrait, a left rail in landscape. -->
+			<div class="dock" id="dock">
+				<header class="hud" id="hud" hidden>
+					<button class="icon-btn" id="btn-menu" type="button" aria-label="Pause menu">
+						<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h3v14H8zM13 5h3v14h-3z" /></svg>
+					</button>
+					<div class="hud__money">
+						<span class="coin" aria-hidden="true"></span>
+						<div>
+							<b class="hud__credits" id="credits">0</b>
+							<small class="hud__income" id="income">0 / s</small>
+						</div>
+					</div>
+					<div class="hud__dust" id="dust" hidden title="Stardust"><span aria-hidden="true">✦</span> <b id="dust-n">0</b></div>
+					<nav class="hud__actions">
+						<button class="pill" id="btn-research" type="button" hidden>
+							<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6v2h-1v4.2l5.4 9.3A2 2 0 0 1 17.7 21H6.3a2 2 0 0 1-1.7-3l5.4-9.3V5H9z" /></svg>
+							<span>Research</span>
+						</button>
+						<button class="pill pill--nova" id="btn-nova" type="button" hidden>
+							<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.4 7.2H22l-6.1 4.5 2.3 7.3L12 16.6 5.8 21l2.3-7.3L2 9.2h7.6z" /></svg>
+							<span>Nova</span>
+						</button>
+					</nav>
+				</header>
+
+				<button class="goal" id="goal" type="button" hidden>
+					<span class="goal__tag" id="goal-tag">Next</span>
+					<span class="goal__text" id="goal-text"></span>
+					<span class="goal__bar"><i id="goal-fill"></i></span>
+				</button>
+
+				<div class="pv-top" id="pv-top" hidden>
+					<button class="pill" id="btn-back" type="button" aria-label="Back to space">
+						<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+						<span>Space</span>
+					</button>
+					<div class="pv-top__name">
+						<b id="pv-name">Cinder</b>
+						<small id="pv-sub"></small>
+					</div>
+					<div class="pv-top__side">
+						<button class="pill" id="btn-crew" type="button" hidden>
+							<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8zM4 21a8 8 0 0 1 16 0z" /></svg>
+							<span>Crew</span>
+						</button>
+						<button class="pill pill--ghost" id="btn-survey" type="button" hidden title="Expand surveyed area">
+							<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3l6 6-6 6M9 21l-6-6 6-6M4 9h16" /></svg>
+							<span>Survey</span>
+						</button>
+						<button class="pill" id="btn-ships" type="button">
+							<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12l18-8-6 18-3-7z" /></svg>
+							<span>Ships</span>
+						</button>
+					</div>
+				</div>
+			</div>
+
+			<section class="card" id="planet-card" hidden aria-live="polite"></section>
+
+			<div class="inspect" id="inspect" hidden></div>
+			<div class="toolbar" id="toolbar" hidden role="toolbar" aria-label="Build tools"></div>
+
+			<div class="toasts" id="toasts" aria-live="polite"></div>
+
+			<div class="coach" id="coach" hidden>
+				<p class="coach__text" id="coach-text"></p>
+				<button class="coach__skip" id="coach-skip" type="button">Skip tutorial</button>
+			</div>
+
+			<div class="modal" id="modal" hidden>
+				<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+					<header class="sheet__head">
+						<h2 id="modal-title"></h2>
+						<button class="icon-btn" id="modal-close" type="button" aria-label="Close">
+							<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+						</button>
+					</header>
+					<div class="sheet__body" id="modal-body"></div>
+				</div>
+			</div>
+
+			<section class="title" id="title">
+				<div class="title__logo">
+					<span class="title__kicker">Mine · Build · Ship</span>
+					<h1>Idle <em>Orbit</em></h1>
+				</div>
+				<div class="title__buttons">
+					<button class="btn btn--big" id="btn-play" type="button">Play</button>
+					<button class="btn" id="btn-new" type="button" hidden>New game</button>
+					<button class="btn btn--ghost" id="btn-title-settings" type="button">Settings</button>
+					<button class="btn btn--ghost" id="btn-install" type="button" hidden>Install app</button>
+					<a class="btn btn--ghost" id="arcade-link" href="../" hidden>Back to the arcade</a>
+				</div>
+				<p class="title__note" id="title-note">Beta · Saves on this device. Plays offline.</p>
+			</section>
+
+			<button class="update-toast" id="update-toast" type="button" hidden>Update ready. Tap to reload.</button>
+		</div>
+
+		<script type="module" src="/src/main.ts"></script>
+	</body>
+</html>

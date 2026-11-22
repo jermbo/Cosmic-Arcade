@@ -1,0 +1,423 @@
+/* The shape lab page (labs/shape-lab.html). It uses the fonts and the theme variables of base.css. */
+
+:root {
+	--cell: 38px;
+}
+
+/* The lab is a page that scrolls, not the game screen. */
+html,
+body {
+	height: auto;
+	overflow: auto;
+	-webkit-user-select: auto;
+	user-select: auto;
+}
+
+body {
+	position: static;
+	min-height: 100vh;
+	touch-action: auto;
+	container: none;
+	padding: 16px max(16px, env(safe-area-inset-right)) 48px max(16px, env(safe-area-inset-left));
+	background-color: var(--bg);
+	background-image: radial-gradient(var(--dot) 1.2px, transparent 1.4px);
+	background-size: 16px 16px;
+}
+
+h1 {
+	margin: 0;
+	font-family: var(--font-display);
+	font-weight: 400;
+	font-size: 1.8rem;
+	text-shadow: 3px 3px 0 var(--accent);
+}
+
+h2 {
+	margin: 0 0 10px;
+	font-family: var(--font-label);
+	font-weight: 500;
+	font-size: 0.78rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+p {
+	margin: 0;
+}
+
+a {
+	color: inherit;
+	font-weight: 700;
+	text-underline-offset: 3px;
+}
+
+header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 12px 16px;
+	margin-bottom: 18px;
+}
+
+header .sub {
+	font-size: 0.9rem;
+}
+
+.bar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin-left: auto;
+}
+
+button {
+	font: inherit;
+	font-weight: 700;
+	color: var(--text);
+	background: var(--card);
+	border: 2px solid var(--ink);
+	border-radius: var(--r);
+	box-shadow: 3px 3px 0 var(--shadow);
+	padding: 8px 12px;
+	cursor: pointer;
+	transition: transform 0.08s, box-shadow 0.08s;
+}
+
+button:active {
+	transform: translate(3px, 3px);
+	box-shadow: 0 0 0 var(--shadow);
+}
+
+button:focus-visible,
+.cell:focus-visible,
+.card:focus-visible {
+	outline: 3px solid var(--ink);
+	outline-offset: 2px;
+}
+
+button.primary {
+	background: var(--accent);
+	color: var(--on-accent);
+}
+
+button.danger {
+	background: var(--danger);
+	color: #111111;
+}
+
+button:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.layout {
+	display: grid;
+	gap: 18px;
+	grid-template-columns: 1fr;
+}
+
+@media (min-width: 980px) {
+	.layout {
+		grid-template-columns: 280px minmax(300px, 380px) 1fr;
+		align-items: start;
+	}
+}
+
+.panel {
+	background: var(--card);
+	border: var(--bw) solid var(--ink);
+	border-radius: var(--r);
+	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	padding: 14px;
+}
+
+.row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin-top: 12px;
+}
+
+/* shape list */
+.list {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+	gap: 10px;
+	max-height: 62vh;
+	overflow: auto;
+	padding: 2px 5px 5px 2px;
+}
+
+.card {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: space-between;
+	gap: 6px;
+	min-height: 84px;
+	padding: 8px 4px 6px;
+	border: 2px solid var(--ink);
+	border-radius: var(--r);
+	background: var(--bg);
+	cursor: pointer;
+}
+
+.card.on {
+	background: var(--accent);
+	color: var(--on-accent);
+	box-shadow: 3px 3px 0 var(--shadow);
+}
+
+.card.bad {
+	border-color: var(--danger);
+	border-style: dashed;
+}
+
+.card small {
+	font-family: var(--font-label);
+	font-size: 0.66rem;
+	text-transform: uppercase;
+}
+
+.thumb {
+	display: grid;
+	gap: 1px;
+	align-content: center;
+	justify-content: center;
+	min-height: 40px;
+}
+
+.thumb i {
+	width: 12px;
+	height: 12px;
+}
+
+.thumb i.e {
+	background: transparent;
+}
+
+/* Blocks: the image of each color in the active block style (labs/shape-lab/shape-lab.js writes them). */
+.blk {
+	background-position: center;
+	background-size: 100% 100%;
+	background-repeat: no-repeat;
+}
+
+.blk.c0 {
+	background-image: var(--blk-c0);
+}
+
+.blk.c1 {
+	background-image: var(--blk-c1);
+}
+
+.blk.c2 {
+	background-image: var(--blk-c2);
+}
+
+.blk.c3 {
+	background-image: var(--blk-c3);
+}
+
+.blk.c4 {
+	background-image: var(--blk-c4);
+}
+
+/* editor grid */
+.editor {
+	display: grid;
+	gap: 4px;
+	justify-content: center;
+	touch-action: none;
+	user-select: none;
+	-webkit-user-select: none;
+	padding: 8px;
+	background: var(--well);
+	border: 2px solid var(--ink);
+	border-radius: var(--r);
+	width: max-content;
+	max-width: 100%;
+	margin: 0 auto;
+}
+
+.cell {
+	width: var(--cell);
+	height: var(--cell);
+	border-radius: 4px;
+	background-color: var(--empty);
+	border: 2px dashed color-mix(in srgb, var(--ink) 25%, transparent);
+	cursor: pointer;
+}
+
+.cell.on {
+	border: 0;
+	background-color: transparent;
+}
+
+.stats {
+	margin-top: 12px;
+	font-size: 0.92rem;
+	line-height: 1.5;
+}
+
+.warn {
+	margin: 8px 0 0;
+	padding: 0;
+	list-style: none;
+	font-size: 0.88rem;
+}
+
+.warn li {
+	padding: 6px 10px;
+	border: 2px solid var(--ink);
+	border-radius: var(--r);
+	margin-top: 6px;
+	color: #111111;
+}
+
+.warn .bad {
+	background: var(--danger);
+}
+
+.warn .note {
+	background: var(--accent);
+}
+
+.warn .ok {
+	background: var(--c2);
+}
+
+label.weight {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-top: 12px;
+	font-family: var(--font-label);
+	font-size: 0.78rem;
+	text-transform: uppercase;
+}
+
+input[type='range'] {
+	flex: 1;
+	accent-color: var(--ink);
+}
+
+/* drop test */
+.well {
+	display: grid;
+	gap: 2px;
+	width: max-content;
+	max-width: 100%;
+	padding: 8px;
+	background: var(--well);
+	border: var(--bw) solid var(--ink);
+	border-radius: var(--r);
+	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	position: relative;
+	touch-action: manipulation;
+}
+
+.slot {
+	width: calc(var(--cell) * 0.82);
+	height: calc(var(--cell) * 0.82);
+	border-radius: 4px;
+	background-color: var(--empty);
+	position: relative;
+}
+
+.slot.blk {
+	background-color: transparent;
+}
+
+.slot.ghost::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: 4px;
+	border: 2px dashed var(--ink);
+	background: color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+.slot.nofit::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: 4px;
+	background: color-mix(in srgb, var(--danger) 45%, transparent);
+}
+
+.slot.col {
+	box-shadow: inset 0 0 0 100px color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.hint {
+	font-size: 0.85rem;
+	margin-top: 8px;
+	min-height: 1.3em;
+}
+
+.hint.bad {
+	color: var(--danger);
+	font-weight: 700;
+}
+
+input[type='number'] {
+	font: inherit;
+	width: 4.5em;
+	color: var(--text);
+	background: var(--card);
+	border: 2px solid var(--ink);
+	border-radius: var(--r);
+	padding: 6px 8px;
+}
+
+textarea {
+	width: 100%;
+	min-height: 160px;
+	margin-top: 10px;
+	font: 0.8rem var(--font-label);
+	color: var(--text);
+	background: var(--bg);
+	border: 2px solid var(--ink);
+	border-radius: var(--r);
+	padding: 10px;
+}
+
+.toast {
+	position: fixed;
+	left: 50%;
+	bottom: 20px;
+	transform: translateX(-50%);
+	background: var(--accent2);
+	color: var(--on-accent2);
+	border: var(--bw) solid var(--ink);
+	border-radius: var(--r);
+	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	font-weight: 700;
+	padding: 10px 16px;
+	max-width: calc(100vw - 32px);
+	z-index: 10;
+}
+
+[hidden] {
+	display: none !important;
+}
+
+.dirty {
+	font-family: var(--font-label);
+	font-size: 0.75rem;
+	text-transform: uppercase;
+}
+
+.stats--intro {
+	margin: 0 0 10px;
+}
+
+.row--form {
+	margin: 0 0 10px;
+	align-items: center;
+}
+
+.panel--export {
+	margin-top: 18px;
+}

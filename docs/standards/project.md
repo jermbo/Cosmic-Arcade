@@ -1,7 +1,7 @@
 ---
 title: Project facts
 summary: "The facts of this project that the workflow skills read: the pages, the commands, and the test data for stories."
-updated: 2026-11-05
+updated: 2026-11-17
 ---
 
 # Project facts
@@ -25,10 +25,21 @@ The workflow skills hold the method and the baseline rules. This page holds the 
 | Vision                | `docs/vision.md`           |
 | Glossary              | `docs/glossary.md`         |
 | Personas              | `docs/personas.md`         |
-| Initiatives           | `docs/initiatives/<slug>/` |
-| Stories               | `docs/features/<version>/` |
-| What the product does | `docs/features/README.md`  |
+| Initiatives           | `docs/initiatives/<project>/<slug>/` |
+| Stories               | `docs/features/<project>/v<version>/` |
+| What the product does | `docs/features/<project>/README.md`  |
 | Architecture          | `docs/architecture/`       |
+
+## Projects
+
+The arcade holds many projects, so the pages of work are grouped by project. Each skill puts an initiative, a spec, a story or a version folder in the folder of its project. Never put one directly in `docs/initiatives/` or `docs/features/`.
+
+| Fact          | Value                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------- |
+| `<project>`   | The slug of the game entry: the folder name in `src/content/games/`. Kerplunk is `kerplunk`. The code of a game is in `games/<project>/` when the names match. |
+| The site      | Work on the arcade site itself uses the project `arcade`.                                               |
+| `<version>`   | The version of that project, with no `v`: Kerplunk `2.0.0` gives `docs/features/kerplunk/v2.0.0/`.    |
+| Example       | `docs/initiatives/kerplunk/v2/spec.md` and `docs/features/kerplunk/v2.0.0/`.                          |
 
 ## Rules that differ
 
@@ -90,8 +101,9 @@ These are the layers of the site. Each game project has its own layers.
 
 | Fact           | Value                                                            |
 | -------------- | ---------------------------------------------------------------- |
-| Branch form    | `feature/v<version>`                                             |
-| Version folder | The version in the branch name: `feature/v0.2.0` gives `v0.2.0`. |
+| Branch form    | `feature/<project>-v<version>`                                   |
+| Version folder | The project and version in the branch name: `feature/kerplunk-v2.0.0` gives `docs/features/kerplunk/v2.0.0/`. |
+| Game version   | A game keeps its own version in its code (Kerplunk: `src/js/app/version.js` and `src/sw.js`). The version folder uses the same number. |
 
 ## Test data
 

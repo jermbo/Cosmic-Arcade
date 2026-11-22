@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Glintwell style prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Bricolage+Grotesque:opsz,wght@12..96,800&family=DM+Mono:wght@500&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{display:flex;flex-direction:column;padding-bottom:108px;background:#2b2b2b;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.q{width:100%;max-width:420px;margin:0 auto;padding:6px 12px;font:11px/1.35 ui-monospace,Menlo,monospace;color:#ddd;background:#3a3a3a;border-bottom:1px dashed #888}
+
+/* ---------- The theme: every look is only these variables ---------- */
+.phone{
+  --bw:3px;--sh:4px;--r:6px;
+  position:relative;flex:1;min-height:0;width:100%;max-width:420px;margin:0 auto;
+  display:flex;flex-direction:column;gap:12px;padding:14px 14px 12px;overflow:hidden;
+  background-color:var(--bg);color:var(--text);
+  background-image:radial-gradient(var(--dot) 1.2px,transparent 1.4px);background-size:16px 16px;
+  font-family:var(--font-ui),system-ui,sans-serif;font-variant-numeric:tabular-nums;
+  transition:filter .2s,background-color .3s;
+}
+.phone.gray{filter:grayscale(1)}
+.c0{--col:var(--t0);--g:var(--g0)}.c1{--col:var(--t1);--g:var(--g1)}.c2{--col:var(--t2);--g:var(--g2)}.c3{--col:var(--t3);--g:var(--g3)}.c4{--col:var(--t4);--g:var(--g4)}
+
+.card{background:var(--card);border:var(--bw) solid var(--ink);border-radius:var(--r);box-shadow:var(--sh) var(--sh) 0 var(--shadow)}
+.press{cursor:pointer;transition:transform .08s,box-shadow .08s}
+.press:active{transform:translate(var(--sh),var(--sh));box-shadow:0 0 0 var(--shadow)}
+.lbl{font:500 10px/1 'DM Mono',ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase}
+
+.hud{display:grid;grid-template-columns:1fr auto;gap:10px}
+.score{background:var(--accent);color:var(--on-accent);padding:10px 14px 8px;transform:rotate(var(--tilt,0deg))}
+.score .n{font-family:var(--font-display),sans-serif;font-size:38px;line-height:1;letter-spacing:-.02em;margin-top:4px}
+.stats{display:flex;flex-direction:column;gap:8px}
+.stats .card{padding:6px 10px;min-width:100px;display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-weight:700;font-size:15px}
+.stats .glints{background:var(--accent2);color:var(--on-accent2)}
+
+.well{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;padding:6px;aspect-ratio:7/9;align-self:center;
+  width:min(100%,calc((100dvh - 172px - 236px) * 7 / 9));background:var(--well)}
+.cell{position:relative;aspect-ratio:1;display:grid;place-items:center;border-radius:4px;cursor:pointer}
+.cell.empty{background:var(--empty)}
+.cell:not(.empty){background:var(--col);border:2.5px solid var(--tile-ink)}
+.cell svg{width:42%;height:42%;fill:var(--g);pointer-events:none;overflow:visible}
+.cell.pop{animation:pop .34s cubic-bezier(.5,0,.75,0) forwards;animation-delay:var(--d,0ms);z-index:3}
+@keyframes pop{0%{transform:none}30%{transform:translate(-3px,-3px) scale(1.06)}100%{transform:translate(0,14px) rotate(14deg) scale(.4);opacity:0}}
+
+.low{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;margin-top:4px}
+.slot{height:96px;display:grid;place-items:center;position:relative}
+.slot .tag{position:absolute;top:-10px;left:8px;background:var(--card);color:var(--text);border:2px solid var(--ink);padding:2px 5px;border-radius:3px}
+.slot.used{background:transparent;box-shadow:none;border-style:dashed}
+.slot.used .piece{opacity:0}
+.piece{display:grid;gap:3px;--s:24px}
+.piece .cell,.piece .gap{width:var(--s);aspect-ratio:1}
+.piece .cell:not(.empty){border-width:2px}
+.pows{display:flex;flex-direction:column;gap:6px;justify-content:space-between}
+.pw{width:42px;height:28px;display:flex;align-items:center;justify-content:center;border-width:2px;box-shadow:2px 2px 0 var(--shadow)}
+.pw svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.pw.e{background:transparent;box-shadow:none;border-style:dashed;opacity:.5}
+.toast{position:absolute;left:50%;top:40%;z-index:5;pointer-events:none;background:var(--accent);color:var(--on-accent);border:var(--bw) solid var(--ink);box-shadow:var(--sh) var(--sh) 0 var(--shadow);
+  padding:4px 12px;font:24px var(--font-display),sans-serif;animation:toast .9s cubic-bezier(.2,.8,.2,1) forwards}
+@keyframes toast{0%{transform:translate(-50%,0) rotate(-8deg) scale(.6);opacity:0}20%{transform:translate(-50%,-10px) rotate(-4deg) scale(1.05);opacity:1}80%{opacity:1}100%{transform:translate(-50%,-30px) rotate(-4deg);opacity:0}}
+
+/* ================= BLOCK STYLES ================= */
+
+/* B: Patterns — each color wears a print. */
+[data-b=pattern] .cell:not(.empty){--p:color-mix(in srgb,var(--tile-ink) 80%,transparent)}
+[data-b=pattern] .c0:not(.empty){background:repeating-linear-gradient(45deg,var(--p) 0 2px,transparent 2px 7px),var(--col)}
+[data-b=pattern] .c1:not(.empty){background:radial-gradient(var(--p) 1.5px,transparent 1.9px) 0 0/7px 7px,var(--col)}
+[data-b=pattern] .c3:not(.empty){background:conic-gradient(var(--p) 25%,transparent 0 50%,var(--p) 0 75%,transparent 0) 0 0/10px 10px,var(--col)}
+[data-b=pattern] .c4:not(.empty){background:repeating-radial-gradient(circle at 50% 50%,transparent 0 3px,var(--p) 3px 5px),var(--col)}
+[data-b=pattern] .cell svg{display:none}
+
+/* C: Faces — each color is a little character with its own mood. */
+[data-b=face] .cell svg{width:86%;height:86%;stroke:var(--g);stroke-width:1.9;stroke-linecap:round;fill:none}
+[data-b=face] .cell svg .f{fill:var(--g);stroke:none}
+[data-b=face] .cell svg .eye{transform-box:fill-box;transform-origin:center;animation:blink 6s infinite;animation-delay:var(--bd,0s)}
+@keyframes blink{0%,94%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+[data-b=face] .cell.pop svg{animation:shock .34s forwards}
+@keyframes shock{30%{transform:scale(1.25)}}
+
+/* D: Pips — dice dots, 1 to 5. */
+[data-b=pip] .cell svg{width:76%;height:76%}
+
+/* E: Silhouettes — the block outline itself changes per color. */
+[data-b=sil] .cell:not(.empty){background:none;border:0}
+[data-b=sil] .cell svg{width:100%;height:100%;fill:var(--col);stroke:var(--tile-ink);stroke-width:2.2;stroke-linejoin:round}
+
+/* Links: same-color neighbors are joined by a bridge, so groups read at a glance. */
+.links .well .cell.le::after,.links .well .cell.ls::before{content:"";position:absolute;background:var(--col);z-index:1;pointer-events:none}
+.links .well .cell.le::after{left:calc(100% - 2.5px);top:28%;height:44%;width:9px;border-block:2.5px solid var(--tile-ink)}
+.links .well .cell.ls::before{top:calc(100% - 2.5px);left:28%;width:44%;height:9px;border-inline:2.5px solid var(--tile-ink)}
+.links[data-b=pattern] .well .cell::after,.links[data-b=pattern] .well .cell::before{background:var(--col)}
+.links[data-b=sil] .well .cell.le::after{left:calc(100% - 4px);width:12px}
+.links[data-b=sil] .well .cell.ls::before{top:calc(100% - 4px);height:12px}
+
+/* The bar: not part of any variant. */
+.bar{position:fixed;left:0;right:0;bottom:0;height:108px;display:grid;grid-template-rows:1fr 1fr;gap:4px;padding:6px 8px;background:#fff;border-top:3px dashed #000;font:600 13px ui-monospace,Menlo,monospace;z-index:10}
+.bar .row{display:flex;gap:6px;align-items:center;justify-content:center}
+.bar button{min-width:44px;height:44px;border:2px solid #000;background:#eee;font:inherit;border-radius:22px;cursor:pointer;color:#000;padding:0 12px}
+.bar .name{flex:0 1 180px;text-align:center;color:#000}
+.bar .on{background:#000;color:#fff}
+</style>
+</head>
+<body>
+<div class="q">PROTOTYPE · What should the blocks look like? ◀ ▶ change the block style. Theme, Links and B/W are toggles. Tap a block to clear its group; tap a tray piece to use it.</div>
+<div class="phone" id="phone"></div>
+<div class="bar">
+  <div class="row">
+    <button id="prev" aria-label="Previous block style">◀</button>
+    <div class="name" id="name"></div>
+    <button id="next" aria-label="Next block style">▶</button>
+  </div>
+  <div class="row">
+    <button id="theme"></button>
+    <button id="links">Links</button>
+    <button id="gray">B/W</button>
+    <button id="reset" aria-label="Reset board">↺</button>
+  </div>
+</div>
+<script>
+const FILL = ['M12 3.5 21 20H3Z','M12 3.5a8.5 8.5 0 1 1 0 17a8.5 8.5 0 1 1 0-17Z','M12 2.5 21.5 12 12 21.5 2.5 12Z','M4 4h16v16H4Z','M9.5 3h5v6.5H21v5h-6.5V21h-5v-6.5H3v-5h6.5Z'];
+// Faces: grumpy, happy, sleepy, surprised, wink.
+const FACES = [
+  '<path d="M6 7.2l4.2 1.6M18 7.2l-4.2 1.6"/><circle class="f eye" cx="8.5" cy="11" r="1.6"/><circle class="f eye" cx="15.5" cy="11" r="1.6"/><path d="M9 16.2h6"/>',
+  '<circle class="f eye" cx="8.5" cy="10" r="1.8"/><circle class="f eye" cx="15.5" cy="10" r="1.8"/><path d="M8.3 14.2q3.7 3.8 7.4 0"/>',
+  '<path d="M6.4 10.5q2.1 1.7 4.2 0M13.4 10.5q2.1 1.7 4.2 0"/><circle class="f" cx="12" cy="16" r="1.3"/>',
+  '<circle class="f eye" cx="8.3" cy="10" r="2.3"/><circle class="f eye" cx="15.7" cy="10" r="2.3"/><ellipse class="f" cx="12" cy="16.4" rx="1.7" ry="2.1"/>',
+  '<circle class="f eye" cx="8.5" cy="10" r="1.8"/><path d="M13.6 10.2h4"/><path d="M9 15.2q3.2 2.2 6.2-.8"/>',
+];
+const PIPS = [[[12,12]],[[7,7],[17,17]],[[7,7],[12,12],[17,17]],[[7,7],[17,7],[7,17],[17,17]],[[7,7],[17,7],[12,12],[7,17],[17,17]]];
+const SIL = [
+  '<rect x="1.5" y="1.5" width="21" height="21" rx="1"/>',
+  '<circle cx="12" cy="12" r="10.5"/>',
+  '<path d="M1.5 12A10.5 10.5 0 0 1 12 1.5h10.5V12A10.5 10.5 0 0 1 12 22.5H1.5Z"/>',
+  '<path d="M8 1.5h8l6.5 6.5v8L16 22.5H8L1.5 16V8Z"/>',
+  '<path d="M1.5 22.5V11a10.5 10.5 0 0 1 21 0v11.5Z"/>',
+];
+const BLOCKS = [
+  {id:'sym', name:'A: Symbols (today)', svg:c=>`<path d="${FILL[c]}"/>`},
+  {id:'pattern', name:'B: Patterns', svg:()=>''},
+  {id:'face', name:'C: Faces', svg:c=>FACES[c]},
+  {id:'pip', name:'D: Dice pips', svg:c=>PIPS[c].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="2.4"/>`).join('')},
+  {id:'sil', name:'E: Silhouettes', svg:c=>SIL[c]},
+];
+const ICON = {
+  prism:'<svg viewBox="0 0 24 24"><path d="M12 4 20 18H4Z"/><path d="M12 4v14"/></svg>',
+  blast:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>',
+};
+
+function inkOn(hex){ const [r,g,b]=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255).map(c=>c<=.03928?c/12.92:((c+.055)/1.055)**2.4);
+  const L=.2126*r+.7152*g+.0722*b; return (L+.05)/.05 >= 1.05/(L+.05) ? '#111111' : '#ffffff'; }
+const TILE_SETS = [
+  ['#FF6B6B','#FFD93D','#6BCB77','#4D96FF','#C084FC'],
+  ['#EF476F','#FFD166','#06D6A0','#118AB2','#9D4EDD'],
+  ['#FF5C5C','#FFB000','#3DDC97','#4CC9F0','#F15BB5'],
+  ['#FF7A59','#F8E16C','#00C2A8','#5B8DEF','#B388EB'],
+];
+const THEMES = {
+  light: { name:'Light', bg:'#FFF8E7', dot:'#00000014', text:'#111', ink:'#111', shadow:'#111', card:'#ffffff',
+    accent:'#FFD93D', accent2:'#A0E7E5', well:'#ffffff', empty:'#F2ECDD', tileInk:'#111', tiles:TILE_SETS[0],
+    fontUi:"'Space Grotesk'", fontDisplay:"'Archivo Black'", tilt:'-1.5deg' },
+  dark: { name:'Dark', bg:'#121212', dot:'#ffffff0f', text:'#F4F1EA', ink:'#F4F1EA', shadow:'#F4F1EA', card:'#1E1E1E',
+    accent:'#FFD93D', accent2:'#C084FC', well:'#1A1A1A', empty:'#262626', tileInk:'#0A0A0A', tiles:TILE_SETS[0],
+    fontUi:"'Space Grotesk'", fontDisplay:"'Archivo Black'", tilt:'-1.5deg' },
+};
+const pick = a => a[Math.floor(Math.random()*a.length)];
+function rollRandom(){
+  const bg = pick(['#FFDE59','#A0E7E5','#FFAEBC','#B4F8C8','#C3B1E1','#FBE7C6','#90E0EF','#FFC6A8','#E4F4A5']);
+  const pool = ['#FF6B6B','#FFD93D','#6BCB77','#4D96FF','#C084FC','#FF9F1C','#2EC4B6','#F72585','#FFFFFF','#111111'].filter(c=>c.toLowerCase()!==bg.toLowerCase());
+  const accent = pick(pool), accent2 = pick(pool.filter(c=>c!==accent));
+  const well = pick(['#FFFFFF','#FFFDF5','#111111']);
+  return { name:'Random', bg, dot:'#0000001a', text:'#111', ink:'#111', shadow:'#111', card:'#FFFFFF',
+    accent, accent2, well, empty: well==='#111111' ? '#232323' : '#00000010', tileInk:'#111', tiles:pick(TILE_SETS),
+    fontUi:"'Space Grotesk'", fontDisplay:pick(["'Archivo Black'","'Bricolage Grotesque'"]), tilt:(Math.random()*5-2.5).toFixed(1)+'deg',
+    bw:pick(['3px','3px','4px']), sh:pick(['4px','5px','6px']), r:pick(['0px','6px','12px']) };
+}
+const THEME_ORDER = ['light','dark','random'];
+
+const BOARD0 = ['0112334','0212434','22.0411','3..001.','3...2..','....2..','.......','.......','.......'];
+const SHAPES = [['###'],['##','#.'],['#.#','###'],['.#.','###'],['##.','.##'],['#','#','#'],['#.','##'],['##','##']];
+const rnd = n => Math.floor(Math.random()*n);
+const newPiece = () => { const art = pick(SHAPES); return {art, colors: art.join('').replace(/\./g,'').split('').map(()=>rnd(5))}; };
+const S = {b:0, t:0, links:false, board:null, tray:null, used:[false,false], gray:false, score:12480, random:rollRandom()};
+function reset(){ S.board = BOARD0.map(r=>r.split('').map(c=>c==='.'?null:+c)); S.tray=[{art:['##','#.'],colors:[1,3,1]},{art:['#.#','###'],colors:[4,0,0,4,4]}]; S.used=[false,false]; S.score=12480; }
+
+const theme = () => THEME_ORDER[S.t]==='random' ? S.random : THEMES[THEME_ORDER[S.t]];
+function applyTheme(el, t){
+  const set = (k,v) => el.style.setProperty(k,v);
+  set('--bg',t.bg); set('--dot',t.dot); set('--text',t.text); set('--ink',t.ink); set('--shadow',t.shadow); set('--card',t.card);
+  set('--accent',t.accent); set('--on-accent',inkOn(t.accent)); set('--accent2',t.accent2); set('--on-accent2',inkOn(t.accent2));
+  set('--well',t.well); set('--empty',t.empty); set('--tile-ink',t.tileInk);
+  t.tiles.forEach((c,i)=>{ set('--t'+i,c); set('--g'+i,inkOn(c)); });
+  set('--font-ui',t.fontUi); set('--font-display',t.fontDisplay); set('--tilt',t.tilt);
+  set('--bw',t.bw||'3px'); set('--sh',t.sh||'4px'); set('--r',t.r||'6px');
+}
+
+const inner = c => { const s = BLOCKS[S.b].svg(c); return s ? `<svg viewBox="0 0 24 24">${s}</svg>` : ''; };
+const blinkDelay = () => `--bd:${(Math.random()*6).toFixed(2)}s`;
+function cell(c,i){
+  if (c==null) return `<div class="cell empty"></div>`;
+  const x=i%7, y=(i/7)|0, le = x<6 && S.board[y][x+1]===c, ls = y<8 && S.board[y+1]?.[x]===c;
+  return `<div class="cell c${c}${le?' le':''}${ls?' ls':''}" data-i="${i}" style="${blinkDelay()}">${inner(c)}</div>`;
+}
+function piece(p){ let k=0; const w=Math.max(...p.art.map(r=>r.length));
+  return `<div class="piece" style="grid-template-columns:repeat(${w},var(--s))">${p.art.map(r=>r.padEnd(w,'.').split('').map(ch=>{ if(ch!=='#') return '<div class="gap"></div>'; const c=p.colors[k++]; return `<div class="cell c${c}" style="${blinkDelay()}">${inner(c)}</div>`; }).join('')).join('')}</div>`; }
+const slot = i => `<div class="slot card press${S.used[i]?' used':''}" data-slot="${i}"><span class="tag lbl">0${i+1}</span>${piece(S.tray[i])}</div>`;
+const fmt = n => n.toLocaleString('en-US');
+
+const phone = document.getElementById('phone');
+function render(){
+  const t = theme(); phone.removeAttribute('style'); applyTheme(phone,t);
+  phone.dataset.b = BLOCKS[S.b].id; phone.classList.toggle('gray',S.gray); phone.classList.toggle('links',S.links);
+  phone.innerHTML = `
+    <div class="hud">
+      <div class="score card"><div class="lbl">Score</div><div class="n">${fmt(S.score)}</div></div>
+      <div class="stats"><div class="card"><span class="lbl">Best</span>18,200</div><div class="card glints"><span class="lbl">Glints</span>✦342</div></div>
+    </div>
+    <div class="well card">${S.board.flat().map((c,i)=>cell(c,i)).join('')}</div>
+    <div class="low">${slot(0)}${slot(1)}
+      <div class="pows"><div class="pw card press" title="Prism">${ICON.prism}</div><div class="pw card press" title="Blast">${ICON.blast}</div><div class="pw card e" title="Empty"></div></div>
+    </div>`;
+  document.getElementById('name').textContent = BLOCKS[S.b].name;
+  document.getElementById('theme').textContent = t.name + (t.name==='Random' ? ' 🎲' : '');
+  document.getElementById('gray').classList.toggle('on',S.gray);
+  document.getElementById('links').classList.toggle('on',S.links);
+}
+function group(i){ const W=7, c=S.board.flat()[i], seen=new Set([i]), q=[i];
+  for(let h=0;h<q.length;h++){ const j=q[h], x=j%W, y=(j/W)|0; for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx=x+dx, ny=y+dy, n=ny*W+nx;
+    if(nx>=0&&nx<W&&ny>=0&&ny<9&&!seen.has(n)&&S.board[ny][nx]===c){seen.add(n);q.push(n);} } } return q; }
+let busy=false;
+phone.addEventListener('click', e => {
+  const s = e.target.closest('.slot');
+  if (s) { const i=+s.dataset.slot; if(S.used[i]) return; S.used[i]=true; render();
+    if(S.used.every(Boolean)) setTimeout(()=>{ S.tray=[newPiece(),newPiece()]; S.used=[false,false]; render(); }, 300); return; }
+  const el = e.target.closest('.well .cell[data-i]'); if(!el||busy) return;
+  busy=true; const g=group(+el.dataset.i);
+  g.forEach((i,n)=>{ const c=phone.querySelector(`.well [data-i="${i}"]`); c.style.setProperty('--d', n*35+'ms'); c.classList.add('pop'); });
+  const pts=g.length*40, t=document.createElement('div'); t.className='toast'; t.textContent='+'+pts; phone.append(t);
+  setTimeout(()=>{ g.forEach(i=>S.board[(i/7)|0][i%7]=null);
+    for(let x=0;x<7;x++){ const col=S.board.map(r=>r[x]).filter(c=>c!=null); for(let y=0;y<9;y++) S.board[y][x]=col[y]??null; }
+    S.score+=pts; busy=false; render(); }, 360 + g.length*35);
+});
+document.getElementById('prev').onclick=()=>{ S.b=(S.b+BLOCKS.length-1)%BLOCKS.length; render(); };
+document.getElementById('next').onclick=()=>{ S.b=(S.b+1)%BLOCKS.length; render(); };
+document.getElementById('theme').onclick=()=>{ S.t=(S.t+1)%THEME_ORDER.length; if(THEME_ORDER[S.t]==='random') S.random=rollRandom(); render(); };
+document.getElementById('links').onclick=()=>{ S.links=!S.links; render(); };
+document.getElementById('gray').onclick=()=>{ S.gray=!S.gray; render(); };
+document.getElementById('reset').onclick=()=>{ reset(); render(); };
+reset(); render();
+</script>
+</body>
+</html>

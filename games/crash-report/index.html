@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+		<meta name="theme-color" content="#15161c" />
+		<meta name="description" content="Launch one car into a busy junction and cause the biggest pile-up you can." />
+		<title>Crash Report</title>
+	</head>
+	<body>
+		<canvas id="stage" class="stage" aria-label="Game view"></canvas>
+
+		<div id="hud" class="hud" hidden>
+			<div class="hud__corner hud__corner--top-left">
+				<p class="hud__level" id="hud-level"></p>
+				<ul class="hud__goals" id="hud-goals"></ul>
+			</div>
+
+			<div class="hud__corner hud__corner--top">
+				<p class="hud__money" id="hud-money" aria-live="off">$0</p>
+				<p class="hud__replay" id="hud-replay" hidden>Replay of your best run</p>
+			</div>
+
+			<div class="hud__corner hud__corner--top-right">
+				<p class="hud__time" id="hud-time">0:30</p>
+				<button class="hud__pause" id="hud-pause" type="button" aria-label="Pause">II</button>
+			</div>
+
+			<div class="hud__chain" id="hud-chain" data-on="false">
+				<p class="hud__mult" id="hud-mult">×1</p>
+				<p class="hud__chain-label" id="hud-chain-label">chain</p>
+				<div class="hud__chain-bar"><div class="hud__chain-fill" id="hud-chain-fill"></div></div>
+			</div>
+
+			<div class="hud__corner hud__corner--bottom-left">
+				<p class="hud__label">Aftertouch</p>
+				<div class="hud__meter" id="hud-meter"><div class="hud__meter-fill" id="hud-meter-fill"></div></div>
+			</div>
+
+			<div class="hud__corner hud__corner--bottom">
+				<p class="hud__prompt" id="hud-prompt"></p>
+				<div class="hud__settle" id="hud-settle" hidden>
+					<span>Run ends</span>
+					<div class="hud__settle-bar"><div class="hud__settle-fill" id="hud-settle-fill"></div></div>
+				</div>
+			</div>
+
+			<div class="hud__corner hud__corner--bottom-right">
+				<button class="hud__action hud__action--launch" id="hud-launch" type="button" hidden>Launch</button>
+				<button class="hud__action hud__action--breaker" id="hud-breaker" type="button" hidden>Crashbreaker</button>
+			</div>
+
+			<p class="hud__banner" id="hud-banner" hidden></p>
+			<div class="hud__pops" id="hud-pops" aria-hidden="true"></div>
+		</div>
+
+		<section id="screen-title" class="screen screen--title" hidden>
+			<div class="title">
+				<p class="title__tape">Incident no. 001</p>
+				<h1 class="title__logo">Crash<span>Report</span></h1>
+				<p class="title__tagline">One car. One junction. The biggest pile-up you can cause.</p>
+				<nav class="menu" aria-label="Main menu">
+					<button class="button button--main" id="title-play" type="button">Play</button>
+					<button class="button" id="title-select" type="button">Junctions</button>
+					<button class="button" id="title-help" type="button">How to play</button>
+					<button class="button" id="title-settings" type="button">Settings</button>
+				</nav>
+				<p class="title__note" id="title-note"></p>
+			</div>
+		</section>
+
+		<section id="screen-select" class="screen" hidden>
+			<div class="panel panel--wide">
+				<header class="panel__header">
+					<h2 class="panel__title">Junctions</h2>
+					<button class="button button--small" id="select-back" type="button">Back</button>
+				</header>
+				<ol class="cards" id="select-cards"></ol>
+			</div>
+		</section>
+
+		<section id="screen-pause" class="screen screen--dim" hidden>
+			<div class="panel">
+				<h2 class="panel__title">Paused</h2>
+				<nav class="menu" aria-label="Pause menu">
+					<button class="button button--main" id="pause-resume" type="button">Resume</button>
+					<button class="button" id="pause-retry" type="button">Retry</button>
+					<button class="button" id="pause-settings" type="button">Settings</button>
+					<button class="button" id="pause-select" type="button">Junctions</button>
+				</nav>
+			</div>
+		</section>
+
+		<section id="screen-settings" class="screen screen--dim" hidden>
+			<div class="panel">
+				<h2 class="panel__title">Settings</h2>
+				<div class="fields">
+					<label class="field"><span>Main volume</span><input id="set-master" type="range" min="0" max="100" step="5" /></label>
+					<label class="field"><span>Sound effects</span><input id="set-sfx" type="range" min="0" max="100" step="5" /></label>
+					<label class="field"><span>Music</span><input id="set-music" type="range" min="0" max="100" step="5" /></label>
+					<label class="field"><span>Screen shake</span><input id="set-shake" type="range" min="0" max="100" step="10" /></label>
+				</div>
+				<nav class="menu" aria-label="Settings menu">
+					<button class="button button--main" id="set-back" type="button">Done</button>
+					<button class="button button--quiet" id="set-reset" type="button">Erase saved scores</button>
+				</nav>
+			</div>
+		</section>
+
+		<section id="screen-results" class="screen screen--dim" hidden>
+			<div class="panel panel--report">
+				<p class="report__tape" id="results-tape">Crash report</p>
+				<h2 class="panel__title" id="results-level"></h2>
+				<p class="report__total" id="results-money">$0</p>
+				<p class="report__best" id="results-best"></p>
+				<dl class="report__facts">
+					<div><dt>Best chain</dt><dd id="results-chain">0</dd></div>
+					<div><dt>Wrecks</dt><dd id="results-wrecks">0</dd></div>
+					<div><dt>Bonus hits</dt><dd id="results-bonus">0</dd></div>
+				</dl>
+				<ul class="report__goals" id="results-goals"></ul>
+				<nav class="menu menu--row" aria-label="Results menu">
+					<button class="button button--main" id="results-retry" type="button">Retry</button>
+					<button class="button" id="results-next" type="button">Next junction</button>
+					<button class="button" id="results-replay" type="button">Watch best run</button>
+					<button class="button" id="results-select" type="button">Junctions</button>
+				</nav>
+			</div>
+		</section>
+
+		<section id="screen-tutorial" class="screen screen--dim" hidden>
+			<div class="panel">
+				<p class="report__tape" id="tutorial-count">1 of 4</p>
+				<h2 class="panel__title" id="tutorial-title"></h2>
+				<p class="tutorial__text" id="tutorial-text"></p>
+				<dl class="tutorial__keys" id="tutorial-keys"></dl>
+				<nav class="menu menu--row" aria-label="Tutorial">
+					<button class="button button--main" id="tutorial-next" type="button">Next</button>
+					<button class="button button--quiet" id="tutorial-skip" type="button">Skip</button>
+				</nav>
+			</div>
+		</section>
+
+		<div id="rotate" class="rotate" hidden>
+			<p>Turn your phone on its side to play.</p>
+		</div>
+
+		<div id="loading" class="loading">Loading…</div>
+
+		<script type="module" src="/src/main.ts"></script>
+	</body>
+</html>

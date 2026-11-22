@@ -1,0 +1,53 @@
+import type { LevelDef } from './types.ts';
+
+export const marketCross: LevelDef = {
+	id: 'market-cross',
+	name: 'Market Cross',
+	hint: 'Tight streets. The barrels at the corners start the party.',
+	theme: 'dusk',
+	timeLimit: 45,
+	roads: [
+		{ a: [-105, 0], b: [105, 0], lanes: 4 },
+		{ a: [0, 105], b: [0, -105], lanes: 4 },
+		{ a: [46, -46], b: [7, -7], lanes: 1 },
+	],
+	lights: { green: 6, clear: 2.5 },
+	lanes: [
+		{ path: [[-95, 1.8], [95, 1.8]], speed: 12, vehicles: ['car', 'van', 'car', 'car'], offset: 0.2, phase: 0, stopAt: 85.8 },
+		{ path: [[-95, 5.4], [95, 5.4]], speed: 11, vehicles: ['bus', 'car', 'van', 'car'], offset: 0.6, phase: 0, stopAt: 85.8 },
+		{ path: [[95, -1.8], [-95, -1.8]], speed: 12, vehicles: ['car', 'car', 'van', 'car'], offset: 0.4, phase: 0, stopAt: 85.8 },
+		{ path: [[95, -5.4], [-95, -5.4]], speed: 11, vehicles: ['car', 'tanker', 'car', 'car'], offset: 0.9, phase: 0, stopAt: 85.8 },
+		{ path: [[1.8, 95], [1.8, -95]], speed: 12, vehicles: ['car', 'van', 'car', 'car'], offset: 0.1, phase: 1, stopAt: 85.8 },
+		{ path: [[5.4, 95], [5.4, -95]], speed: 11, vehicles: ['van', 'car', 'bus', 'car'], offset: 0.5, phase: 1, stopAt: 85.8 },
+		{ path: [[-1.8, -95], [-1.8, 95]], speed: 12, vehicles: ['car', 'car', 'car', 'van'], offset: 0.3, phase: 1, stopAt: 85.8 },
+		{ path: [[-5.4, -95], [-5.4, 95]], speed: 11, vehicles: ['car', 'van', 'car', 'tanker'], offset: 0.75, phase: 1, stopAt: 85.8 },
+	],
+	parked: [
+		{ kind: 'van', at: [-13, 9.2], heading: 90 },
+		{ kind: 'car', at: [-19, 9.2], heading: 90 },
+		{ kind: 'car', at: [-9.2, -15], heading: 0 },
+		{ kind: 'van', at: [-9.2, -22], heading: 0 },
+		{ kind: 'car', at: [14, 9.2], heading: 270 },
+		{ kind: 'car', at: [9.2, 16], heading: 180 },
+	],
+	barrels: [[-9, 9.6], [-10.2, 10.6], [-9.2, -9.4], [-10.4, -10.4], [9.4, 9.4], [10.6, 10.4], [-9.6, 11.8], [11.8, 9.6]],
+	buildings: [
+		{ at: [40, -14], size: [30, 10, 9] },
+		{ at: [14, -40], size: [9, 14, 30] },
+		{ at: [-24, -24], size: [24, 9, 24] },
+		{ at: [-25, 26], size: [26, 13, 26] },
+		{ at: [26, 26], size: [26, 8, 26] },
+		{ at: [-62, -20], size: [28, 7, 18] },
+		{ at: [-62, 22], size: [28, 10, 18] },
+		{ at: [64, 22], size: [28, 12, 18] },
+		{ at: [-22, -62], size: [20, 8, 28] },
+		{ at: [24, 64], size: [22, 9, 28] },
+		{ at: [-24, 64], size: [22, 6, 28] },
+	],
+	launch: { at: [40, -40], heading: -45, arc: 12, speed: 30 },
+	goals: [
+		{ kind: 'money', target: 250000 },
+		{ kind: 'chain', target: 18 },
+		{ kind: 'bonus', what: 'barrel', target: 5 },
+	],
+};
