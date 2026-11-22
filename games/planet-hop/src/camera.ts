@@ -26,6 +26,8 @@ export class CameraRig {
 	fovKick = 0;
 	reduceMotion = false;
 	assist = true;
+	/** When false, update aim but skip moving the camera (intro blend). */
+	movesCamera = true;
 	private smoothH = 0;
 	private shake = 0;
 	private noLookT = 0;
@@ -89,7 +91,7 @@ export class CameraRig {
 
 		const want = this.clearDistance(planet);
 		this.arm += (want - this.arm) * damp(want < this.arm ? 16 : 2.2, dt);
-		this.place(planet.center, planet.R);
+		if (this.movesCamera) this.place(planet.center, planet.R);
 	}
 
 	/** How far back the camera can sit before a tree, pillar or tower blocks the view of Pip. */

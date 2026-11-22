@@ -112,7 +112,7 @@ export function groundMaterial(lit: THREE.Texture, look: GroundLook): THREE.Shad
 					float crack = abs(vnoise(p * 0.55 - 4.0) - 0.5);
 					c = mix(c, uAccent, (1.0 - smoothstep(0.012, 0.022, crack)) * 0.8);
 					float tw = step(0.992, hash3(floor(p * 7.0))) * (0.5 + 0.5 * sin(uTime * 3.0 + hash3(floor(p * 7.0) + 1.0) * 40.0));
-					glow += vec3(0.8, 0.95, 1.0) * tw * lit * 1.4;
+					glow += vec3(0.8, 0.95, 1.0) * tw * lit * 0.45;
 				#else
 					float ridge = 1.0 - abs(vnoise(p * 0.42 + 2.0) * 2.0 - 1.0);
 					float vein = smoothstep(0.935, 0.97, ridge);
@@ -123,8 +123,16 @@ export function groundMaterial(lit: THREE.Texture, look: GroundLook): THREE.Shad
 				vec3 albedo = mix(nightOf(c), c, lit);
 				vec3 N = normalize(vN);
 				vec3 V = normalize(cameraPosition - vWorld);
-				vec3 col = toonLight(albedo, N, V, vWorld, uRim, 0.45 + 0.35 * lit);
+				#if KIND == 1
+					float rimK = 0.45 + 0.22 * lit;
+				#else
+					float rimK = 0.45 + 0.35 * lit;
+				#endif
+				vec3 col = toonLight(albedo, N, V, vWorld, uRim, rimK);
 				col += glow;
+				#if KIND == 1
+					col *= mix(1.0, 0.88, lit);
+				#endif
 				col += uFront * pow(lit * (1.0 - lit) * 4.0, 2.0) * 0.12;
 				gl_FragColor = vec4(col, 1.0);
 				${outro}

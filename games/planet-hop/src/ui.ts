@@ -2,6 +2,13 @@ import type { Device, MenuKey } from './input';
 import type { Settings } from './save';
 import { formatTime } from './util';
 
+export interface MapNode {
+	index: number;
+	state: 'current' | 'visited' | 'locked';
+	name?: string;
+	lit?: number;
+}
+
 export type Screen = 'title' | 'story' | 'pause' | 'settings' | 'controls' | 'results' | null;
 
 export interface ResultData {
@@ -25,6 +32,7 @@ export interface UiHandlers {
 	replayTutorial(): void;
 	click(): void;
 	move(): void;
+	map(): void;
 }
 
 const icon = {
@@ -46,6 +54,7 @@ export class Ui {
 	private toastEl: HTMLElement;
 	private bannerEl: HTMLElement;
 	private fadeEl: HTMLElement;
+	private mapEl: HTMLElement;
 	private toastT = 0;
 	private bannerT = 0;
 	private device: Device = 'keyboard';
@@ -63,11 +72,26 @@ export class Ui {
 			<div class="hud" hidden>
 				<div class="hud__left">
 					<div class="chip chip--dust"><span class="chip__icon">${icon.dust}</span><span class="chip__num" data-dust>0 / 8</span><span class="bar"><span class="bar__fill" data-bar></span></span></div>
+					<div class="chip chip--wallet"><span class="chip__icon">${icon.dust}</span><span data-wallet>Pouch 0</span></div>
+					<div class="chip chip--explore"><span data-planet-lit>World 0%</span><span class="chip__sep">·</span><span data-galaxy-lit>Sky 0%</span></div>
 					<div class="chip chip--sparks" data-sparks aria-label="Lantern sparks"></div>
 				</div>
-				<button class="btn btn--icon hud__pause" type="button" data-act="pause" aria-label="Pause">
-					<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="5" height="16" fill="currentColor"/><rect x="14" y="4" width="5" height="16" fill="currentColor"/></svg>
-				</button>
+				<div class="hud__right">
+					<button class="btn btn--icon" type="button" data-act="map" aria-label="Star map (M)">
+						<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="2.5" fill="currentColor"/><circle cx="12" cy="8" r="2" fill="currentColor"/><circle cx="18" cy="14" r="2.5" fill="currentColor"/><path d="M6 12h6M12 8l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+					</button>
+					<button class="btn btn--icon hud__pause" type="button" data-act="pause" aria-label="Pause">
+						<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="5" height="16" fill="currentColor"/><rect x="14" y="4" width="5" height="16" fill="currentColor"/></svg>
+					</button>
+				</div>
+			</div>
+			<div class="map" hidden aria-label="Star map">
+				<div class="map__panel panel">
+					<h2 class="map__title">Star map</h2>
+					<p class="map__note">Known worlds glow. Others only show a quiet star.</p>
+					<div class="map__trail" data-map-trail></div>
+					<button class="btn btn--main map__close" type="button" data-act="map">Close</button>
+				</div>
 			</div>
 			<div class="banner" hidden><div class="banner__name"></div><div class="banner__sub"></div><div class="banner__hint"></div></div>
 			<div class="toast" hidden></div>
@@ -77,7 +101,7 @@ export class Ui {
 			<section class="screen screen--title" data-screen="title" hidden>
 				<div class="title">
 					<h1 class="logo"><span>Planet</span><span>Hop</span></h1>
-					<p class="tagline">A small sheep, a big lantern, three sleeping worlds.</p>
+					<p class="tagline">A small sheep, a big lantern, eight sleeping worlds.</p>
 					<div class="menu">
 						<button class="btn btn--main" type="button" data-act="play">Play</button>
 						<button class="btn" type="button" data-act="controls">Controls</button>
@@ -92,7 +116,7 @@ export class Ui {
 				<div class="panel panel--story">
 					<h2>The worlds are asleep</h2>
 					<p>The Star Lighthouse went dark, and the little worlds around it fell asleep. Pip, a small sheep with a big lantern, sets out to wake them.</p>
-					<p>Wherever Pip walks, the lantern brings the color back. Gather stardust to charge each launch pad. On the last world, light the lighthouse.</p>
+					<p>Wherever Pip walks, the lantern brings the color back. Gather stardust into your pouch and charge each launch pad. Explore eight worlds and light the final lighthouse.</p>
 					<div class="menu menu--row"><button class="btn btn--main" type="button" data-act="story-go">Let's hop</button></div>
 				</div>
 			</section>
@@ -122,6 +146,14 @@ export class Ui {
 						${this.toggle('cameraAssist', 'Camera assist', 'The camera slowly swings behind Pip.')}
 						${this.toggle('reduceMotion', 'Reduce motion', 'Calmer camera. No shake or zoom.')}
 						<div class="field">
+							<span class="field__label">Mouse look</span>
+							<div class="seg" role="radiogroup" aria-label="Mouse look">
+								<button class="seg__btn" type="button" role="radio" data-look="drag">Drag</button>
+								<button class="seg__btn" type="button" role="radio" data-look="capture">Capture</button>
+							</div>
+							<small>Drag keeps the cursor free for the HUD. Capture locks the mouse like a shooter.</small>
+						</div>
+						<div class="field">
 							<span class="field__label">Graphics</span>
 							<div class="seg" role="radiogroup" aria-label="Graphics">
 								<button class="seg__btn" type="button" role="radio" data-quality="high">High</button>
@@ -143,12 +175,13 @@ export class Ui {
 						<thead><tr><th>Action</th><th>Keyboard and mouse</th><th>Gamepad</th><th>Touch</th></tr></thead>
 						<tbody>
 							<tr><td>Move</td><td>${kbd('W')}${kbd('A')}${kbd('S')}${kbd('D')} or arrows</td><td>Left stick</td><td>Left thumb</td></tr>
-							<tr><td>Camera</td><td>Mouse</td><td>Right stick</td><td>Drag on the right</td></tr>
+							<tr><td>Camera</td><td>Hold ${kbd('LMB')} and drag on the game</td><td>Right stick</td><td>Drag on the right</td></tr>
+							<tr><td>Star map</td><td>${kbd('M')} or ${kbd('Tab')}</td><td>—</td><td>Map button</td></tr>
 							<tr><td>Jump</td><td>${kbd('Space')}, hold for higher</td><td>${kbd('A')}, hold for higher</td><td>JUMP button</td></tr>
 							<tr><td>Pause</td><td>${kbd('Esc')} or ${kbd('P')}</td><td>${kbd('Start')}</td><td>Pause button</td></tr>
 						</tbody>
 					</table>
-					<p class="note">Jump on frost mites to pop them. Pink blossoms bounce you high. Hold jump on a blossom to go even higher.</p>
+					<p class="note">Jump on frost mites to pop them. Pink blossoms bounce you high — follow the green orb to the gold ones. Hold jump on a blossom to go even higher.</p>
 					<div class="menu menu--row"><button class="btn btn--main" type="button" data-act="back">Back</button></div>
 				</div>
 			</section>
@@ -178,14 +211,21 @@ export class Ui {
 		this.toastEl = host.querySelector('.toast')!;
 		this.bannerEl = host.querySelector('.banner')!;
 		this.fadeEl = host.querySelector('.fade')!;
+		this.mapEl = host.querySelector('.map')!;
 		host.querySelectorAll<HTMLElement>('[data-screen]').forEach((el) => (this.screens[el.dataset.screen!] = el));
 
 		host.addEventListener('click', (e) => {
-			const t = (e.target as HTMLElement).closest<HTMLElement>('[data-act], [data-quality], [data-toggle]');
+			const t = (e.target as HTMLElement).closest<HTMLElement>('[data-act], [data-quality], [data-look], [data-toggle]');
 			if (!t) return;
 			if (t.dataset.act) this.act(t.dataset.act);
 			if (t.dataset.quality) {
 				this.settings.quality = t.dataset.quality as Settings['quality'];
+				this.syncSettings();
+				this.h.settings(this.settings);
+				this.h.click();
+			}
+			if (t.dataset.look) {
+				this.settings.lookMode = t.dataset.look as Settings['lookMode'];
 				this.syncSettings();
 				this.h.settings(this.settings);
 				this.h.click();
@@ -254,6 +294,9 @@ export class Ui {
 		this.root.querySelectorAll<HTMLElement>('[data-quality]').forEach((el) => {
 			el.setAttribute('aria-checked', String(el.dataset.quality === s.quality));
 		});
+		this.root.querySelectorAll<HTMLElement>('[data-look]').forEach((el) => {
+			el.setAttribute('aria-checked', String(el.dataset.look === (s.lookMode ?? 'drag')));
+		});
 	}
 
 	private act(a: string): void {
@@ -268,6 +311,9 @@ export class Ui {
 				break;
 			case 'pause':
 				this.h.pause();
+				break;
+			case 'map':
+				this.h.map();
 				break;
 			case 'resume':
 				this.h.resume();
@@ -379,6 +425,33 @@ export class Ui {
 		const fill = this.root.querySelector<HTMLElement>('[data-bar]')!;
 		fill.style.width = `${Math.min(100, (n / quota) * 100)}%`;
 		this.hud.querySelector('.chip--dust')!.classList.toggle('is-ready', charged);
+	}
+
+	setWallet(total: number): void {
+		this.root.querySelector('[data-wallet]')!.textContent = `Pouch ${total}`;
+	}
+
+	setExplore(planetPct: number, galaxyPct: number): void {
+		this.root.querySelector('[data-planet-lit]')!.textContent = `World ${planetPct}%`;
+		this.root.querySelector('[data-galaxy-lit]')!.textContent = `Sky ${galaxyPct}%`;
+	}
+
+	setMapOpen(on: boolean): void {
+		this.mapEl.hidden = !on;
+		this.mapEl.classList.toggle('is-open', on);
+	}
+
+	renderMap(nodes: MapNode[]): void {
+		const trail = this.root.querySelector('[data-map-trail]')!;
+		trail.innerHTML = nodes
+			.map((n) => {
+				const label =
+					n.state === 'locked'
+						? '<span class="map__myst">?</span>'
+						: `<span class="map__name">${n.name}</span><span class="map__pct">${Math.round((n.lit ?? 0) * 100)}%</span>`;
+				return `<p class="map__node map__node--${n.state}" data-i="${n.index}">${label}</p>`;
+			})
+			.join('');
 	}
 
 	setSparks(n: number): void {

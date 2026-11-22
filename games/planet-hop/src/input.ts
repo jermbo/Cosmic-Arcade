@@ -10,6 +10,7 @@ export class Input {
 	jumpHeld = false;
 	jumpPressed = false;
 	pausePressed = false;
+	mapPressed = false;
 	device: Device = 'keyboard';
 	sensitivity = 1;
 	invertY = false;
@@ -23,6 +24,10 @@ export class Input {
 	private mouseDX = 0;
 	private mouseDY = 0;
 	private dragging = false;
+	lookDrag = false;
+	private lookLastX = 0;
+	private lookLastY = 0;
+	lookMode: 'drag' | 'capture' = 'drag';
 	private lastJumpKey = false;
 	private padPrev: boolean[] = [];
 	private padAxesPrev = [0, 0];
@@ -49,16 +54,32 @@ export class Input {
 		});
 
 		canvas.addEventListener('mousedown', (e) => {
-			if (e.button === 0 || e.button === 2) this.dragging = true;
 			this.setDevice('keyboard');
+			if (!this.playing || this.lookMode !== 'drag' || e.button !== 0) return;
+			this.lookDrag = true;
+			this.lookLastX = e.clientX;
+			this.lookLastY = e.clientY;
 		});
-		addEventListener('mouseup', () => (this.dragging = false));
+		addEventListener('mouseup', () => {
+			this.dragging = false;
+			this.lookDrag = false;
+		});
 		addEventListener('mousemove', (e) => {
-			if (document.pointerLockElement === canvas || this.dragging) {
+			if (document.pointerLockElement === canvas) {
 				this.mouseDX += e.movementX;
 				this.mouseDY += e.movementY;
-				if (Math.abs(e.movementX) + Math.abs(e.movementY) > 0) this.setDevice('keyboard');
+			} else if (this.lookDrag && this.lookMode === 'drag' && this.playing) {
+				const dx = e.clientX - this.lookLastX;
+				const dy = e.clientY - this.lookLastY;
+				this.lookLastX = e.clientX;
+				this.lookLastY = e.clientY;
+				this.mouseDX += dx;
+				this.mouseDY += dy;
+			} else if (this.dragging) {
+				this.mouseDX += e.movementX;
+				this.mouseDY += e.movementY;
 			}
+			if (Math.abs(this.mouseDX) + Math.abs(this.mouseDY) > 0) this.setDevice('keyboard');
 		});
 		canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
@@ -166,6 +187,7 @@ export class Input {
 		if (!this.playing) return;
 		if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(code)) e.preventDefault();
 		if (down && !e.repeat && (code === 'Escape' || code === 'KeyP')) this.pausePressed = true;
+		if (this.playing && down && !e.repeat && (code === 'KeyM' || code === 'Tab')) this.mapPressed = true;
 	}
 
 	/** Call once per frame before the game reads the fields. */
@@ -269,6 +291,7 @@ export class Input {
 	endFrame(): void {
 		this.pausePressed = false;
 		this.jumpPressed = false;
+		this.mapPressed = false;
 	}
 
 	/** Swallow the jump so a menu press does not also jump. */

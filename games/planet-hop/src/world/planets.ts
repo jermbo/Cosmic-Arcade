@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Surface, Theme } from '../audio';
 import { dirFromLatLon, rng } from '../util';
+import { galaxyCenters, GALAXY, type PlanetDef, type PuzzleId } from './galaxy';
 import { beamMaterial, glowSprite } from './glow';
 import { LitMap } from './litmap';
 import { local, onSurface, Parts } from './parts';
@@ -29,6 +30,11 @@ export interface Blossom {
 	r: number;
 	mesh: THREE.Object3D;
 	squash: number;
+	/** Ordered puzzle step, if any. */
+	step: number | null;
+	done: boolean;
+	marker: THREE.Mesh | null;
+	center: THREE.Mesh;
 }
 export interface Mite {
 	axis: THREE.Vector3;
@@ -189,6 +195,8 @@ export class Planet {
 	lighthouseLamp: THREE.MeshBasicMaterial | null = null;
 	lighthouseBeams: THREE.Group | null = null;
 	collected = 0;
+	/** Blossoms bounced in order on blossom-path planets. */
+	puzzleProgress = 0;
 	/** Hidden after launch, so the camera does not fly up inside it. */
 	beamOff = false;
 	private random: () => number;
@@ -200,13 +208,28 @@ export class Planet {
 	readonly index: number;
 	readonly center: THREE.Vector3;
 	readonly quality: 'high' | 'low';
+	readonly def: PlanetDef;
+	readonly puzzleId: PuzzleId | null;
+	puzzleSatisfied = true;
+	private padQuota: number;
 
-	constructor(kind: Kind, index: number, center: THREE.Vector3, landingWorld: THREE.Vector3, goalWorld: THREE.Vector3 | null, quality: 'high' | 'low') {
+	constructor(
+		def: PlanetDef,
+		index: number,
+		center: THREE.Vector3,
+		landingWorld: THREE.Vector3,
+		goalWorld: THREE.Vector3 | null,
+		quality: 'high' | 'low',
+	) {
+		const kind = def.kind;
+		this.def = def;
 		this.kind = kind;
 		this.index = index;
 		this.center = center;
 		this.quality = quality;
 		this.style = STYLES[kind];
+		this.padQuota = def.padQuota;
+		this.puzzleId = def.puzzleId ?? null;
 		this.R = this.style.R;
 		this.random = rng(1000 + index * 77);
 		this.decor = new Parts(this.random);
@@ -223,15 +246,24 @@ export class Planet {
 		this.buildAtmosphere();
 		if (kind === 'garden') this.buildGarden();
 		if (kind === 'ice') this.buildIce();
-		if (kind === 'lava') this.buildLava(goalLocal);
-		if (kind !== 'lava') this.buildPad(goalLocal);
+		if (kind === 'lava') this.buildLava(goalLocal, def.lighthouse);
+		else this.buildPad(goalLocal);
 		const d = this.decor.build(decorMaterial(this.lit.texture, this.style.look.rim), decorInkMaterial(this.lit.texture));
 		this.group.add(d);
 		this.finishDust();
 	}
 
 	get quota(): number {
-		return this.style.quota;
+		return this.padQuota;
+	}
+	get displayName(): string {
+		return this.def.name;
+	}
+	get displaySubtitle(): string {
+		return this.def.subtitle;
+	}
+	get displayHint(): string {
+		return this.def.hint;
 	}
 	/** Stardust on the planet at the start, plus one per mite. */
 	get totalDust(): number {
@@ -438,7 +470,10 @@ export class Planet {
 		this.pillar(this.ll(-12, 356), 0.95, 3.9, '#a7a2c4', '#86d566');
 		this.pillar(this.ll(-42, 120), 1.2, 1.6, '#9b95b8', '#6cc35a');
 
-		for (const [lat, lon] of [[18, 60], [-22, 205], [48, 222]]) this.addBlossom(this.ll(lat, lon));
+		const puzzleBlooms = this.puzzleId === 'blossom-path';
+		([[18, 60], [-22, 205], [48, 222]] as const).forEach(([lat, lon], i) =>
+			this.addBlossom(this.ll(lat, lon), puzzleBlooms ? i : null),
+		);
 
 		// Stardust: a tutorial line, then spread out
 		this.addDust(this.ll(74, 0), 1);
@@ -509,7 +544,7 @@ export class Planet {
 		}
 	}
 
-	private addBlossom(localDir: THREE.Vector3): void {
+	private addBlossom(localDir: THREE.Vector3, step: number | null = null): void {
 		const m = onSurface(localDir, this.R);
 		const g = new THREE.Group();
 		g.applyMatrix4(m);
@@ -534,9 +569,57 @@ export class Planet {
 		stem.position.y = 0.05;
 		g.add(stem, head);
 		head.position.y = 0.12;
+		let marker: THREE.Mesh | null = null;
+		if (step !== null) {
+			marker = new THREE.Mesh(
+				new THREE.SphereGeometry(0.26, 12, 10),
+				new THREE.MeshBasicMaterial({ color: '#7bffb8', transparent: true, opacity: 0.95 }),
+			);
+			marker.position.y = 1.35;
+			head.add(marker);
+		}
 		this.group.add(g);
-		this.blossoms.push({ dir: this.toWorldDir(localDir), r: 1.0, mesh: head, squash: 0 });
+		this.blossoms.push({
+			dir: this.toWorldDir(localDir),
+			r: 1.0,
+			mesh: head,
+			squash: 0,
+			step,
+			done: false,
+			marker,
+			center: c,
+		});
 		this.reserve(localDir, 9);
+	}
+
+	/** Show which blooms are done and which is next in the blossom path. */
+	syncPuzzleBlossoms(): void {
+		if (this.puzzleId !== 'blossom-path') return;
+		const doneCount = this.puzzleSatisfied ? 3 : this.puzzleProgress;
+		for (const b of this.blossoms) {
+			if (b.step === null || !b.marker) continue;
+			const done = b.step < doneCount;
+			const next = !this.puzzleSatisfied && b.step === doneCount;
+			b.done = done;
+			const m = b.marker.material as THREE.MeshBasicMaterial;
+			if (done) {
+				m.color.set('#ffd23f');
+				m.opacity = 1;
+				b.marker.scale.setScalar(0.85);
+				b.center.scale.y = 0.38;
+			} else if (next) {
+				m.color.set('#7bffb8');
+				m.opacity = 1;
+				b.marker.scale.setScalar(1.15);
+				b.center.scale.y = 0.45;
+			} else {
+				m.color.set('#b8a8ff');
+				m.opacity = 0.55;
+				b.marker.scale.setScalar(0.75);
+				b.center.scale.y = 0.45;
+			}
+			b.marker.visible = true;
+		}
 	}
 
 	// ---------- Ice ----------
@@ -674,7 +757,7 @@ export class Planet {
 
 	// ---------- Lava ----------
 
-	private buildLava(goalLocal: THREE.Vector3): void {
+	private buildLava(goalLocal: THREE.Vector3, withLighthouse: boolean): void {
 		// Pools first, so the rest stays clear of them
 		for (const [lat, lon, r] of [[40, 120, 2.1], [-5, 200, 2.4], [5, 20, 1.8], [-40, 300, 2.2]] as const) this.addPool(this.ll(lat, lon), r);
 		const vents: [number, number, number][] = [[52, 40, 0], [20, 90, 1.5], [10, 160, 3], [-25, 240, 0.8], [-30, 60, 2.2], [-50, 160, 1.2], [30, 280, 2.8]];
@@ -699,7 +782,8 @@ export class Planet {
 		this.addDust(this.ll(30, 280), 1);
 		this.addDust(this.ll(-50, 160), 1);
 
-		this.buildLighthouse(goalLocal);
+		if (withLighthouse) this.buildLighthouse(goalLocal);
+		else this.buildPad(goalLocal);
 
 		// Basalt clusters
 		for (let i = 0; i < 12; i++) {
@@ -897,6 +981,10 @@ export class Planet {
 			const breathe = 1 + Math.sin(time * 2 + b.dir.x * 5) * 0.03;
 			b.mesh.scale.set((1 + (1 - s) * 0.6) * breathe, s / breathe, (1 + (1 - s) * 0.6) * breathe);
 			b.mesh.rotation.y += dt * 0.3;
+			if (b.marker && b.step !== null && !b.done && !this.puzzleSatisfied && b.step === this.puzzleProgress) {
+				const pulse = 1 + Math.sin(time * 6) * 0.12;
+				b.marker.scale.setScalar(1.15 * pulse);
+			}
 		}
 		for (const mt of this.mites) {
 			if (!mt.alive) continue;
@@ -979,6 +1067,9 @@ export class Planet {
 		this.collected = 0;
 		this.beamOff = false;
 		this.lit.clear();
+		this.puzzleSatisfied = this.puzzleId == null;
+		this.puzzleProgress = 0;
+		this.syncPuzzleBlossoms();
 		for (const g of this.geysers) {
 			g.state = 'idle';
 			g.column.visible = false;
@@ -988,17 +1079,12 @@ export class Planet {
 
 /** The chain of planets, placed nearly in a line so each pad faces the next world. */
 export function buildPlanets(quality: 'high' | 'low'): Planet[] {
-	const kinds: Kind[] = ['garden', 'ice', 'lava'];
-	const d1 = new THREE.Vector3(0.25, 0.3, -1).normalize();
-	const d2 = new THREE.Vector3(0.45, 0.12, -1).normalize();
-	const centers = [new THREE.Vector3(0, 0, 0)];
-	centers.push(centers[0].clone().addScaledVector(d1, 82));
-	centers.push(centers[1].clone().addScaledVector(d2, 88));
-	return kinds.map((k, i) => {
+	const centers = galaxyCenters();
+	return GALAXY.map((def, i) => {
 		const prev = centers[i - 1];
 		const next = centers[i + 1];
 		const landing = prev ? prev.clone().sub(centers[i]) : centers[i].clone().sub(next!);
 		const goal = next ? next.clone().sub(centers[i]) : null;
-		return new Planet(k, i, centers[i], landing, goal, quality);
+		return new Planet(def, i, centers[i], landing, goal, quality);
 	});
 }

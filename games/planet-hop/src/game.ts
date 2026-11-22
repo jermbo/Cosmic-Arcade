@@ -11,6 +11,8 @@ import { Player, type PlayerEvents } from './player';
 import { loadSave, writeSave, type SaveData, type Settings } from './save';
 import { Ui } from './ui';
 import { anyPerpendicular, basisQuat, clamp, damp, formatTime, isTouchDevice } from './util';
+import { canDepart, galaxyDiscoveredPercent, planetLit, recordPlanetLit } from './progression';
+import { GALAXY } from './world/galaxy';
 import { buildPlanets, type Dust, type Planet } from './world/planets';
 import { Sky } from './world/sky';
 import { light } from './world/toon';
@@ -60,6 +62,15 @@ export class Game {
 	private camBlend = 1;
 	private camFrom = new THREE.Vector3();
 	private camFromQ = new THREE.Quaternion();
+	private camTo = new THREE.Vector3();
+	private camToQ = new THREE.Quaternion();
+	private camFromFov = 62;
+	private camToFov = 62;
+	private introBlend = false;
+	private mapOpen = false;
+	private blossomStep = 0;
+	private miteStomps = 0;
+	private litSaveT = 0;
 	private tut: Tut = 'done';
 	private tutAcc = 0;
 	private tutJumps = 0;
@@ -122,13 +133,14 @@ export class Game {
 				this.audio.uiClick();
 			},
 			move: () => this.audio.uiMove(),
+			map: () => this.toggleMap(),
 		});
 		// After the UI, which fills the overlay first.
 		this.input = new Input(canvas, uiHost);
 		this.input.onDevice = (d) => {
 			this.ui.setDevice(d);
 			this.input.showTouch(d === 'touch' && this.isPlaying());
-			if (d !== 'touch' && this.isPlaying() && this.state !== 'paused') this.lock();
+			if (d !== 'touch' && this.isPlaying() && this.state !== 'paused' && this.save.settings.lookMode === 'capture') this.lock();
 		};
 		this.input.onMenu = (k) => {
 			this.audio.unlock();
@@ -165,11 +177,12 @@ export class Game {
 	private wireBrowser(canvas: HTMLCanvasElement): void {
 		document.addEventListener('pointerlockchange', () => {
 			if (document.pointerLockElement === canvas) return;
+			if (this.save.settings.lookMode !== 'capture') return;
 			if (this.lockWanted && this.isActive()) this.pause();
 		});
 		canvas.addEventListener('click', () => {
 			this.audio.unlock();
-			if (this.isActive() && this.input.device !== 'touch') this.lock();
+			if (this.isActive() && this.input.device !== 'touch' && this.save.settings.lookMode === 'capture') this.lock();
 		});
 		document.addEventListener('visibilitychange', () => {
 			if (document.hidden && this.isActive()) this.pause();
@@ -194,7 +207,7 @@ export class Game {
 	}
 
 	private lock(): void {
-		if (this.input.device === 'touch') return;
+		if (this.input.device === 'touch' || this.save.settings.lookMode !== 'capture') return;
 		const c = this.renderer.domElement;
 		if (document.pointerLockElement === c) return;
 		this.lockWanted = true;
@@ -245,6 +258,8 @@ export class Game {
 		this.input.invertY = s.invertY;
 		this.rig.assist = s.cameraAssist;
 		this.rig.reduceMotion = s.reduceMotion;
+		this.input.lookMode = s.lookMode ?? 'drag';
+		if (this.input.lookMode === 'drag') this.unlockPointer();
 		this.save.settings = s;
 		writeSave(this.save);
 		this.onResize();
@@ -271,12 +286,22 @@ export class Game {
 	private startRun(): void {
 		this.audio.unlock();
 		const fromTitle = this.state === 'title' || this.state === 'story' || this.state === 'results';
-		for (const p of this.planets) p.reset();
+		for (const p of this.planets) {
+			p.reset();
+			const saved = this.save.litByPlanet[p.index] ?? 0;
+			if (saved > 0.01) p.lit.seed(saved);
+		}
 		this.glow.clear();
 		this.puffs.clear();
 		this.planetIdx = 0;
 		this.runTime = 0;
 		this.stats = { stomps: 0, hits: 0 };
+		this.blossomStep = 0;
+		this.miteStomps = 0;
+		this.mapOpen = false;
+		this.ui.setMapOpen(false);
+		this.camBlend = fromTitle ? 0 : 1;
+		this.introBlend = false;
 		const p = this.planets[0];
 		const heading = anyPerpendicular(p.landingDir);
 		// Face the first stardust line.
@@ -291,10 +316,11 @@ export class Game {
 		this.player.setLantern(1);
 		this.rig.snap(p.landingDir, this.player.facing);
 		p.lit.paint(p.toLocalDir(p.landingDir), 3.2 / p.R, 1);
+		p.syncPuzzleBlossoms();
 		if (fromTitle) this.startCamBlend();
-		const lh = this.planets[2];
-		if (lh.lighthouseBeams) lh.lighthouseBeams.visible = false;
-		if (lh.lighthouseLamp) lh.lighthouseLamp.color.set('#4a4470');
+		const beacon = this.planets.find((pl) => pl.def.lighthouse);
+		if (beacon?.lighthouseBeams) beacon.lighthouseBeams.visible = false;
+		if (beacon?.lighthouseLamp) beacon.lighthouseLamp.color.set('#4a4470');
 		this.sky.setBrightness(1);
 
 		this.tut = this.save.tutorialDone ? 'done' : 'move';
@@ -305,9 +331,10 @@ export class Game {
 		this.ui.show(null);
 		this.ui.showHud(true);
 		this.ui.setSparks(3);
-		this.refreshDust();
+		this.refreshProgressHud();
 		this.ui.prompt(this.tut === 'done' ? null : this.tut);
-		this.ui.banner(p.style.name, p.style.subtitle, this.tut === 'done' ? p.style.hint : '');
+		this.ui.banner(p.displayName, p.displaySubtitle, this.tut === 'done' ? p.displayHint : '');
+		if (p.def.storyLine) this.ui.toast(p.def.storyLine, 4.2);
 		this.audio.setTheme(p.style.theme);
 		this.audio.duck(false);
 		this.input.playing = true;
@@ -318,13 +345,30 @@ export class Game {
 	}
 
 	private startCamBlend(): void {
+		const planet = this.planets[0];
 		this.camFrom.copy(this.camera.position);
 		this.camFromQ.copy(this.camera.quaternion);
+		this.camFromFov = this.camera.fov;
+		this.rig.movesCamera = false;
+		this.rig.snap(planet.landingDir, this.player.facing);
+		this.rig.update(0, null, this.player, planet);
+		this.camTo.copy(this.camera.position);
+		this.camToQ.copy(this.camera.quaternion);
+		this.camToFov = this.rig.baseFov;
+		this.camera.position.copy(this.camFrom);
+		this.camera.quaternion.copy(this.camFromQ);
+		this.camera.fov = this.camFromFov;
+		this.camera.updateProjectionMatrix();
 		this.camBlend = 0;
+		this.introBlend = true;
 	}
 
 	private pause(): void {
 		if (!this.isActive()) return;
+		if (this.mapOpen) {
+			this.toggleMap();
+			return;
+		}
 		this.pausedFrom = this.state;
 		this.state = 'paused';
 		this.ui.show('pause');
@@ -371,7 +415,45 @@ export class Game {
 
 	private refreshDust(): void {
 		const p = this.planets[this.planetIdx];
-		this.ui.setDust(p.collected, p.quota, p.charged);
+		const padReady = p.charged && p.puzzleSatisfied;
+		this.ui.setDust(p.collected, p.quota, padReady);
+	}
+
+	private refreshProgressHud(): void {
+		this.refreshDust();
+		this.ui.setWallet(this.save.wallet);
+		const p = this.planets[this.planetIdx];
+		const planetPct = Math.round(planetLit(this.save, this.planetIdx, p.lit.lit) * 100);
+		const galaxyPct = Math.round(galaxyDiscoveredPercent(this.save) * 100);
+		this.ui.setExplore(planetPct, galaxyPct);
+		this.refreshMapData();
+	}
+
+	private refreshMapData(): void {
+		this.ui.renderMap(
+			GALAXY.map((def, i) => {
+				const live = this.planets[i]?.lit.lit ?? 0;
+				const lit = planetLit(this.save, i, i === this.planetIdx ? live : 0);
+				if (i === this.planetIdx) return { index: i, state: 'current', name: def.name, lit };
+				if (i <= this.save.furthestPlanet) return { index: i, state: 'visited', name: def.name, lit };
+				return { index: i, state: 'locked' };
+			}),
+		);
+	}
+
+	private toggleMap(): void {
+		if (this.state !== 'play') return;
+		this.mapOpen = !this.mapOpen;
+		this.ui.setMapOpen(this.mapOpen);
+		this.refreshMapData();
+		if (this.mapOpen) {
+			this.unlockPointer();
+			this.input.lookDrag = false;
+			this.input.showTouch(false);
+		} else {
+			this.input.showTouch(this.input.device === 'touch');
+			this.lock();
+		}
 	}
 
 	// ---------- Frame ----------
@@ -419,6 +501,7 @@ export class Game {
 		const neb = cur.style.nebula.map((c) => new THREE.Color(c)) as [THREE.Color, THREE.Color, THREE.Color];
 		this.sky.tint(neb[0], neb[1], neb[2], damp(0.8, dt));
 		this.updateLights(dt);
+		this.tunePlanetBrightness();
 		this.ui.update(dt);
 		if (this.save.settings.quality === 'high') this.composer.render(dt);
 		else this.renderer.render(this.scene, this.camera);
@@ -426,11 +509,30 @@ export class Game {
 	}
 
 	private applyCamBlend(dt: number): void {
-		if (this.camBlend >= 1) return;
-		this.camBlend = Math.min(1, this.camBlend + dt / 1.4);
+		if (!this.introBlend) return;
+		const dur = this.rig.reduceMotion ? 2.4 : 1.65;
+		this.camBlend = Math.min(1, this.camBlend + dt / dur);
 		const e = easeInOut(this.camBlend);
-		this.camera.position.lerpVectors(this.camFrom, this.camera.position, e);
-		this.camera.quaternion.slerpQuaternions(this.camFromQ, this.camera.quaternion, e);
+		this.camera.position.lerpVectors(this.camFrom, this.camTo, e);
+		this.camera.quaternion.slerpQuaternions(this.camFromQ, this.camToQ, e);
+		this.camera.fov = this.camFromFov + (this.camToFov - this.camFromFov) * e;
+		this.camera.updateProjectionMatrix();
+		if (this.camBlend >= 1) {
+			this.introBlend = false;
+			this.rig.movesCamera = true;
+		}
+	}
+
+	private tunePlanetBrightness(): void {
+		const cur = this.planets[this.planetIdx];
+		const lit = cur.lit.lit;
+		if (cur.kind === 'ice') {
+			this.bloom.strength = 0.2 + (1 - lit) * 0.42;
+			this.renderer.toneMappingExposure = 0.9 + (1 - lit) * 0.1;
+		} else {
+			this.bloom.strength = 0.55;
+			this.renderer.toneMappingExposure = 1;
+		}
 	}
 
 	private updateLights(dt: number): void {
@@ -513,7 +615,11 @@ export class Game {
 		const other = new THREE.Vector3().crossVectors(up, side);
 		const around = side.clone().multiplyScalar(Math.cos(this.titleAngle)).addScaledVector(other, Math.sin(this.titleAngle));
 		const camPos = p.center.clone().addScaledVector(around, 21).addScaledVector(up, 12);
-		const look = p.center.clone().addScaledVector(up, 6);
+		const look = p.center
+			.clone()
+			.addScaledVector(up, 6)
+			.lerp(this.player.pos, 0.5)
+			.addScaledVector(up, 0.6);
 		this.camera.position.copy(camPos);
 		this.camera.up.copy(up);
 		this.camera.lookAt(look);
@@ -532,6 +638,12 @@ export class Game {
 
 	private playUpdate(dt: number, planet: Planet): void {
 		const input = this.input;
+		if (this.mapOpen) {
+			if (input.pausePressed || input.mapPressed) this.toggleMap();
+			this.rig.update(dt, null, this.player, planet);
+			return;
+		}
+		if (input.mapPressed) this.toggleMap();
 		if (input.pausePressed) {
 			this.pause();
 			return;
@@ -545,6 +657,13 @@ export class Game {
 		this.tutorial(dt);
 		this.rig.fovKick += (0 - this.rig.fovKick) * damp(4, dt);
 		this.rig.update(dt, input, this.player, planet);
+		this.litSaveT -= dt;
+		if (this.litSaveT <= 0) {
+			this.litSaveT = 2;
+			recordPlanetLit(this.save, this.planetIdx, planet.lit.lit);
+			writeSave(this.save);
+			this.refreshProgressHud();
+		}
 	}
 
 	private interact(dt: number, planet: Planet): void {
@@ -572,6 +691,24 @@ export class Game {
 				b.squash = 1;
 				this.audio.bounce();
 				this.glow.emit({ pos: pl.pos.clone(), count: 14, color: '#ff8fc0', color2: '#ffd23f', speed: 5, size: 0.3, life: 0.8, dir: pl.up, spread: 1.5, center: planet.center, gravity: 6, drag: 2 });
+				if (planet.puzzleId === 'blossom-path' && b.step !== null && !planet.puzzleSatisfied) {
+					if (b.step === this.blossomStep) {
+						this.blossomStep++;
+						planet.puzzleProgress = this.blossomStep;
+						planet.syncPuzzleBlossoms();
+						if (this.blossomStep >= 3) {
+							planet.puzzleSatisfied = true;
+							planet.syncPuzzleBlossoms();
+							this.ui.toast('The garden path remembers you. The pad can listen now.', 2.8);
+							this.refreshDust();
+						} else this.ui.toast(`Pink path: ${this.blossomStep} of 3`, 1.6);
+					} else {
+						this.blossomStep = 0;
+						planet.puzzleProgress = 0;
+						planet.syncPuzzleBlossoms();
+						this.ui.toast('Start from the blossom with the green light.', 2);
+					}
+				}
 			}
 		}
 
@@ -589,6 +726,14 @@ export class Game {
 				this.stats.stomps++;
 				this.audio.stomp();
 				this.glow.emit({ pos: mc, count: 22, color: '#8fe6ff', color2: '#ffffff', speed: 6, size: 0.3, life: 0.7, center: planet.center, gravity: 8, drag: 2 });
+				if (planet.puzzleId === 'mite-trio' && !planet.puzzleSatisfied) {
+					this.miteStomps++;
+					if (this.miteStomps >= 3) {
+						planet.puzzleSatisfied = true;
+						this.ui.toast('Three frost mites popped. The pad hums in tune.', 2.8);
+						this.refreshDust();
+					} else this.ui.toast(`Frost song: ${this.miteStomps} / 3 mites`, 1.6);
+				}
 				planet.dropDust(m.pos.clone().addScaledVector(m.up, 1.2));
 			} else this.hurt(planet, mc);
 		}
@@ -604,12 +749,25 @@ export class Game {
 		// Goal
 		const onGoal = pl.grounded && pl.up.angleTo(planet.goalDir) * planet.R < planet.goalRadius;
 		if (onGoal) {
-			if (planet.charged) {
+			const padReady = planet.charged && planet.puzzleSatisfied;
+			if (padReady) {
 				if (planet.lighthouse) this.startEnding(planet);
-				else this.startLaunch();
+				else {
+					const gate = canDepart(this.planetIdx, this.save, planet.lit.lit, planet.puzzleSatisfied);
+					if (gate.ok) this.startLaunch();
+					else if (this.deniedT <= 0) {
+						this.ui.toast(gate.reason ?? 'Not yet.', 2.8);
+						this.audio.denied();
+						this.deniedT = 3;
+					}
+				}
 			} else if (this.deniedT <= 0) {
-				const left = planet.quota - planet.collected;
-				this.ui.toast(`Collect ${left} more stardust to ${planet.lighthouse ? 'light the lighthouse' : 'charge the pad'}`, 2.5);
+				if (!planet.puzzleSatisfied && planet.puzzleId) {
+					this.ui.toast('Finish this planet puzzle before the pad wakes.', 2.8);
+				} else {
+					const left = planet.quota - planet.collected;
+					this.ui.toast(`Collect ${left} more stardust to ${planet.lighthouse ? 'light the lighthouse' : 'charge the pad'}`, 2.5);
+				}
 				this.audio.denied();
 				this.deniedT = 3;
 			}
@@ -628,7 +786,10 @@ export class Game {
 		this.audio.collect(this.combo - 1);
 		this.glow.emit({ pos: d.mesh.position.clone(), count: 16, color: planet.style.dust, color2: '#ffffff', speed: 4, size: 0.28, life: 0.6, drag: 3 });
 		this.refreshDust();
-		if (!wasCharged && planet.charged) {
+		this.save.wallet++;
+		writeSave(this.save);
+		this.refreshProgressHud();
+		if (!wasCharged && planet.charged && planet.puzzleSatisfied) {
 			this.audio.padReady();
 			this.audio.bloom();
 			planet.lit.startWave(planet.toLocalDir(this.player.up), 3.2);
@@ -711,7 +872,7 @@ export class Game {
 					this.save.tutorialDone = true;
 					writeSave(this.save);
 					const p = this.planets[this.planetIdx];
-					this.ui.banner(p.style.name, `${p.quota} stardust charges the pad`, p.style.hint, 4.5);
+					this.ui.banner(p.displayName, `${p.quota} stardust charges the pad`, p.displayHint, 4.5);
 				}
 			}
 		}
@@ -826,6 +987,7 @@ export class Game {
 		const f = this.flight;
 		const A = this.planets[this.planetIdx];
 		const B = this.planets[this.planetIdx + 1];
+		if (!B) return;
 		f.from = this.planetIdx;
 		f.to = this.planetIdx + 1;
 		f.p0.copy(this.player.pos);
@@ -916,9 +1078,17 @@ export class Game {
 		if (!f.switched && s > 0.45) {
 			f.switched = true;
 			this.planetIdx = f.to;
-			const p = B.style;
-			this.ui.banner(p.name, p.subtitle, p.hint, 5);
-			this.audio.setTheme(p.theme);
+			this.blossomStep = 0;
+			this.miteStomps = 0;
+			B.puzzleProgress = 0;
+			B.syncPuzzleBlossoms();
+			if (f.to > this.save.furthestPlanet) {
+				this.save.furthestPlanet = f.to;
+				writeSave(this.save);
+				if (B.def.storyLine) this.ui.toast(B.def.storyLine, 4.2);
+			}
+			this.ui.banner(B.displayName, B.displaySubtitle, B.displayHint, 5);
+			this.audio.setTheme(B.style.theme);
 		}
 		if (!f.arrived && s > 0.82) {
 			f.arrived = true;
@@ -937,7 +1107,7 @@ export class Game {
 			this.state = 'play';
 			this.stateT = 0;
 			this.ui.showHud(true);
-			this.refreshDust();
+			this.refreshProgressHud();
 		}
 	}
 
@@ -1022,6 +1192,7 @@ export class Game {
 
 	private finish(): void {
 		this.state = 'results';
+		for (const p of this.planets) recordPlanetLit(this.save, p.index, p.lit.lit);
 		let dust = 0;
 		let total = 0;
 		for (const p of this.planets) {

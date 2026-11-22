@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Planet } from './world/planets';
-import { anyPerpendicular, basisQuat, clamp, damp, projectKeepLength } from './util';
+import { anyPerpendicular, basisQuat, clamp, damp, projectKeepLength, safeNormalize } from './util';
 import { glowSprite } from './world/glow';
 import { inked, toon } from './world/toon';
 
@@ -13,7 +13,10 @@ const HOLD_GRAVITY = 0.45;
 const COYOTE = 0.11;
 const BUFFER = 0.13;
 export const BODY_RADIUS = 0.46;
+/** Slight lift so Pip draws in front of the planet sphere at the same radius. */
+const SURFACE_LIFT = 0.06;
 const _Y = new THREE.Vector3(0, 1, 0);
+const _rel = new THREE.Vector3();
 
 export interface PlayerEvents {
 	jump(): void;
@@ -229,6 +232,10 @@ export class Player {
 		});
 		for (const m of meshes) {
 			m.renderOrder = 10;
+			const mat = m.material as THREE.Material;
+			mat.polygonOffset = true;
+			mat.polygonOffsetFactor = -3;
+			mat.polygonOffsetUnits = -3;
 			const x = new THREE.Mesh(m.geometry, xray);
 			x.renderOrder = 5;
 			m.add(x);
@@ -246,11 +253,11 @@ export class Player {
 	/** Put Pip on a planet at a direction, standing still. */
 	place(planet: Planet, dir: THREE.Vector3, facing?: THREE.Vector3): void {
 		this.up.copy(dir).normalize();
-		this.pos.copy(planet.center).addScaledVector(this.up, planet.R);
+		this.pos.copy(planet.center).addScaledVector(this.up, planet.R + SURFACE_LIFT);
 		this.vT.set(0, 0, 0);
 		this.vr = 0;
 		this.grounded = true;
-		this.height = 0;
+		this.height = SURFACE_LIFT;
 		this.groundLevel = planet.R;
 		if (facing) this.facing.copy(facing);
 		this.facing.addScaledVector(this.up, -this.facing.dot(this.up));
@@ -259,13 +266,58 @@ export class Player {
 		basisQuat(this.up, this.facing, this.root.quaternion);
 		this.root.position.copy(this.pos);
 		this.prevVT.set(0, 0, 0);
+		this.resetPose();
+	}
+
+	/** Local run/bounce/lean state — reset whenever Pip is placed or recovered from bad math. */
+	private resetPose(): void {
+		this.runPhase = 0;
+		this.lastStep = 0;
+		this.squash = 0;
+		this.squashV = 0;
+		this.lean.set(0, 0);
+		this.swing.set(0, 0);
+		this.swingV.set(0, 0);
+		this.scarfSwing = 0;
+		this.body.position.set(0, 0, 0);
+		this.body.rotation.set(0, 0, 0);
+		this.body.scale.set(1, 1, 1);
+		this.head.rotation.set(0, 0, 0);
+		this.arm.rotation.set(0, 0, 0);
+		this.arm.position.set(0.38, 0.8, 0.06);
+		this.lantern.rotation.set(0, 0, 0);
+		for (const l of this.legs) l.rotation.set(0, 0, 0);
+	}
+
+	private saneVec(v: THREE.Vector3): boolean {
+		return Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z);
+	}
+
+	/** Snap Pip back to the surface if physics or animation produced NaN. */
+	private recover(planet: Planet, dir: THREE.Vector3): void {
+		this.up.copy(dir).normalize();
+		this.pos.copy(planet.center).addScaledVector(this.up, planet.R + SURFACE_LIFT);
+		this.vT.set(0, 0, 0);
+		this.vr = 0;
+		this.grounded = true;
+		this.height = SURFACE_LIFT;
+		projectKeepLength(this.facing, this.up);
+		if (this.facing.lengthSq() < 1e-6) anyPerpendicular(this.up, this.facing);
+		this.facing.normalize();
+		this.prevVT.set(0, 0, 0);
+		this.resetPose();
 	}
 
 	update(dt: number, planet: Planet, move: THREE.Vector3, jumpPressed: boolean, jumpHeld: boolean, ev: PlayerEvents): void {
+		if (!Number.isFinite(dt) || dt <= 0) return;
 		const c = planet.center;
 		this.center.copy(c);
+		if (!this.saneVec(this.pos) || !this.saneVec(this.up) || !this.saneVec(this.vT) || !Number.isFinite(this.vr)) {
+			this.recover(planet, planet.landingDir);
+		}
 		this.invuln = Math.max(0, this.invuln - dt);
-		this.up.copy(this.pos).sub(c).normalize();
+		_rel.copy(this.pos).sub(c);
+		safeNormalize(this.up, _rel, planet.landingDir);
 
 		if (!this.frozen) {
 			// Ground speed
@@ -307,7 +359,8 @@ export class Player {
 
 		// Move
 		this.pos.addScaledVector(this.vT, dt).addScaledVector(this.up, this.vr * dt);
-		this.up.copy(this.pos).sub(c).normalize();
+		_rel.copy(this.pos).sub(c);
+		safeNormalize(this.up, _rel, planet.landingDir);
 
 		// Colliders
 		const rel = this.pos.clone().sub(c);
@@ -334,7 +387,7 @@ export class Player {
 		}
 		this.groundLevel = ground;
 		const dist = rel.length();
-		this.up.copy(rel).normalize();
+		safeNormalize(this.up, rel, planet.landingDir);
 
 		if (this.vr <= 0 && dist <= ground + (this.grounded ? 0.3 : 0.001)) {
 			if (!this.grounded) {
@@ -343,28 +396,34 @@ export class Player {
 			}
 			this.grounded = true;
 			this.vr = 0;
-			this.pos.copy(c).addScaledVector(this.up, ground);
+			this.pos.copy(c).addScaledVector(this.up, ground + SURFACE_LIFT);
 		} else if (this.grounded && dist > ground + 0.3) {
 			this.grounded = false;
 		} else if (this.vr > 0) {
 			this.grounded = false;
 		}
-		this.height = this.pos.distanceTo(c) - planet.R;
+		this.height = Math.max(0, this.pos.distanceTo(c) - planet.R);
 
 		// Facing follows the ground speed
 		projectKeepLength(this.facing, this.up);
 		if (this.facing.lengthSq() < 1e-6) anyPerpendicular(this.up, this.facing);
 		this.facing.normalize();
+		if (!this.saneVec(this.vT)) this.vT.set(0, 0, 0);
 		const speed = this.vT.length();
 		if (speed > 0.4 && !this.frozen) {
 			const want = this.vT.clone().normalize();
 			this.facing.lerp(want, damp(14, dt)).normalize();
 		}
 
+		if (!this.saneVec(this.pos) || !this.saneVec(this.up)) {
+			this.recover(planet, planet.landingDir);
+		}
 		this.animate(dt, speed, ev);
 	}
 
 	private animate(dt: number, speed: number, ev: PlayerEvents): void {
+		if (!Number.isFinite(this.runPhase) || !Number.isFinite(this.lean.x) || !Number.isFinite(this.lean.y)) this.resetPose();
+		const spd = Number.isFinite(speed) ? speed : 0;
 		basisQuat(this.up, this.facing, this.targetQuat);
 		this.root.quaternion.slerp(this.targetQuat, damp(20, dt));
 		this.root.position.copy(this.pos);
@@ -377,8 +436,8 @@ export class Player {
 		this.body.scale.set(1 - sq * 0.5 + cur * 0.05, 1 + sq - cur * 0.15, 1 - sq * 0.5 + cur * 0.05);
 
 		// Run cycle
-		const runK = this.grounded ? clamp(speed / 6, 0, 1) : 0;
-		this.runPhase += dt * (4 + speed * 2.0) * (this.grounded ? 1 : 0.3);
+		const runK = this.grounded ? clamp(spd / 6, 0, 1) : 0;
+		this.runPhase += dt * (4 + spd * 2.0) * (this.grounded ? 1 : 0.3);
 		const s = Math.sin(this.runPhase);
 		this.legs.forEach((l, i) => {
 			const side = i === 0 || i === 3 ? 1 : -1;
@@ -428,7 +487,7 @@ export class Player {
 		this.time += dt;
 		const flop = clamp(-this.squashV * 0.02, -0.4, 0.4) + (this.grounded ? 0 : 0.25) + s * 0.08 * runK;
 		this.ears.forEach((e, i) => (e.rotation.z = (i === 0 ? -1 : 1) * (0.45 - flop)));
-		const wantSwing = clamp(speed / 6, 0, 1) * 0.9 + (this.grounded ? 0 : clamp(-this.vr * 0.05, -0.5, 0.6));
+		const wantSwing = clamp(spd / 6, 0, 1) * 0.9 + (this.grounded ? 0 : clamp(-this.vr * 0.05, -0.5, 0.6));
 		this.scarfSwing += (wantSwing - this.scarfSwing) * damp(6, dt);
 		this.scarfTail.rotation.x = -this.scarfSwing * 0.9 + Math.sin(this.time * 14) * 0.12 * this.scarfSwing - 0.5;
 		this.scarfTail.rotation.y = Math.sin(this.time * 9) * 0.15 * this.scarfSwing;
@@ -462,7 +521,8 @@ export class Player {
 	knock(away: THREE.Vector3, up: number, speed: number): void {
 		const t = away.clone().addScaledVector(this.up, -away.dot(this.up));
 		if (t.lengthSq() < 1e-6) anyPerpendicular(this.up, t);
-		this.vT.copy(t.normalize().multiplyScalar(speed));
+		safeNormalize(t, t, this.facing);
+		this.vT.copy(t).multiplyScalar(speed);
 		this.vr = up;
 		this.grounded = false;
 		this.cut = true;

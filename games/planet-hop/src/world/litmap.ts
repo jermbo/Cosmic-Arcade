@@ -87,6 +87,15 @@ export class LitMap {
 		this.lit = 0;
 	}
 
+	/** Restore saved exploration (approximate even wash). */
+	seed(fraction: number): void {
+		const v = Math.round(Math.min(1, Math.max(0, fraction)) * 255);
+		this.data.fill(v);
+		this.wave = null;
+		this.dirty = true;
+		this.lit = v / 255;
+	}
+
 	update(dt: number): void {
 		const w = this.wave;
 		if (w) {

@@ -6,7 +6,16 @@ export function damp(k: number, dt: number): number {
 }
 
 export function clamp(v: number, lo: number, hi: number): number {
+	if (!Number.isFinite(v)) return (lo + hi) * 0.5;
 	return v < lo ? lo : v > hi ? hi : v;
+}
+
+/** Like normalize(), but keeps `fallback` when `v` is too short or invalid. */
+export function safeNormalize(out: THREE.Vector3, v: THREE.Vector3, fallback: THREE.Vector3): THREE.Vector3 {
+	const l = v.length();
+	if (l > 1e-5 && Number.isFinite(l)) return out.copy(v).multiplyScalar(1 / l);
+	const f = fallback.lengthSq() > 1e-8 ? fallback : _y;
+	return out.copy(f).normalize();
 }
 
 /** Small seeded random, so each planet looks the same on every run. */
@@ -38,6 +47,7 @@ const _y = new THREE.Vector3(0, 1, 0);
 
 /** Removes the part of `v` along unit `n` and keeps the old length (parallel transport). */
 export function projectKeepLength(v: THREE.Vector3, n: THREE.Vector3): THREE.Vector3 {
+	if (!Number.isFinite(n.x) || !Number.isFinite(n.y) || !Number.isFinite(n.z)) return v;
 	const len = v.length();
 	if (len < 1e-6) return v;
 	v.addScaledVector(n, -v.dot(n));

@@ -458,6 +458,25 @@ kbd {
 	justify-items: start;
 }
 
+.hud__right {
+	display: flex;
+	gap: 8px;
+	align-items: flex-start;
+}
+
+.chip__sep {
+	opacity: 0.45;
+	margin: 0 2px;
+}
+
+.chip--explore {
+	font-size: 0.95rem;
+}
+
+.chip--wallet {
+	background: #fff9e8;
+}
+
 .chip {
 	display: flex;
 	align-items: center;
@@ -511,6 +530,80 @@ kbd {
 	display: block;
 	width: 20px;
 	height: 24px;
+}
+
+.map {
+	position: absolute;
+	inset: 0;
+	display: grid;
+	place-items: center;
+	padding: 16px;
+	background: rgba(18, 15, 46, 0.72);
+	pointer-events: auto;
+}
+
+.map__panel {
+	max-width: 420px;
+	width: min(100%, 420px);
+}
+
+.map__title {
+	margin: 0 0 8px;
+	font: 400 1.6rem/1.1 var(--head);
+}
+
+.map__note {
+	margin: 0 0 16px;
+	color: var(--muted);
+	font-size: 0.95rem;
+}
+
+.map__trail {
+	display: grid;
+	gap: 8px;
+	margin-bottom: 16px;
+}
+
+.map__node {
+	margin: 0;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 10px 12px;
+	border: var(--line) solid var(--ink);
+	border-radius: 6px;
+	background: #f6f0ff;
+	box-shadow: var(--shadow-small);
+}
+
+.map__node--current {
+	background: var(--sun);
+}
+
+.map__node--locked {
+	background: #2a2548;
+	color: var(--paper);
+	border-color: #3e3860;
+}
+
+.map__node--locked .map__myst {
+	font: 400 1.4rem/1 var(--head);
+	opacity: 0.7;
+}
+
+.map__name {
+	font: 400 1.1rem/1 var(--head);
+}
+
+.map__pct {
+	font: 400 1rem/1 var(--body);
+	font-variant-numeric: tabular-nums;
+	opacity: 0.85;
+}
+
+.map__close {
+	width: 100%;
 }
 
 .prompt {
