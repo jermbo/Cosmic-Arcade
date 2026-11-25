@@ -1,0 +1,112 @@
+{
+	"intro": [
+		"Tuesday. 4:52 PM. You took the stairs because the elevator smelled like rain.",
+		"Between the third floor and the second there was one step too many. Your foot went through it like wet paper.",
+		"You fell for a long time. Long enough to get bored. Then: carpet.",
+		"This is the floor under the floor. The place where the world keeps its wiring. Somebody left the lights on.",
+		"Somewhere down here is a door marked EXIT 0. Zero means clean. Zero means it worked."
+	],
+	"ending": [
+		"The door opens on cold air and a sound you forgot existed: nothing. No hum.",
+		"> process 'you' exited with code 0",
+		"You step through. The stairs on the other side only go down."
+	],
+	"teaser": {
+		"title": "MAINTENANCE LEVEL 1",
+		"body": "The Damp Archive. Being built now. Your exit code is saved."
+	},
+	"areas": {
+		"halls": { "name": "THE YELLOW HALLS", "blurb": "The carpet is damp. The lights hum a note you almost know.", "music": "halls" },
+		"office": { "name": "DEAD OFFICE", "blurb": "Nobody has worked here for a long time. The chairs still face the desks.", "music": "halls" },
+		"closet": { "name": "LOCKER CLOSET", "blurb": "Somebody's coffee mug. Somebody's coat. Nobody.", "music": "halls" },
+		"tenant": { "name": "ROOM 0B", "blurb": "Something stood here so long the carpet wore through.", "music": "maint" },
+		"maint": { "name": "BREAKER CORRIDOR", "blurb": "Concrete and cold air. The hum drops an octave down here.", "music": "maint" },
+		"breaker": { "name": "BREAKER ROOM", "blurb": "Every switch has a label. Some labels are lies.", "music": "maint" },
+		"pipes": { "name": "PIPE GALLERY", "blurb": "Pipes climb into the dark. Something gurgles inside them, patiently.", "music": "maint" },
+		"flood": { "name": "FLOODED UTILITY", "blurb": "Ankle-deep and very still. The pump is off. Keep it off.", "music": "maint" },
+		"exit": { "name": "EXIT 0", "blurb": "The green light is warm. That's new.", "music": "exit" }
+	},
+	"tutorial": {
+		"move": { "keys": "WASD + Mouse", "pad": "Sticks", "text": "Move and look around." },
+		"interact": { "keys": "E or Click", "pad": "A", "text": "Use what you look at. Some things need you to hold." },
+		"inventory": { "keys": "Tab or I", "pad": "Y", "text": "Your pockets. Read your notes again here." },
+		"sprint": { "keys": "Shift", "pad": "LT or L3", "text": "Sprint. Running is loud." },
+		"flashlight": { "keys": "F", "pad": "X", "text": "Flashlight. Some rooms have no power." },
+		"view": { "keys": "V", "pad": "Back", "text": "Switch between first and third person." },
+		"listen": { "keys": "Walk", "pad": "Walk", "text": "It listens for running feet. Walk and it stays asleep." }
+	},
+	"death": {
+		"creature": "The Fixture heard you.",
+		"water": "The water was live."
+	},
+	"text": {
+		"level.m0": "MAINTENANCE LEVEL 0",
+
+		"prompt.pickup": "Pick up",
+		"prompt.read": "Read",
+		"prompt.open": "Open",
+		"prompt.locked": "Locked",
+		"prompt.flip.on": "Switch on",
+		"prompt.flip.off": "Switch off",
+		"prompt.keypad": "Enter code",
+		"prompt.exit": "Go through",
+		"prompt.gate": "Gate",
+		"prompt.needs": "Needs",
+		"prompt.hold": "hold",
+
+		"sign.exit0": "EXIT 0",
+		"sign.exit1": "EXIT 1",
+		"sign.exit2": "EXIT 2",
+		"sign.exit7": "EXIT 7",
+		"sign.maint": "MAINTENANCE",
+		"sign.gate": "GATE PWR: B4",
+		"sign.pump": "DANGER PUMP 2",
+		"sign.flood": "FLOOD RM",
+		"sign.locker": "LOCKER 3",
+		"sign.desk4": "DESK 4",
+		"sign.room0b": "ROOM 0B",
+
+		"fake.exit1": "Behind the door: brick. Somebody painted EXIT 1 on it, too.",
+		"fake.exit2": "Brick. A crayon arrow points back the way you came.",
+		"fake.exit7": "Brick, and a second door painted on the brick. It doesn't open either.",
+
+		"gate.locked": "The gate won't move. A dead motor box says GATE PWR: B4.",
+		"gate.look": "Through the gate: a green sign. EXIT 0. It's right there.",
+		"gate.open": "Somewhere a motor groans. The gate is rolling up.",
+
+		"locked.maint": "Locked. The keyhole is brass and very clean.",
+		"open.maint": "The key turns. Cold air comes out of the door.",
+
+		"keypad.wrong": "Wrong code. The keypad sighs.",
+		"keypad.ok": "Click. The locker opens.",
+
+		"brk.B1": "B1 OFFICE",
+		"brk.B2": "B2 HALL",
+		"brk.B3": "B3 PU?? 2",
+		"brk.B4": "B4 GATE",
+		"brk.dead": "The switch clacks. Nothing happens. The main box is dead.",
+		"brk.B1.on": "Far away, office lights stutter on.",
+		"brk.B2.off": "The hall lights die. All of them.",
+		"brk.B2.on": "The hall lights flicker back.",
+		"brk.B3.on": "A loud buzz from the south. The water is singing.",
+		"brk.B3.off": "The buzzing stops.",
+		"brk.B4.on": "An alarm wails through the level. The gate motor is running. So is something else.",
+
+		"repair.name": "Main box",
+		"repair.unbolt": "Unbolt the cover",
+		"repair.unbolt.done": "The cover swings open. The 30A slot is black and empty.",
+		"repair.fuse": "Seat the fuse",
+		"repair.fuse.done": "It clicks in. The box warms up.",
+		"repair.bolt": "Bolt the cover",
+		"repair.done": "The box hums awake. The breaker panel lights up.",
+		"repair.need": "You need something for this.",
+		"repair.fixed": "Main box: working.",
+
+		"hint.water.live": "The water is crackling. Don't step in.",
+		"hint.dark": "It's very dark in there.",
+		"hint.first.note": "A page torn from a notebook.",
+
+		"exit.locked": "The door is warm. It isn't locked.",
+		"saved": "Checkpoint saved"
+	}
+}

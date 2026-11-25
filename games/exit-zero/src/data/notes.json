@@ -1,0 +1,84 @@
+{
+	"note.welcome": {
+		"title": "Torn notebook page",
+		"style": "paper",
+		"body": [
+			"If you can read this, you fell too. Don't panic. Panic is loud.",
+			"I have been down here three days (I think). The halls go on, but not forever. There is a way out. A real one.",
+			"The exits are numbered. EXIT 1, EXIT 2... they open onto brick. Only EXIT 0 is real. Zero means a clean shutdown. It's behind the gate at the west end of the long hall. The gate is dead. It needs power.",
+			"The power is past the MAINTENANCE door. Find the key first.",
+			"- M."
+		]
+	},
+	"note.cooler": {
+		"title": "Sticky note on the cooler",
+		"style": "sticky",
+		"body": ["LOCKER 3 code:", "1 9 9 7", "(the year we got the good coffee machine)", "- Dale"]
+	},
+	"note.tenant": {
+		"title": "Note taped by the window",
+		"style": "paper",
+		"body": [
+			"DON'T RUN.",
+			"The tall one in there is not a person. It wears a light where a face should be. I call it the Fixture.",
+			"It can't see while it sleeps. It listens. Running feet, splashing, slammed switches. Walk, and it stays asleep.",
+			"If it wakes, it goes to the noise and looks around. Get out of its light and keep walking. It gives up. Eventually.",
+			"- M."
+		]
+	},
+	"note.office": {
+		"title": "Interoffice memo",
+		"style": "memo",
+		"body": [
+			"TO: All Maintenance Staff",
+			"RE: Keys",
+			"The MAINTENANCE door key must be returned to Desk 4 at the end of each shift. Do not take the key home. There is no home.",
+			"Reminder: the halls are cleaned nightly. Do not be in the halls at night.",
+			"- Facilities"
+		]
+	},
+	"note.locker": {
+		"title": "Hand-drawn map",
+		"style": "map",
+		"body": [
+			"START: the room with the hole in the ceiling.",
+			"LONG HALL runs east-west. EXIT 0 is behind the gate at its west end.",
+			"DEAD OFFICE: south of the pillar room. Desk 4 has the key. Bring a light.",
+			"MAINTENANCE door: east end of the south hall.",
+			"Past it: breaker room north. Pipes east. Flood room south.",
+			"The Fixture's room has a back door into the corridor. WALK.",
+			"- M."
+		]
+	},
+	"note.repair": {
+		"title": "Grease-stained page",
+		"style": "paper",
+		"body": [
+			"Found why the gate is dead. The main box in the breaker room blew its 30A fuse.",
+			"To fix it: wrench to take the cover off, new fuse in, bolt the cover back on.",
+			"Spare fuses are in the flood room, on the far shelf. The water is safe as long as PUMP 2 stays OFF.",
+			"Then B4 for the gate. It will be LOUD. Be ready to walk away. Not run. Walk fast.",
+			"- M."
+		]
+	},
+	"note.breaker": {
+		"title": "Panel label, hand-written",
+		"style": "memo",
+		"body": [
+			"B1 - Office lighting",
+			"B2 - Hall lighting. Leave it ON. Things come out in the dark.",
+			"B3 - Pump 2. NEVER WHILE FLOODED!!!",
+			"B4 - Gate / east exit. Needs the main box."
+		]
+	},
+	"note.flood": {
+		"title": "Wet page",
+		"style": "paper",
+		"body": [
+			"On day one I switched on B3 to drain this room. The water started to sing. I didn't go in.",
+			"The mop did. It is still smoking a little.",
+			"Leave the pump off.",
+			"- M."
+		]
+	}
+}
