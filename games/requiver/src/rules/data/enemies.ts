@@ -14,6 +14,8 @@ export interface ProjectileDef {
 	flight: number;
 	/** Gravity scale for its arc. */
 	gravity: number;
+	/** Chance it is thrown true. The rest fall short or fly over your head. */
+	hitChance: number;
 }
 
 export interface EnemyDef {
@@ -163,9 +165,9 @@ export const ENEMIES: Record<string, EnemyDef> = {
 		melee: { damage: 4, interval: 1.6 },
 		thrower: {
 			range: [560, 720],
-			interval: 3.8,
+			interval: 3.2,
 			windup: 0.7,
-			projectile: { kind: 'rock', radius: 9, hp: 1, damage: 6, flight: 1.9, gravity: 1 },
+			projectile: { kind: 'rock', radius: 10, hp: 1, damage: 8, flight: 2, gravity: 1, hitChance: 0.5 },
 		},
 		cost: 2.2,
 		art: 'thrower',

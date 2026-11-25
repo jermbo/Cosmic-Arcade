@@ -1,103 +1,154 @@
-// All sound is made here in code: plucked strings, thunks, clanks and a small generative score per act.
-// The buffers go to KAPLAY's loadSound; KAPLAY plays them.
+// All sound is made here in code, with Web Audio nodes rendered offline: oscillators, filtered noise,
+// envelopes and a small reverb. The results go to KAPLAY's loadSound as WAV files; KAPLAY plays them.
+// Sounds stay soft and musical: pentatonic steps, no harsh distortion.
 
 import type { AudioPlay } from 'kaplay';
 import { k } from './k.ts';
 
 const SR = 44100;
 const MSR = 22050;
-const TAU = Math.PI * 2;
 
-// ---------- Tiny synth helpers ----------
+// ---------- Building blocks ----------
 
-const rand = () => Math.random() * 2 - 1;
+type Ctx = OfflineAudioContext;
 
-function make(seconds: number, rate = SR) {
-	return new Float32Array(Math.max(1, Math.floor(seconds * rate)));
+interface Kit {
+	c: Ctx;
+	/** The dry bus. */
+	dry: AudioNode;
+	/** The reverb send. */
+	wet: AudioNode;
+	noise: AudioBuffer;
 }
 
-/** Adds a plucked string (Karplus-Strong) into `out` at `start` seconds. */
-function pluck(out: Float32Array, rate: number, start: number, freq: number, dur: number, amp: number, damp = 0.996, bright = 0.5) {
-	const n = Math.max(2, Math.floor(rate / freq));
-	const ring = new Float32Array(n);
-	for (let i = 0; i < n; i++) ring[i] = rand() * (1 - bright) + (i < n / 2 ? 1 : -1) * bright;
-	const s0 = Math.floor(start * rate);
-	const len = Math.floor(dur * rate);
-	let idx = 0;
-	for (let i = 0; i < len && s0 + i < out.length; i++) {
-		const next = (idx + 1) % n;
-		const v = ring[idx];
-		ring[idx] = (v + ring[next]) * 0.5 * damp;
-		idx = next;
-		const fade = i > len - 400 ? (len - i) / 400 : 1;
-		out[s0 + i] += v * amp * fade;
+function makeNoise(c: Ctx): AudioBuffer {
+	const b = c.createBuffer(1, c.sampleRate * 2, c.sampleRate);
+	const d = b.getChannelData(0);
+	for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+	return b;
+}
+
+function makeImpulse(c: Ctx, seconds: number): AudioBuffer {
+	const b = c.createBuffer(1, Math.floor(c.sampleRate * seconds), c.sampleRate);
+	const d = b.getChannelData(0);
+	for (let i = 0; i < d.length; i++) {
+		const t = i / d.length;
+		d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 3) * (t < 0.01 ? t / 0.01 : 1);
 	}
+	return b;
 }
 
-/** Adds a sine with a pitch slide and an exponential decay. */
-function tone(out: Float32Array, rate: number, start: number, f0: number, f1: number, dur: number, amp: number, attack = 0.002, wave: 'sine' | 'saw' | 'tri' = 'sine') {
-	const s0 = Math.floor(start * rate);
-	const len = Math.floor(dur * rate);
-	let ph = 0;
-	for (let i = 0; i < len && s0 + i < out.length; i++) {
-		const t = i / len;
-		const f = f0 * Math.pow(f1 / f0, t);
-		ph += f / rate;
-		let w: number;
-		if (wave === 'saw') w = 2 * (ph % 1) - 1;
-		else if (wave === 'tri') w = 1 - 4 * Math.abs((ph % 1) - 0.5);
-		else w = Math.sin(TAU * ph);
-		const env = Math.min(1, i / (attack * rate + 1)) * Math.exp(-t * 5);
-		out[s0 + i] += w * amp * env;
+/** A gain with an attack, an optional hold, then an exponential decay. */
+function envGain(kit: Kit, t: number, peak: number, attack: number, decay: number, dest: AudioNode, hold = 0): GainNode {
+	const g = kit.c.createGain();
+	g.gain.setValueAtTime(0.0001, t);
+	g.gain.linearRampToValueAtTime(peak, t + attack);
+	if (hold > 0) g.gain.setValueAtTime(peak, t + attack + hold);
+	g.gain.exponentialRampToValueAtTime(0.0001, t + attack + hold + decay);
+	g.connect(dest);
+	return g;
+}
+
+/** A node that feeds the dry bus and, by `wet`, the reverb. */
+function mixTo(kit: Kit, wet: number): AudioNode {
+	if (wet <= 0) return kit.dry;
+	const g = kit.c.createGain();
+	g.connect(kit.dry);
+	const send = kit.c.createGain();
+	send.gain.value = wet;
+	g.connect(send);
+	send.connect(kit.wet);
+	return g;
+}
+
+interface ToneOpt {
+	type?: OscillatorType;
+	to?: number;
+	glide?: number;
+	attack?: number;
+	hold?: number;
+	detune?: number;
+	lp?: number;
+	wet?: number;
+}
+
+/** One oscillator note. */
+function tone(kit: Kit, t: number, freq: number, decay: number, gain: number, o: ToneOpt = {}) {
+	const osc = kit.c.createOscillator();
+	osc.type = o.type ?? 'sine';
+	osc.frequency.setValueAtTime(freq, t);
+	if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to, t + (o.glide ?? decay));
+	if (o.detune) osc.detune.value = o.detune;
+	let node: AudioNode = envGain(kit, t, gain, o.attack ?? 0.003, decay, mixTo(kit, o.wet ?? 0), o.hold ?? 0);
+	if (o.lp) {
+		const f = kit.c.createBiquadFilter();
+		f.type = 'lowpass';
+		f.frequency.value = o.lp;
+		f.connect(node);
+		node = f;
 	}
+	osc.connect(node);
+	osc.start(t);
+	osc.stop(t + (o.attack ?? 0.003) + (o.hold ?? 0) + decay + 0.05);
 }
 
-/** Adds filtered noise. `lo`/`hi` are one-pole cutoffs in Hz (lo: low pass, hi: high pass). */
-function noise(out: Float32Array, rate: number, start: number, dur: number, amp: number, lo: number, hi: number, decay = 6, lo2?: number) {
-	const s0 = Math.floor(start * rate);
-	const len = Math.floor(dur * rate);
-	let lp = 0;
-	let hp = 0;
-	let prev = 0;
-	for (let i = 0; i < len && s0 + i < out.length; i++) {
-		const t = i / len;
-		const cut = lo2 ? lo * Math.pow(lo2 / lo, t) : lo;
-		const a = 1 - Math.exp((-TAU * cut) / rate);
-		lp += (rand() - lp) * a;
-		const b = Math.exp((-TAU * hi) / rate);
-		hp = b * (hp + lp - prev);
-		prev = lp;
-		const env = Math.min(1, i / 40) * Math.exp(-t * decay);
-		out[s0 + i] += hp * amp * env;
-	}
+interface NoiseOpt {
+	type?: BiquadFilterType;
+	freq: number;
+	to?: number;
+	q?: number;
+	attack?: number;
+	wet?: number;
 }
 
-/** Bell or metal: several decaying partials. */
-function partials(out: Float32Array, rate: number, start: number, freqs: number[], dur: number, amp: number, decay = 6) {
-	freqs.forEach((f, i) => {
-		const s0 = Math.floor(start * rate);
-		const len = Math.floor(dur * rate);
-		const a = amp / (1 + i * 0.7);
-		for (let j = 0; j < len && s0 + j < out.length; j++) {
-			const t = j / len;
-			out[s0 + j] += Math.sin((TAU * f * j) / rate) * a * Math.exp(-t * decay * (1 + i * 0.3)) * Math.min(1, j / 30);
-		}
-	});
+/** A burst of filtered noise. */
+function hiss(kit: Kit, t: number, decay: number, gain: number, o: NoiseOpt) {
+	const src = kit.c.createBufferSource();
+	src.buffer = kit.noise;
+	const f = kit.c.createBiquadFilter();
+	f.type = o.type ?? 'bandpass';
+	f.frequency.setValueAtTime(o.freq, t);
+	if (o.to) f.frequency.exponentialRampToValueAtTime(o.to, t + decay);
+	f.Q.value = o.q ?? 1;
+	src.connect(f);
+	f.connect(envGain(kit, t, gain, o.attack ?? 0.002, decay, mixTo(kit, o.wet ?? 0)));
+	src.start(t, Math.random());
+	src.stop(t + (o.attack ?? 0.002) + decay + 0.05);
 }
 
-function normalize(out: Float32Array, peak = 0.9) {
+/** Renders a sound offline. `build` schedules notes on the kit. */
+async function render(seconds: number, rate: number, build: (kit: Kit) => void, room = 1.4): Promise<Float32Array> {
+	const c = new OfflineAudioContext(1, Math.ceil(seconds * rate), rate);
+	const comp = c.createDynamicsCompressor();
+	comp.threshold.value = -14;
+	comp.ratio.value = 3;
+	comp.connect(c.destination);
+	const dry = c.createGain();
+	dry.connect(comp);
+	const verb = c.createConvolver();
+	verb.buffer = makeImpulse(c, room);
+	const wetGain = c.createGain();
+	wetGain.gain.value = 0.6;
+	verb.connect(wetGain);
+	wetGain.connect(comp);
+	build({ c, dry, wet: verb, noise: makeNoise(c) });
+	const out = await c.startRendering();
+	return out.getChannelData(0);
+}
+
+function normalize(d: Float32Array, peak: number) {
 	let max = 0;
-	for (const v of out) max = Math.max(max, Math.abs(v));
-	if (max > 0) for (let i = 0; i < out.length; i++) out[i] *= peak / max;
-	return out;
+	for (const v of d) max = Math.max(max, Math.abs(v));
+	if (max > 0) for (let i = 0; i < d.length; i++) d[i] *= peak / max;
+	return d;
 }
 
 /** Packs samples into a 16-bit WAV file, which KAPLAY decodes like any loaded sound. */
-function toBuffer(data: Float32Array, rate = SR): ArrayBuffer {
+function wav(data: Float32Array, rate: number): ArrayBuffer {
 	const bytes = 44 + data.length * 2;
 	const buf = new ArrayBuffer(bytes);
 	const v = new DataView(buf);
-	const text = (at: number, s: string) => [...s].forEach((c, i) => v.setUint8(at + i, c.charCodeAt(0)));
+	const text = (at: number, s: string) => [...s].forEach((ch, i) => v.setUint8(at + i, ch.charCodeAt(0)));
 	text(0, 'RIFF');
 	v.setUint32(4, bytes - 8, true);
 	text(8, 'WAVE');
@@ -116,233 +167,228 @@ function toBuffer(data: Float32Array, rate = SR): ArrayBuffer {
 }
 
 // ---------- Sound effects ----------
+// Each entry: length in seconds, loudness (peak after normalizing), and the notes.
 
-const SFX: Record<string, () => Float32Array> = {
-	twang: () => {
-		const o = make(0.7);
-		pluck(o, SR, 0, 98, 0.7, 0.9, 0.994, 0.8);
-		pluck(o, SR, 0, 196.5, 0.3, 0.3, 0.99, 0.9);
-		noise(o, SR, 0, 0.03, 0.8, 8000, 1500, 20);
-		return normalize(o);
-	},
-	whoosh: () => {
-		const o = make(0.35);
-		noise(o, SR, 0, 0.35, 1, 600, 300, 4, 3000);
-		return normalize(o, 0.6);
-	},
-	creak: () => {
-		const o = make(0.55);
-		let ph = 0;
-		for (let i = 0; i < o.length; i++) {
-			const t = i / o.length;
-			ph += (38 + t * 40) / SR;
-			const pulse = (ph % 1) < 0.08 ? 1 : 0;
-			o[i] = pulse * (0.6 + rand() * 0.4) * Math.min(1, t * 6) * (1 - t * 0.4);
-		}
-		let lp = 0;
-		for (let i = 0; i < o.length; i++) {
-			lp += (o[i] - lp) * 0.25;
-			o[i] = lp;
-		}
-		return normalize(o, 0.5);
-	},
-	thunk: () => {
-		const o = make(0.2);
-		tone(o, SR, 0, 150, 55, 0.18, 1);
-		noise(o, SR, 0, 0.06, 0.7, 2500, 200, 10);
-		return normalize(o);
-	},
-	crack: () => {
-		const o = make(0.25);
-		noise(o, SR, 0, 0.012, 1, 12000, 2000, 2);
-		tone(o, SR, 0, 2100, 1700, 0.12, 0.6);
-		tone(o, SR, 0, 960, 820, 0.2, 0.4);
-		tone(o, SR, 0.005, 160, 70, 0.12, 0.6);
-		return normalize(o);
-	},
-	clank: () => {
-		const o = make(0.55);
-		partials(o, SR, 0, [523, 1307, 2096, 2911, 3712], 0.55, 0.6, 5);
-		noise(o, SR, 0, 0.02, 0.8, 9000, 3000, 8);
-		return normalize(o);
-	},
-	knock: () => {
-		const o = make(0.18);
-		partials(o, SR, 0, [190, 420, 655], 0.18, 0.8, 9);
-		noise(o, SR, 0, 0.03, 0.6, 3000, 400, 10);
-		return normalize(o);
-	},
-	thud: () => {
-		const o = make(0.12);
-		noise(o, SR, 0, 0.1, 1, 900, 80, 8);
-		tone(o, SR, 0, 110, 60, 0.08, 0.6);
-		return normalize(o, 0.6);
-	},
-	poof: () => {
-		const o = make(0.3);
-		noise(o, SR, 0, 0.3, 1, 2600, 200, 5, 300);
-		return normalize(o, 0.6);
-	},
-	boom: () => {
-		const o = make(0.9);
-		noise(o, SR, 0, 0.9, 1, 3200, 30, 5, 160);
-		tone(o, SR, 0, 70, 32, 0.6, 1);
-		return normalize(o);
-	},
-	crackle: () => {
-		const o = make(0.4);
-		for (let i = 0; i < 18; i++) noise(o, SR, Math.random() * 0.35, 0.01, 0.5 + Math.random() * 0.5, 7000, 1500, 3);
-		return normalize(o, 0.5);
-	},
-	chime: () => {
-		const o = make(0.5);
-		partials(o, SR, 0, [2093, 3136, 4186], 0.5, 0.6, 6);
-		return normalize(o, 0.5);
-	},
-	tink: () => {
-		const o = make(0.25);
-		tone(o, SR, 0, 2600, 2400, 0.12, 0.6);
-		noise(o, SR, 0, 0.08, 0.7, 5000, 900, 10);
-		return normalize(o);
-	},
-	hurt: () => {
-		const o = make(0.35);
-		tone(o, SR, 0, 140, 50, 0.3, 1);
-		noise(o, SR, 0, 0.2, 0.9, 1800, 100, 6);
-		for (let i = 0; i < o.length; i++) o[i] = Math.tanh(o[i] * 2.5);
-		return normalize(o);
-	},
-	block: () => {
-		const o = make(0.5);
-		partials(o, SR, 0, [1568, 2349, 3136, 4699], 0.5, 0.6, 4);
-		return normalize(o, 0.6);
-	},
-	note: () => {
-		const o = make(0.4);
-		tone(o, SR, 0, 523, 523, 0.4, 0.8);
-		tone(o, SR, 0, 2092, 2092, 0.08, 0.25);
-		return normalize(o, 0.6);
-	},
-	fanfare: () => {
-		const o = make(1.1);
-		[523, 659, 784, 1046].forEach((f, i) => {
-			pluck(o, SR, i * 0.07, f, 0.9, 0.5, 0.997, 0.6);
-			tone(o, SR, i * 0.07, f, f, 0.6, 0.2);
-		});
-		return normalize(o, 0.8);
-	},
-	bonus: () => {
-		const o = make(1.1);
-		noise(o, SR, 0, 0.6, 0.8, 800, 200, 3, 5000);
-		[392, 523, 659, 784].forEach((f) => tone(o, SR, 0.05, f, f * 1.01, 1, 0.25, 0.02, 'tri'));
-		return normalize(o, 0.85);
-	},
-	zap: () => {
-		const o = make(0.7);
-		tone(o, SR, 0, 300, 2600, 0.25, 0.7, 0.001, 'saw');
-		partials(o, SR, 0.1, [1760, 2637, 3520], 0.6, 0.4, 5);
-		noise(o, SR, 0, 0.4, 0.5, 9000, 2000, 4);
-		return normalize(o, 0.8);
-	},
-	whistle: () => {
-		const o = make(0.4);
-		tone(o, SR, 0, 2200, 700, 0.4, 0.4);
-		noise(o, SR, 0, 0.4, 0.3, 4000, 1500, 3);
-		return normalize(o, 0.4);
-	},
-	growl: () => {
-		const o = make(1.2);
-		const len = o.length;
-		let ph1 = 0;
-		let ph2 = 0;
-		let lp = 0;
-		for (let i = 0; i < len; i++) {
-			const t = i / len;
-			ph1 += 55 / SR;
-			ph2 += 83 / SR;
-			const w = (2 * (ph1 % 1) - 1 + 2 * (ph2 % 1) - 1) * 0.5;
-			const trem = 0.6 + 0.4 * Math.sin(TAU * 9 * (i / SR));
-			lp += (w - lp) * 0.06;
-			o[i] = lp * trem * Math.sin(Math.PI * t) * 1.2;
-		}
-		noise(o, SR, 0, 1.2, 0.25, 500, 60, 1);
-		return normalize(o, 0.8);
-	},
-	roar: () => {
-		const o = make(1.8);
-		noise(o, SR, 0, 1.8, 1, 1200, 40, 2.5, 200);
-		tone(o, SR, 0, 60, 30, 1.6, 0.9, 0.1, 'saw');
-		return normalize(o);
-	},
-	horn: () => {
-		const o = make(1.3);
-		const len = o.length;
-		let lp = 0;
-		let a = 0;
-		let b = 0;
-		for (let i = 0; i < len; i++) {
-			const t = i / len;
-			a += 110 / SR;
-			b += 165 / SR;
-			const w = 2 * (a % 1) - 1 + (2 * (b % 1) - 1) * 0.7;
-			lp += (w - lp) * 0.08;
-			const env = Math.min(1, t * 7) * Math.min(1, (1 - t) * 3);
-			o[i] = lp * env;
-		}
-		return normalize(o, 0.6);
-	},
-	click: () => {
-		const o = make(0.05);
-		tone(o, SR, 0, 1400, 1100, 0.04, 0.8);
-		noise(o, SR, 0, 0.005, 0.6, 9000, 2000, 2);
-		return normalize(o, 0.5);
-	},
-	coin: () => {
-		const o = make(0.35);
-		tone(o, SR, 0, 1318, 1318, 0.12, 0.6);
-		tone(o, SR, 0.07, 1760, 1760, 0.28, 0.6);
-		return normalize(o, 0.6);
-	},
-	heal: () => {
-		const o = make(0.7);
-		[523, 659, 784, 1046].forEach((f, i) => tone(o, SR, i * 0.08, f, f, 0.4, 0.4, 0.01));
-		return normalize(o, 0.6);
-	},
-	step: () => {
-		const o = make(0.12);
-		noise(o, SR, 0, 0.1, 1, 600, 60, 9);
-		return normalize(o, 0.5);
-	},
-	win: () => {
-		const o = make(1.6);
-		[392, 440, 523, 587, 784].forEach((f, i) => pluck(o, SR, i * 0.11, f, 1.2, 0.6, 0.997, 0.5));
-		[392, 494, 587].forEach((f) => tone(o, SR, 0.6, f, f, 1, 0.2, 0.05, 'tri'));
-		return normalize(o, 0.8);
-	},
-	lose: () => {
-		const o = make(1.8);
-		[440, 392, 349, 294].forEach((f, i) => pluck(o, SR, i * 0.22, f / 2, 1.2, 0.7, 0.996, 0.3));
-		tone(o, SR, 0.9, 73, 70, 0.9, 0.4, 0.1, 'tri');
-		return normalize(o, 0.8);
-	},
-	split: () => {
-		const o = make(0.12);
-		noise(o, SR, 0, 0.12, 1, 9000, 2500, 8);
-		tone(o, SR, 0, 900, 1600, 0.1, 0.3);
-		return normalize(o, 0.5);
-	},
-	bounce: () => {
-		const o = make(0.15);
-		tone(o, SR, 0, 280, 520, 0.14, 0.7);
-		noise(o, SR, 0, 0.04, 0.5, 2000, 200, 10);
-		return normalize(o, 0.5);
-	},
+/** A note n semitones from middle C. */
+const NOTE = (n: number) => 261.63 * Math.pow(2, n / 12);
+
+const SFX: Record<string, [number, number, (kit: Kit) => void]> = {
+	// The bow lets go: a short string, a soft slap of air, a wood knock.
+	twang: [
+		0.5,
+		0.75,
+		(kt) => {
+			tone(kt, 0, 220, 0.22, 0.5, { type: 'triangle', to: 196, glide: 0.05, lp: 2400, wet: 0.12 });
+			tone(kt, 0, 440, 0.08, 0.12);
+			hiss(kt, 0, 0.08, 0.35, { freq: 2600, to: 900, q: 1.6 });
+			tone(kt, 0, 130, 0.07, 0.35, { to: 80 });
+		},
+	],
+	whoosh: [0.4, 0.45, (kt) => hiss(kt, 0, 0.3, 0.6, { freq: 1500, to: 450, q: 1.2, attack: 0.03, wet: 0.08 })],
+	// A body hit: a soft punch.
+	thunk: [
+		0.3,
+		0.8,
+		(kt) => {
+			tone(kt, 0, 150, 0.14, 0.9, { to: 62 });
+			hiss(kt, 0, 0.06, 0.35, { type: 'lowpass', freq: 900 });
+			hiss(kt, 0.004, 0.08, 0.2, { freq: 600, q: 1, wet: 0.06 });
+		},
+	],
+	// A head shot: a bright wooden "tok" and a small sparkle.
+	crack: [
+		0.6,
+		0.85,
+		(kt) => {
+			tone(kt, 0, 1050, 0.07, 0.5, { attack: 0.001 });
+			tone(kt, 0, 1575, 0.05, 0.22, { attack: 0.001 });
+			tone(kt, 0, 320, 0.09, 0.55, { to: 120 });
+			tone(kt, 0.03, NOTE(28), 0.35, 0.1, { type: 'triangle', wet: 0.3 });
+		},
+	],
+	clank: [
+		0.7,
+		0.6,
+		(kt) => {
+			[740, 1112, 1716, 2470].forEach((f, i) => tone(kt, 0, f, 0.4 - i * 0.07, 0.3 - i * 0.05, { attack: 0.001, wet: 0.25 }));
+			hiss(kt, 0, 0.02, 0.25, { type: 'highpass', freq: 4000 });
+		},
+	],
+	knock: [
+		0.3,
+		0.6,
+		(kt) => {
+			tone(kt, 0, 220, 0.09, 0.5, { attack: 0.001 });
+			tone(kt, 0, 340, 0.07, 0.3, { attack: 0.001 });
+			hiss(kt, 0, 0.05, 0.25, { freq: 800, q: 3, wet: 0.1 });
+		},
+	],
+	thud: [
+		0.15,
+		0.45,
+		(kt) => {
+			hiss(kt, 0, 0.07, 0.6, { type: 'lowpass', freq: 350 });
+			tone(kt, 0, 90, 0.06, 0.3, { to: 60 });
+		},
+	],
+	poof: [
+		0.4,
+		0.45,
+		(kt) => {
+			hiss(kt, 0, 0.25, 0.6, { type: 'lowpass', freq: 1800, to: 220, attack: 0.008, wet: 0.15 });
+			tone(kt, 0, 220, 0.15, 0.2, { to: 110 });
+		},
+	],
+	boom: [
+		1.2,
+		0.9,
+		(kt) => {
+			hiss(kt, 0, 0.75, 1, { type: 'lowpass', freq: 2000, to: 120, attack: 0.004, wet: 0.25 });
+			tone(kt, 0, 72, 0.55, 0.9, { to: 34 });
+		},
+	],
+	chime: [
+		0.8,
+		0.45,
+		(kt) => {
+			tone(kt, 0, NOTE(21), 0.45, 0.25, { type: 'triangle', wet: 0.3 });
+			tone(kt, 0.03, NOTE(28), 0.4, 0.18, { type: 'triangle', wet: 0.3 });
+		},
+	],
+	tink: [
+		0.5,
+		0.6,
+		(kt) => {
+			tone(kt, 0, NOTE(31), 0.14, 0.35, { type: 'triangle', attack: 0.001, wet: 0.15 });
+			hiss(kt, 0, 0.04, 0.3, { freq: 3000, q: 2 });
+			tone(kt, 0, 520, 0.06, 0.3, { to: 300 });
+		},
+	],
+	hurt: [
+		0.5,
+		0.85,
+		(kt) => {
+			tone(kt, 0, 130, 0.25, 0.9, { to: 58 });
+			hiss(kt, 0, 0.18, 0.5, { type: 'lowpass', freq: 600 });
+			hiss(kt, 0.01, 0.12, 0.35, { freq: 420, q: 4, wet: 0.1 });
+		},
+	],
+	block: [0.9, 0.5, (kt) => [0, 7, 12].forEach((n, i) => tone(kt, i * 0.025, NOTE(24 + n), 0.45, 0.2, { type: 'triangle', wet: 0.35 }))],
+	// The combo tick: a soft marimba note on C5. Raised in pentatonic steps when played.
+	note: [
+		0.6,
+		0.5,
+		(kt) => {
+			tone(kt, 0, NOTE(12), 0.35, 0.5, { wet: 0.2 });
+			tone(kt, 0, NOTE(12) * 4, 0.05, 0.12);
+			tone(kt, 0, NOTE(12) * 10, 0.012, 0.05);
+		},
+	],
+	fanfare: [
+		1.4,
+		0.7,
+		(kt) => {
+			[12, 16, 19, 24].forEach((n, i) => tone(kt, i * 0.065, NOTE(n), 0.55, 0.25, { type: 'triangle', wet: 0.3 }));
+			[12, 19].forEach((n) => tone(kt, 0.26, NOTE(n), 0.6, 0.08, { type: 'sawtooth', lp: 1400, attack: 0.05, wet: 0.3 }));
+		},
+	],
+	bonus: [
+		1.4,
+		0.7,
+		(kt) => {
+			hiss(kt, 0, 0.5, 0.45, { freq: 300, to: 3000, q: 1.2, attack: 0.2, wet: 0.2 });
+			[7, 12, 16].forEach((n) => tone(kt, 0.1, NOTE(n), 0.8, 0.15, { type: 'triangle', attack: 0.05, wet: 0.35 }));
+		},
+	],
+	zap: [
+		1.2,
+		0.7,
+		(kt) => {
+			tone(kt, 0, 600, 0.2, 0.35, { to: 2400, glide: 0.18 });
+			tone(kt, 0.12, NOTE(33), 0.6, 0.18, { type: 'triangle', wet: 0.4 });
+			tone(kt, 0.12, NOTE(28), 0.6, 0.15, { type: 'triangle', wet: 0.4 });
+			hiss(kt, 0, 0.35, 0.2, { type: 'highpass', freq: 3000, wet: 0.2 });
+		},
+	],
+	whistle: [0.6, 0.35, (kt) => tone(kt, 0, 1600, 0.4, 0.25, { to: 650, attack: 0.05, wet: 0.2 })],
+	growl: [
+		1.4,
+		0.6,
+		(kt) => {
+			tone(kt, 0, 55, 0.6, 0.35, { type: 'sawtooth', lp: 420, attack: 0.3, hold: 0.3, wet: 0.2 });
+			tone(kt, 0, 55, 0.6, 0.35, { type: 'sawtooth', lp: 420, attack: 0.3, hold: 0.3, detune: 18, wet: 0.2 });
+			hiss(kt, 0, 0.8, 0.12, { freq: 250, q: 2, attack: 0.3 });
+		},
+	],
+	roar: [
+		2,
+		0.8,
+		(kt) => {
+			hiss(kt, 0, 1.2, 0.6, { freq: 320, to: 180, q: 1.4, attack: 0.12, wet: 0.3 });
+			tone(kt, 0, 66, 1.1, 0.4, { type: 'sawtooth', to: 44, lp: 600, attack: 0.1, wet: 0.3 });
+		},
+	],
+	horn: [
+		1.6,
+		0.5,
+		(kt) => {
+			tone(kt, 0, 110, 0.5, 0.3, { type: 'sawtooth', lp: 700, attack: 0.15, hold: 0.45, wet: 0.35 });
+			tone(kt, 0, 165, 0.5, 0.22, { type: 'sawtooth', lp: 700, attack: 0.15, hold: 0.45, wet: 0.35 });
+		},
+	],
+	click: [
+		0.08,
+		0.35,
+		(kt) => {
+			tone(kt, 0, 880, 0.03, 0.3, { attack: 0.001 });
+			tone(kt, 0, 1760, 0.02, 0.1, { attack: 0.001 });
+		},
+	],
+	coin: [
+		0.6,
+		0.5,
+		(kt) => {
+			tone(kt, 0, NOTE(28), 0.15, 0.3, { type: 'triangle', wet: 0.2 });
+			tone(kt, 0.07, NOTE(33), 0.35, 0.3, { type: 'triangle', wet: 0.2 });
+		},
+	],
+	heal: [1, 0.5, (kt) => [12, 16, 19, 24].forEach((n, i) => tone(kt, i * 0.07, NOTE(n), 0.45, 0.2, { type: 'triangle', attack: 0.01, wet: 0.35 }))],
+	step: [0.1, 0.35, (kt) => hiss(kt, 0, 0.06, 0.5, { type: 'lowpass', freq: 500 })],
+	win: [
+		2.2,
+		0.7,
+		(kt) => {
+			[7, 9, 12, 14, 19].forEach((n, i) => tone(kt, i * 0.1, NOTE(n), 0.6, 0.22, { type: 'triangle', wet: 0.35 }));
+			[7, 11, 14].forEach((n) => tone(kt, 0.55, NOTE(n), 1, 0.1, { type: 'triangle', attack: 0.08, wet: 0.4 }));
+		},
+	],
+	lose: [
+		2.6,
+		0.6,
+		(kt) => {
+			[9, 7, 4, 2].forEach((n, i) => tone(kt, i * 0.28, NOTE(n), 0.7, 0.22, { lp: 1500, wet: 0.4 }));
+			tone(kt, 1.1, NOTE(-15), 1.2, 0.3, { type: 'triangle', attack: 0.1, wet: 0.4 });
+		},
+	],
+	split: [
+		0.12,
+		0.35,
+		(kt) => {
+			hiss(kt, 0, 0.06, 0.4, { freq: 3000, q: 2 });
+			tone(kt, 0, 1200, 0.06, 0.15, { to: 1800, type: 'triangle' });
+		},
+	],
+	bounce: [0.2, 0.4, (kt) => tone(kt, 0, 300, 0.12, 0.4, { to: 520, glide: 0.08 })],
 };
+
+/** Sounds that are in tune: never detuned at random. */
+const MUSICAL = new Set(['note', 'fanfare', 'heal', 'coin', 'win', 'lose', 'chime', 'block', 'bonus', 'zap']);
 
 // ---------- Music ----------
 
 interface Score {
 	bpm: number;
+	/** Root note, in semitones from middle C. */
 	root: number;
 	scale: number[];
 	chords: number[];
@@ -350,58 +396,85 @@ interface Score {
 }
 
 const SCORES: Score[] = [
-	{ bpm: 84, root: 146.83, scale: [0, 3, 5, 7, 10], chords: [0, -4, 3, -2], seed: 3 },
-	{ bpm: 78, root: 164.81, scale: [0, 2, 3, 7, 9], chords: [0, 5, -4, -2], seed: 11 },
-	{ bpm: 72, root: 110, scale: [0, 1, 5, 7, 8], chords: [0, 1, -4, -5], seed: 29 },
+	{ bpm: 84, root: 2, scale: [0, 3, 5, 7, 10], chords: [0, -4, 3, -2], seed: 3 },
+	{ bpm: 78, root: 4, scale: [0, 2, 3, 7, 9], chords: [0, 5, -4, -2], seed: 11 },
+	{ bpm: 70, root: -3, scale: [0, 3, 5, 7, 10], chords: [0, -4, -5, -2], seed: 29 },
 ];
 
-const semi = (f: number, n: number) => f * Math.pow(2, n / 12);
-
-function renderMusic(act: number, battle: boolean): Float32Array {
+function composeMusic(kt: Kit, act: number, battle: boolean, length: number) {
 	const sc = SCORES[act] ?? SCORES[0];
 	const beat = 60 / sc.bpm;
-	const bars = 8;
-	const out = make(bars * 4 * beat, MSR);
 	let seed = sc.seed + (battle ? 100 : 0);
 	const rnd = () => {
 		seed = (seed * 16807) % 2147483647;
 		return seed / 2147483647;
 	};
-	// A two-bar motif, repeated with small changes.
+	// A two-bar motif of eighth notes, varied in the second half.
 	const motif: (number | null)[] = [];
-	for (let i = 0; i < 16; i++) motif.push(rnd() < (battle ? 0.62 : 0.42) ? Math.floor(rnd() * 7) : null);
-	for (let bar = 0; bar < bars; bar++) {
-		const chord = sc.chords[bar % sc.chords.length];
+	for (let i = 0; i < 16; i++) motif.push(rnd() < (battle ? 0.55 : 0.38) ? Math.floor(rnd() * 8) : null);
+	// An echo for the melody.
+	const delay = kt.c.createDelay(2);
+	delay.delayTime.value = beat * 0.75;
+	const feedback = kt.c.createGain();
+	feedback.gain.value = 0.28;
+	delay.connect(feedback);
+	feedback.connect(delay);
+	const echo = kt.c.createGain();
+	echo.gain.value = 0.35;
+	delay.connect(echo);
+	echo.connect(kt.dry);
+	const melody = kt.c.createGain();
+	melody.connect(mixTo(kt, 0.35));
+	melody.connect(delay);
+
+	for (let bar = 0; bar < 8; bar++) {
 		const t0 = bar * 4 * beat;
-		const root = semi(sc.root, chord);
-		// Pad: root, fifth, minor third, as soft triangles.
-		for (const iv of [0, 7, 3, 12]) tone(out, MSR, t0, semi(root, iv) / 2, semi(root, iv) / 2, 4 * beat * 1.1, 0.06, 0.6, 'tri');
-		// Bass plucks.
-		pluck(out, MSR, t0, root / 2, 2 * beat, 0.35, 0.995, 0.2);
-		pluck(out, MSR, t0 + 2 * beat, root / 2, 2 * beat, 0.25, 0.995, 0.2);
-		// Melody.
+		if (t0 >= length) break;
+		const root = sc.root + sc.chords[bar % sc.chords.length];
+		// Pad: warm detuned saws, low passed, slow in and out.
+		for (const iv of [0, 3, 7, 12]) {
+			for (const d of [-7, 7]) tone(kt, t0, NOTE(root + iv - 12), 1.2, 0.035, { type: 'sawtooth', lp: 750, attack: 0.9, hold: 4 * beat - 1.2, detune: d, wet: 0.45 });
+		}
+		// Bass on beats 1 and 3.
+		tone(kt, t0, NOTE(root - 24), 0.9, 0.32, { type: 'triangle', lp: 500 });
+		tone(kt, t0 + 2 * beat, NOTE(root - 24), 0.7, 0.24, { type: 'triangle', lp: 500 });
+		// Melody: soft plucks from the scale.
 		for (let i = 0; i < 8; i++) {
 			const step = motif[(bar % 2) * 8 + i];
 			if (step === null) continue;
-			const varied = bar >= 4 && rnd() < 0.3 ? step + 1 : step;
+			const varied = bar >= 4 && rnd() < 0.3 ? step + 2 : step;
 			const deg = varied % sc.scale.length;
 			const oct = Math.floor(varied / sc.scale.length);
-			const f = semi(sc.root * 2, sc.scale[deg] + 12 * oct + (chord > 0 ? 0 : 0));
-			pluck(out, MSR, t0 + (i * beat) / 2, f, beat * 1.6, 0.22, 0.997, 0.55);
+			const t = t0 + (i * beat) / 2;
+			const osc = kt.c.createOscillator();
+			osc.type = 'triangle';
+			osc.frequency.value = NOTE(sc.root + 12 + sc.scale[deg] + 12 * oct);
+			const lp = kt.c.createBiquadFilter();
+			lp.type = 'lowpass';
+			lp.frequency.value = 2600;
+			osc.connect(lp);
+			lp.connect(envGain(kt, t, 0.13, 0.006, beat * 0.9, melody));
+			osc.start(t);
+			osc.stop(t + beat + 0.1);
 		}
 		if (battle) {
-			// Frame drum and shaker.
-			for (const b of [0, 1.5, 2, 3.5]) tone(out, MSR, t0 + b * beat, 95, 42, 0.3, b === 0 || b === 2 ? 0.6 : 0.35);
-			for (let i = 0; i < 8; i++) noise(out, MSR, t0 + (i * beat) / 2, 0.06, i % 2 ? 0.08 : 0.14, 8000, 4000, 8);
-			if (bar % 4 === 3) for (let i = 0; i < 3; i++) tone(out, MSR, t0 + (3 + i / 3) * beat, 160, 90, 0.2, 0.3);
+			// A soft frame drum and a quiet shaker.
+			for (const b of [0, 1.5, 2, 3.5]) tone(kt, t0 + b * beat, 110, 0.28, b === 0 || b === 2 ? 0.5 : 0.3, { to: 46, glide: 0.12 });
+			for (let i = 0; i < 8; i++) hiss(kt, t0 + (i * beat) / 2, 0.04, i % 2 ? 0.035 : 0.06, { type: 'highpass', freq: 7000 });
+			if (bar % 4 === 3) for (let i = 0; i < 3; i++) tone(kt, t0 + (3 + i / 3) * beat, 180, 0.18, 0.25, { to: 100 });
 		}
 	}
-	// Soft loop seam.
-	const fade = Math.floor(0.02 * MSR);
-	for (let i = 0; i < fade; i++) {
-		out[i] *= i / fade;
-		out[out.length - 1 - i] *= i / fade;
-	}
+}
+
+async function renderMusic(act: number, battle: boolean): Promise<Float32Array> {
+	const sc = SCORES[act] ?? SCORES[0];
+	const length = (8 * 4 * 60) / sc.bpm;
+	const tail = 2.5;
+	const raw = await render(length + tail, MSR, (kt) => composeMusic(kt, act, battle, length), 2.2);
+	// Fold the reverb tail back onto the start, so the loop is seamless.
+	const n = Math.floor(length * MSR);
+	const out = raw.slice(0, n);
+	for (let i = n; i < raw.length; i++) out[i - n] += raw[i];
 	return normalize(out, 0.7);
 }
 
@@ -412,28 +485,37 @@ let musicVolume = 0.5;
 const loaded = new Set<string>();
 let current: { key: string; play: AudioPlay } | null = null;
 
-/** Makes every sound and all six music loops. Call before the first scene: KAPLAY waits for them. */
-export function loadAudio() {
-	for (const [name, fn] of Object.entries(SFX)) {
-		k.loadSound(name, toBuffer(fn()));
-		loaded.add(name);
+/** Makes every sound and all six music loops. Pass it to k.load(): KAPLAY waits before the first scene. */
+export async function loadAudio(): Promise<void> {
+	const jobs: Promise<void>[] = [];
+	for (const [name, [seconds, peak, build]] of Object.entries(SFX)) {
+		jobs.push(
+			render(seconds, SR, build).then((d) => {
+				k.loadSound(name, wav(normalize(d, peak), SR));
+				loaded.add(name);
+			}),
+		);
 	}
 	for (let act = 0; act < SCORES.length; act++) {
 		for (const battle of [false, true]) {
 			const key = `music-${act}-${battle ? 'b' : 'm'}`;
-			k.loadSound(key, toBuffer(renderMusic(act, battle), MSR));
-			loaded.add(key);
+			jobs.push(
+				renderMusic(act, battle).then((d) => {
+					k.loadSound(key, wav(d, MSR));
+					loaded.add(key);
+				}),
+			);
 		}
 	}
+	// A failed sound never blocks the game.
+	await Promise.all(jobs.map((j) => j.catch(() => {})));
 }
 
 export function setVolumes(sfx: number, music: number) {
 	sfxVolume = sfx;
 	musicVolume = music;
-	if (current) current.play.volume = musicVolume * 0.55;
+	if (current) current.play.volume = musicVolume * 0.5;
 }
-
-const lastPlayed = new Map<string, number>();
 
 /** Volume fades on a timer, so a scene change cannot cut them off. */
 function fade(play: AudioPlay, to: number, seconds: number, done?: () => void) {
@@ -449,30 +531,36 @@ function fade(play: AudioPlay, to: number, seconds: number, done?: () => void) {
 	}, 30);
 }
 
+/** Pentatonic steps in cents, for rising combo notes. */
+const PENTA = [0, 200, 400, 700, 900, 1200, 1400, 1600, 1900, 2100, 2400];
+export const pentatonic = (step: number) => PENTA[Math.max(0, Math.min(PENTA.length - 1, Math.round(step)))];
+
+const lastPlayed = new Map<string, number>();
+
 /** Plays a sound effect. Repeats of the same sound within a few ms are merged. */
 export function sfx(name: string, opt: { volume?: number; detune?: number; speed?: number } = {}) {
 	if (!loaded.has(name) || sfxVolume <= 0) return;
 	const now = performance.now();
-	if (now - (lastPlayed.get(name) ?? 0) < 28) return;
+	if (now - (lastPlayed.get(name) ?? 0) < 35) return;
 	lastPlayed.set(name, now);
+	const wobble = MUSICAL.has(name) ? 0 : (Math.random() - 0.5) * 80;
 	try {
-		k.play(name, { volume: (opt.volume ?? 1) * sfxVolume, detune: (opt.detune ?? 0) + (Math.random() - 0.5) * 60, speed: opt.speed ?? 1 });
+		k.play(name, { volume: (opt.volume ?? 1) * sfxVolume * 0.8, detune: (opt.detune ?? 0) + wobble, speed: opt.speed ?? 1 });
 	} catch {
 		// Audio not ready yet.
 	}
 }
 
-/** Starts the loop for an act (map or battle). Makes it on first use. */
+/** Starts the loop for an act (map or battle). */
 export function music(act: number, battle: boolean) {
 	const key = `music-${act}-${battle ? 'b' : 'm'}`;
-	if (current?.key === key) return;
-	if (!loaded.has(key)) return;
+	if (current?.key === key || !loaded.has(key)) return;
 	const old = current;
-	if (old) fade(old.play, 0, 0.6, () => old.play.stop());
+	if (old) fade(old.play, 0, 0.8, () => old.play.stop());
 	try {
 		const play = k.play(key, { loop: true, volume: 0 });
 		current = { key, play };
-		fade(play, musicVolume * 0.55, 1.2);
+		fade(play, musicVolume * 0.5, 1.5);
 	} catch {
 		current = null;
 	}

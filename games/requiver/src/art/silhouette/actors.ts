@@ -151,18 +151,27 @@ export function drawArcher(a: ArcherView) {
 		});
 	}
 	if (fall > 0) {
-		render(rotate(f, x, y, -fall * 0.5), ink);
+		const fallen = rotate(f, x, y, -fall * 0.5);
+		rim(fallen, a.act, 0.5);
+		render(fallen, ink);
 		return;
 	}
 	if (flinch > 0.05) render(f, col('#ffffff'), flinch * 0.5, 2, false);
+	rim(f, a.act, s < 1 ? 0.7 : 0.85);
 	render(f, ink);
 }
 
 // ---------- Foes ----------
 
-/** The accent glow for elites, the frost glow for chilled foes. */
+/** Sunlight on the edges: a thin light outline so ink figures read on any background. */
+function rim(f: Figure, act: number, opacity = 0.75, width = 1.5) {
+	render(f, col(pal(act).sun), opacity, width, false);
+}
+
+/** The rim light, then the accent glow for elites, the frost glow for chilled foes. */
 function glowPass(f: Figure, v2: { elite: boolean; chilled: boolean; burning: boolean; time: number; act: number }) {
 	const p = pal(v2.act);
+	rim(f, v2.act);
 	if (v2.elite) render(f, col(p.accent), 0.55 + 0.2 * Math.sin(v2.time * 6), 2.4, false);
 	if (v2.chilled) render(f, col('#bdefff'), 0.75, 1.6, false);
 	if (v2.burning) render(f, col('#ffb347'), 0.4 + 0.25 * Math.sin(v2.time * 20), 1.8, false);
@@ -435,8 +444,9 @@ export function drawCorpse(c: CorpseView) {
 		biped(f, pose);
 		if (c.headless) f.dots.pop();
 	}
-	const pivotY = c.shape === 'flyer' ? c.y : c.y;
-	render(rotate(f, c.x, pivotY, c.angle), ink, opacity);
+	const fallen = rotate(f, c.x, c.y, c.angle);
+	rim(fallen, c.act, 0.5 * opacity);
+	render(fallen, ink, opacity);
 }
 
 // ---------- Bosses ----------
@@ -546,6 +556,7 @@ function drawGatewarden(b: BossView) {
 	else {
 		if (b.burning) render(f, col('#ffb347'), 0.35, 2, false);
 		if (b.chilled) render(f, col('#bdefff'), 0.7, 1.6, false);
+		rim(f, b.act, 0.85, 2);
 		render(f, ink);
 	}
 	// The lantern in its chest.
@@ -622,6 +633,7 @@ function drawKiteQueen(b: BossView) {
 	else {
 		if (b.burning) render(fig, col('#ffb347'), 0.35, 2, false);
 		if (b.chilled) render(fig, col('#bdefff'), 0.7, 1.6, false);
+		rim(fig, b.act, 0.85, 2);
 		render(fig, ink);
 	}
 	weakSpot(b.x + def.weak.x, y + def.weak.y, def.weak.r, b, b.guard);
@@ -705,6 +717,7 @@ function drawHollowKing(b: BossView) {
 	else {
 		if (b.burning) render(f, col('#ffb347'), 0.35, 2, false);
 		if (b.chilled) render(f, col('#bdefff'), 0.7, 1.6, false);
+		rim(f, b.act, 0.85, 2);
 		render(f, ink);
 	}
 	weakSpot(x + def.weak.x + sway, y + def.weak.y, def.weak.r, b, b.guard);

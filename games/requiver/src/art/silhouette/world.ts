@@ -101,21 +101,22 @@ function drawHills(sv: SkyView, horizon: string) {
 		if (sv.act === 2) {
 			// Sharp peaks.
 			fy = 330 + Math.abs(noise1(n * 0.9, 3)) * -90 + noise1(n * 3, 5) * 10 + 60;
-			my = 395 - Math.abs(noise1(n * 1.6 + 4, 7)) * 60 + noise1(n * 5, 2) * 6;
+			my = 456 - Math.abs(noise1(n * 1.6 + 4, 7)) * 14 + noise1(n * 5, 2) * 3;
 		} else if (sv.act === 1) {
 			// Flat marsh with a far tree line.
-			fy = 410 + noise1(n * 0.8, 3) * 12 - Math.max(0, noise1(n * 6, 9)) * 14;
-			my = 430 + noise1(n * 1.3, 6) * 8 - Math.max(0, noise1(n * 9, 4)) * 10;
+			fy = 414 + noise1(n * 0.8, 3) * 10 - Math.max(0, noise1(n * 6, 9)) * 14;
+			my = 456 + noise1(n * 1.3, 6) * 4 - Math.max(0, noise1(n * 9, 4)) * 6;
 		} else {
 			// Rolling fields.
-			fy = 392 + noise1(n * 0.7, 3) * 26;
-			my = 424 + noise1(n * 1.1 + 2, 6) * 16;
+			fy = 400 + noise1(n * 0.7, 3) * 22;
+			my = 454 + noise1(n * 1.1 + 2, 6) * 6;
 		}
 		far.push([px, fy]);
 		mid.push([px, my]);
 	}
-	ridge(far, HORIZON + 40, mix(p.far, horizon, 0.35), 1, col(p.far));
-	ridge(mid, WORLD.groundY + 10, col(p.mid), 1, mix(p.mid, INK, 0.5));
+	// Hazy and light, so ink figures stand out against them.
+	ridge(far, HORIZON + 40, mix(p.far, horizon, 0.62), 1, mix(p.far, horizon, 0.4));
+	ridge(mid, WORLD.groundY + 10, mix(p.mid, horizon, 0.3), 1, col(p.mid));
 	// Marsh water catches the sky.
 	if (sv.act === 1) {
 		for (let i = 0; i < 6; i++) {
@@ -151,15 +152,17 @@ export function drawLand(sv: SkyView) {
 	// Props, seeded per fight. Kept away from the lane in front of the archer.
 	for (let i = 0; i < 14; i++) {
 		const px = from + hash(i * 17.3 + sv.seed) * (to - from);
-		if (px > 150 && px < 900 && hash(i * 2.2 + sv.seed) < 0.6) continue;
-		prop(sv.act, px, i + sv.seed, sv.time);
+		// In the lane only low props, so nothing looks like a foe.
+		const lane = px > 150 && px < 940;
+		if (lane && hash(i * 2.2 + sv.seed) < 0.5) continue;
+		prop(sv.act, px, i + sv.seed, sv.time, lane);
 	}
 }
 
-function prop(act: number, px: number, seed: number, time: number) {
+function prop(act: number, px: number, seed: number, time: number, low: boolean) {
 	const ink = col(INK);
 	const g = WORLD.groundY;
-	const r = hash(seed * 1.7);
+	const r = low ? hash(seed * 1.7) * 0.5 : hash(seed * 1.7);
 	const sway = Math.sin(time * 1.3 + seed) * 1.5;
 	if (act === 0) {
 		if (r < 0.5) {
@@ -227,7 +230,7 @@ function prop(act: number, px: number, seed: number, time: number) {
 		// Reeds and cattails.
 		for (let j = 0; j < 4; j++) {
 			const sx = px + j * 4 - 6;
-			const hh = 22 + hash(seed + j) * 20;
+			const hh = (low ? 12 : 22) + hash(seed + j) * (low ? 8 : 20);
 			const bend = sway + (j - 1.5) * 2;
 			stroke(
 				[
@@ -241,7 +244,7 @@ function prop(act: number, px: number, seed: number, time: number) {
 			if (j % 2 === 0) k.drawEllipse({ pos: v(sx + bend * 0.75, g - hh * 0.78), radiusX: 2.4, radiusY: 6, color: ink });
 		}
 	} else {
-		if (r < 0.55) {
+		if (r < 0.55 && !low) {
 			// Pine.
 			const hh = 50 + hash(seed) * 40;
 			for (let j = 0; j < 4; j++) {

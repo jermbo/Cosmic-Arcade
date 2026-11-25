@@ -706,7 +706,19 @@ export class Battle {
 	private throwAt(x: number, y: number, def: ProjectileDef) {
 		const g = PHYSICS.gravity * def.gravity;
 		const flight = def.flight * this.rng.range(0.92, 1.08);
-		const v = lobVelocity(x, y, WORLD.archerX + 4, WORLD.targetY, flight, g);
+		// Not every throw is true: a miss falls short or sails over the archer's head.
+		let tx = WORLD.archerX + 4;
+		let ty = WORLD.targetY + this.rng.range(-10, 10);
+		if (!this.rng.chance(def.hitChance)) {
+			if (this.rng.chance(0.5)) {
+				tx = WORLD.archerX + this.rng.range(WORLD.missShort[0], WORLD.missShort[1]);
+				ty = WORLD.groundY;
+			} else {
+				tx = WORLD.archerX - 30;
+				ty = WORLD.targetY - 46 - this.rng.range(WORLD.missOver[0], WORLD.missOver[1]);
+			}
+		}
+		const v = lobVelocity(x, y, tx, ty, flight, g);
 		this.projectiles.push({ uid: this.uid++, def, x, y, vx: v.vx, vy: v.vy, hp: def.hp, age: 0, dead: false });
 	}
 
@@ -848,6 +860,7 @@ export class Battle {
 	private updateProjectile(p: Projectile, dt: number) {
 		p.age += dt;
 		const px = p.x;
+		const py = p.y;
 		p.vy += PHYSICS.gravity * p.def.gravity * dt;
 		p.x += p.vx * dt;
 		p.y += p.vy * dt;
@@ -857,7 +870,9 @@ export class Battle {
 			this.events.push({ type: 'projectileLand', x: p.x, y: p.y, kind: p.def.kind });
 			return;
 		}
-		if (p.x <= WORLD.archerX + 16 && p.y >= WORLD.targetY - 46) {
+		// The archer's body: it hits only if it crosses this box.
+		const box = { x: WORLD.archerX - 16, y: WORLD.targetY - 46, w: 34, h: WORLD.groundY - WORLD.targetY + 46 };
+		if (segBox(px, py, p.x, p.y, { x: box.x - p.def.radius, y: box.y - p.def.radius, w: box.w + p.def.radius * 2, h: box.h + p.def.radius }) !== null) {
 			p.dead = true;
 			this.hitPlayer(p.def.damage, null);
 			return;

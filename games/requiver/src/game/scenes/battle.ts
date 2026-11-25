@@ -10,7 +10,7 @@ import { battleSetup, dusk, finishBattle } from '../../rules/run.ts';
 import { banner, clearLayers, hurtFlash, onBack, panel, pop, button, h, topLayer } from '../../ui/dom.ts';
 import { BattleHud, Coach } from '../../ui/hud.ts';
 import { confirmPanel, howToPanel, settingsPanel } from '../../ui/panels.ts';
-import { music, sfx, stopMusic } from '../audio.ts';
+import { music, pentatonic, sfx, stopMusic } from '../audio.ts';
 import { abandonRun, goMap, goTitle, resolvePending } from '../flow.ts';
 import { Fx } from '../fx.ts';
 import { AimInput } from '../input.ts';
@@ -335,14 +335,14 @@ export function battleScene() {
 					if (stuck) for (const s of stuck) fx.part('arrow', en.x + s.dx, en.y + s.dy, 40 + Math.random() * 60, -200);
 					fx.inFoe.delete(en.uid);
 				}
-				sfx('poof', { volume: 0.7 });
+				sfx('poof', { volume: 0.5 });
 				if (ev.cause === 'fire') fx.burst('ember', en.x, en.y - 30, -Math.PI / 2, 3);
 				fx.burst('ink', en.x, en.shape === 'flyer' ? en.y : en.y - 30 * en.size, angleOf(ev.vx, ev.vy), 0.6);
 				fx.stop(FX.hitStopKill);
 				if (ev.multi >= 2) {
 					const words = ['', '', 'DOUBLE!', 'TRIPLE!', 'QUAD!'];
 					fx.pop(words[ev.multi] ?? `x${ev.multi}!`, en.x, en.y - 90 * en.size, 28, art.palette(act).accent, 1, 50);
-					sfx('note', { detune: 700 + ev.multi * 200 });
+					sfx('note', { detune: pentatonic(5 + ev.multi) });
 					fx.shake(3 + ev.multi);
 				}
 				break;
@@ -370,7 +370,7 @@ export function battleScene() {
 				lastStreak = 0;
 				break;
 			case 'combo':
-				sfx('note', { detune: Math.round((ev.meter / 100) * 12) * 100, volume: 0.5 });
+				sfx('note', { detune: pentatonic((ev.meter / 100) * 7), volume: 0.45 });
 				if (ev.streak >= 5 && ev.streak % 5 === 0 && ev.streak !== lastStreak) fx.pop(`STREAK ${ev.streak}`, WORLD.archerX + 70, WORLD.groundY - 130, 20, art.palette(act).accent, 1, 30);
 				lastStreak = ev.streak;
 				break;

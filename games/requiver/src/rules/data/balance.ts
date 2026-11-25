@@ -12,6 +12,9 @@ export const WORLD = {
 	bowY: 418,
 	/** The point enemies and projectiles aim at (the archer's chest). */
 	targetY: 430,
+	/** Thrown shots that miss land this far in front of the archer, or fly this high over the head. */
+	missShort: [70, 190] as [number, number],
+	missOver: [60, 110] as [number, number],
 	/** Where new enemies appear (off the right edge). */
 	spawnX: 1010,
 	/** Walkers stop and hit the archer here. */
@@ -71,7 +74,7 @@ export const DAMAGE = {
 export const HITBOX = {
 	headPad: 3,
 	bodyPad: 2,
-	projectilePad: 6,
+	projectilePad: 10,
 };
 
 export const COMBO = {

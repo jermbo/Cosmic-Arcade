@@ -17,7 +17,7 @@ import { setupBack, setupRotate } from './ui/dom.ts';
 
 art.load();
 k.loadFont('display', displayFont, { outline: { width: 4, color: k.rgb('#0d0a10') }, filter: 'linear' });
-loadAudio();
+k.load(loadAudio());
 unlockAudio();
 applySettings();
 

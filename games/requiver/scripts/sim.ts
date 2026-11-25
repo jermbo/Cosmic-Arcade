@@ -89,6 +89,30 @@ function dataCheck() {
 	for (const b of Object.values(BOOSTS)) if (b.text.length !== b.levels.length) problems.push(`boost ${b.id}: ${b.text.length} texts for ${b.levels.length} levels`);
 }
 
+/** Throwers with nobody shooting back: how many throws land? Should match hitChance. */
+function throwCheck() {
+	let thrown = 0;
+	let hits = 0;
+	for (let seed = 1; seed <= 30; seed++) {
+		const stats = runStats(newRun(newMeta(), 'ash', seed), newMeta());
+		stats.maxHp = 9999;
+		const b = new Battle({ seed, act: 0, row: 0, kind: 'fight', stats, hp: 9999, tutorial: false });
+		b.waves = [[]];
+		b.waveIndex = 0;
+		for (let i = 0; i < 3; i++) b.spawn('thrower', false, 900 + i * 40);
+		for (let t = 0; t < 60; t += STEP) {
+			b.update(STEP);
+			for (const ev of b.drain()) {
+				if (ev.type === 'throw') thrown++;
+				if (ev.type === 'hurt') hits++;
+			}
+			for (const e of b.enemies) if (e.state === 'attack') e.hp = 0;
+		}
+	}
+	console.log(`\n== Throws ==\nthrown ${thrown}, hit ${hits} (${pct(hits, thrown)}), data says ${pct(50, 100)}`);
+	if (thrown && Math.abs(hits / thrown - 0.5) > 0.12) problems.push(`thrower accuracy ${pct(hits, thrown)} is far from its hitChance`);
+}
+
 // ---------- 3. Runs ----------
 
 interface BattleLog {
@@ -297,6 +321,7 @@ function maxedMeta(): MetaState {
 console.log('ReQuiver sim');
 dataCheck();
 mapCheck();
+throwCheck();
 
 const fresh = newMeta();
 fresh.tutorialDone = true;
