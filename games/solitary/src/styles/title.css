@@ -23,6 +23,7 @@
 .title__tools {
 	display: flex;
 	gap: 10px;
+	margin-left: auto;
 }
 
 .title__brand {

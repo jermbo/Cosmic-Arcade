@@ -13,6 +13,7 @@ import { RANK_SHORT, type Suit } from '../core/cards.ts';
 import { getTheme } from '../themes/themes.ts';
 import { spriteStyle } from './board.ts';
 import { icon, pixelSuit, suitIcon } from './icons.ts';
+import { canInstall, isStandalone, promptInstall, setupPwa } from './pwa.ts';
 
 const MODES: ModeId[] = ['klondike', 'spider', 'freecell'];
 
@@ -69,6 +70,9 @@ export class App {
 		onSettings(() => this.settingsChanged());
 		this.renderTitle();
 		this.bindGlobal();
+		setupPwa(() => {
+			if (this.screen === 'title') this.renderTitle();
+		});
 	}
 
 	// ---------- title ----------
@@ -77,8 +81,9 @@ export class App {
 		const saved = loadGame();
 		this.title.innerHTML = `
 			<header class="title__bar">
-				<a class="btn btn--ghost btn--small" href="../">${icon('back')}<span>Arcade</span></a>
+				${isStandalone() ? '' : `<a class="btn btn--ghost btn--small" href="../">${icon('back')}<span>Arcade</span></a>`}
 				<div class="title__tools">
+					${canInstall() ? `<button class="btn btn--ghost btn--small" data-act="install" aria-label="Install app">${icon('install')}<span>Install</span></button>` : ''}
 					<button class="btn btn--ghost btn--small" data-act="how">${icon('help')}<span>How to play</span></button>
 					<button class="btn btn--ghost btn--small" data-act="settings">${icon('gear')}<span>Settings</span></button>
 				</div>
@@ -105,6 +110,7 @@ export class App {
 				this.startNew(mode, currentOpts());
 			});
 		});
+		this.title.querySelector('[data-act="install"]')?.addEventListener('click', () => promptInstall().then(() => this.renderTitle()));
 		this.title.querySelector('[data-act="how"]')!.addEventListener('click', () => howToPlay('klondike'));
 		this.title.querySelector('[data-act="settings"]')!.addEventListener('click', () => openSettings());
 		this.title.querySelector('[data-act="continue"]')?.addEventListener('click', () => {
@@ -211,7 +217,7 @@ export class App {
 					<button class="btn" data-a="settings">Settings</button>
 					<button class="btn" data-a="menu">Main menu</button>
 				</div>
-				<a class="btn btn--ghost btn--block" href="../">${icon('back')}<span>Back to the arcade</span></a>`,
+				${isStandalone() ? '' : `<a class="btn btn--ghost btn--block" href="../">${icon('back')}<span>Back to the arcade</span></a>`}`,
 		});
 		d.el.addEventListener('click', (e) => {
 			const a = (e.target as HTMLElement).closest<HTMLElement>('[data-a]')?.dataset.a;

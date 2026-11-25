@@ -15,6 +15,7 @@ const ICONS = `
 <symbol id="i-help" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 15h2v2h-2zm1-11a4 4 0 0 1 2.2 7.3c-.8.6-1.2 1-1.2 1.7v.5h-2V15c0-1.5.8-2.3 1.8-3a2 2 0 1 0-2.8-1.8H9A3 3 0 0 1 12 6z"/></symbol>
 <symbol id="i-back" viewBox="0 0 24 24"><path d="M10 5 3 12l7 7v-5h11v-4H10z"/></symbol>
 <symbol id="i-redo" viewBox="0 0 24 24"><path d="M12 4a8 8 0 1 0 8 8h-3a5 5 0 1 1-5-5v3l5-4.5L12 1z"/></symbol>
+<symbol id="i-install" viewBox="0 0 24 24"><path d="M10 3h4v8h4l-6 6-6-6h4zM4 19h16v3H4z"/></symbol>
 <symbol id="i-sound" viewBox="0 0 24 24"><path d="M3 9h4l5-5v16l-5-5H3zm13-1a5 5 0 0 1 0 8l-1.4-1.4a3 3 0 0 0 0-5.2zm2.5-3a9 9 0 0 1 0 14l-1.4-1.4a7 7 0 0 0 0-11.2z"/></symbol>`;
 
 export function installSprite() {

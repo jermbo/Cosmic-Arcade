@@ -8,7 +8,8 @@
 		"build": "tsc && vite build",
 		"preview": "vite preview",
 		"test": "node scripts/test-rules.ts",
-		"deck": "node scripts/make-deck.ts"
+		"deck": "node scripts/make-deck.ts",
+		"icons": "node scripts/make-icons.ts"
 	},
 	"devDependencies": {
 		"typescript": "7.0.2",

@@ -6,7 +6,7 @@ kind: video
 build: "solitary"
 platforms: [desktop, mobile]
 inputs: [mouse, keyboard, touch]
-tags: [cards, solitaire, puzzle]
+tags: [cards, solitaire, puzzle, pwa]
 ---
 
 Three classic patience games at one table. Standard rules only: no Vegas scoring, no twists.
@@ -25,6 +25,8 @@ Three classic patience games at one table. Standard rules only: no Vegas scoring
 - Tap a picked card again to send it to a foundation.
 - When every card can go home, **Finish** plays the game out.
 - Keyboard: **Tab** and the **arrows** move between piles, **Enter** picks up and puts down, **U** undo, **H** hint, **N** new deal, **P** pause.
+
+Works offline after the first load. Tap **Install** on the title screen (or Add to Home Screen on iPhone) to keep it as an app.
 
 Hints are fine to use. A win with a hint counts, but only hint-free wins set a best. Auto-move to the foundations is in Settings, under Accessibility.
 
