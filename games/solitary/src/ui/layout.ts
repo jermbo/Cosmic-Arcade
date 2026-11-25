@@ -58,6 +58,10 @@ function spec(mode: ModeId): Spec {
 }
 
 const gapFor = (cw: number) => Math.max(4, Math.min(14, Math.round(cw * 0.11)));
+/** The side layout packs 9 to 10 columns across a phone, so it needs more air between them. */
+const sideGapFor = (cw: number) => Math.max(8, Math.min(18, Math.round(cw * 0.16)));
+/** Rails sit this many gaps away from the tableau, so the three groups read apart. */
+const RAIL = 2.4;
 
 /** ratio: card height over width. snap: rounds a card width to one that draws crisp (pixel decks). */
 export function computeLayout(
@@ -100,8 +104,8 @@ export function computeLayout(
 	for (const [lc, rc] of railOptions) {
 		const leftCols = mode === 'klondike' ? 1 : lc;
 		const total = leftCols + s.cols + rc;
-		let gap = gapFor(W / total);
-		const railGap = gap * 2.2;
+		let gap = sideGapFor(W / total);
+		const railGap = gap * RAIL;
 		let cw = (W - (total - 3) * gap - 2 * railGap) / total;
 		const rows = (n: number, c: number) => Math.ceil(n / c);
 		const leftRows = rows(s.left.length, leftCols);
@@ -112,18 +116,25 @@ export function computeLayout(
 		const chByLeft = (H - (leftRows - 1) * gap) / (leftRows + extraLeft);
 		const chByRight = (H - (rightRows - 1) * gap) / (rightRows + extraRight);
 		cw = snap(Math.min(cw, chByTab / RATIO, chByLeft / RATIO, chByRight / RATIO, MAX_CW));
-		gap = gapFor(cw);
-		const rg = gap * 2.2;
+		gap = sideGapFor(cw);
 		const ch = cw * RATIO;
-		const width = (leftCols + s.cols + rc) * cw + (leftCols - 1 + s.cols - 1 + rc - 1) * gap + 2 * rg;
+		// Spread any width left over (rounding, crisp-pixel snapping) into the gaps, up to a limit.
+		const gaps = total - 3 + 2 * RAIL;
+		const free = W - total * cw - gaps * gap;
+		if (free > 0) gap = Math.min(gap + free / gaps, cw * 0.3);
+		const rg = gap * RAIL;
+		const width = total * cw + (total - 3) * gap + 2 * rg;
 		let x = (W - width) / 2;
 		const piles: Record<string, Point> = {};
 		const fan: Record<string, Point> = {};
-		const place = (ids: string[], cols: number, x0: number, rowExtra = 0) => {
+		const place = (ids: string[], cols: number, x0: number) => {
+			// Rows keep the wider gap only while they still fit the height.
+			const n = rows(ids.length, cols);
+			const rowGap = n > 1 ? Math.max(0, Math.min(gap, (H - n * ch) / (n - 1))) : 0;
 			ids.forEach((id, i) => {
 				const c = i % cols;
 				const r = Math.floor(i / cols);
-				piles[id] = { x: x0 + c * (cw + gap), y: r * (ch + gap + rowExtra) };
+				piles[id] = { x: x0 + c * (cw + gap), y: r * (ch + rowGap) };
 			});
 		};
 		if (mode === 'spider') {

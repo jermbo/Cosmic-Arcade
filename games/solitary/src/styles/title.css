@@ -218,53 +218,125 @@
 	}
 }
 
-/* Phone in landscape: short, so everything gets tighter. */
+/* Phone in landscape: short, so the logo joins the button bar and the mode cards drop their extras.
+   The goal: every Play button shows without scrolling. */
 @media (max-height: 520px) {
 	.title {
-		gap: 12px;
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr) auto;
+		grid-template-areas:
+			'back brand tools'
+			'cont cont cont'
+			'modes modes modes';
+		align-content: start;
+		align-items: center;
+		justify-items: center;
+		gap: 10px 12px;
+		padding-top: max(10px, env(safe-area-inset-top));
+		padding-bottom: max(12px, env(safe-area-inset-bottom));
+	}
+
+	.title__bar {
+		display: contents;
+	}
+
+	.title__bar > a {
+		grid-area: back;
+		justify-self: start;
+	}
+
+	.title__tools {
+		grid-area: tools;
+		margin-left: 0;
 	}
 
 	.title__brand {
-		display: flex;
-		align-items: center;
-		gap: 16px;
+		grid-area: brand;
 	}
 
 	.logo {
-		font-size: 46px;
+		font-size: 40px;
 	}
 
 	.title__tag {
-		margin: 0;
-		font-size: 14px;
+		display: none;
+	}
+
+	.continue {
+		grid-area: cont;
+		min-height: 44px;
+	}
+
+	.continue small {
+		display: inline;
+		margin: 0 0 0 0.7em;
+	}
+
+	.modes {
+		grid-area: modes;
+		justify-self: stretch;
+		max-width: none;
 	}
 
 	.mode {
 		gap: 8px;
-		padding: 12px 14px 14px;
+		padding: 12px 12px 14px;
 	}
 
-	.mode__art {
-		display: none;
-	}
-
+	.mode__art,
 	.mode__blurb {
-		font-size: 13px;
-		min-height: 0;
+		display: none;
 	}
 
 	.mode__option {
-		min-height: 58px;
+		min-height: 42px;
+		align-items: center;
+	}
+
+	/* The buttons already say "Draw 1" and "2 suits". */
+	.mode .seg legend {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+
+	/* Spider's three choices stay on one row. */
+	.mode .seg {
+		flex-wrap: nowrap;
+	}
+
+	.mode .seg__opt {
+		min-width: 0;
+	}
+
+	.mode .seg__opt span {
+		min-height: 40px;
+		padding: 0 4px;
+		font-size: clamp(12px, 1.75vw, 15px);
+	}
+
+	.mode__fixed {
+		margin: 0;
 	}
 
 	.mode__play {
-		min-height: 46px;
+		min-height: 44px;
 	}
 }
 
-@media (max-width: 560px) {
+/* Icon-only bar buttons: on narrow screens, and on short ones where the logo shares the row.
+   The label stays for screen readers. */
+@media (max-width: 560px), (max-height: 520px) {
 	.title__bar .btn span {
-		display: none;
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
 	}
 
 	.title__bar .btn--small {

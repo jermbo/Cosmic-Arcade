@@ -281,8 +281,8 @@
 
 .card.is-held .card__front {
 	box-shadow:
-		0 0 0 calc(var(--ap) * 2 + 1px) var(--mustard),
-		0 0 0 calc(var(--ap) * 2 + 3px) var(--ink),
+		0 0 0 calc(var(--ap) * 1.25 + 1px) var(--mustard),
+		0 0 0 calc(var(--ap) * 1.25 + 3px) var(--ink),
 		calc(var(--ap) * 3) calc(var(--ap) * 5) 0 var(--card-shadow);
 }
 
@@ -293,8 +293,8 @@
 
 .card.is-dragging .card__front {
 	box-shadow:
-		0 0 0 calc(var(--ap) * 2 + 1px) var(--mustard),
-		0 0 0 calc(var(--ap) * 2 + 3px) var(--ink),
+		0 0 0 calc(var(--ap) * 1.25 + 1px) var(--mustard),
+		0 0 0 calc(var(--ap) * 1.25 + 3px) var(--ink),
 		calc(var(--ap) * 8) calc(var(--ap) * 12) 0 rgb(20 14 28 / 0.32);
 }
 
