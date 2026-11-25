@@ -1,0 +1,288 @@
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+:root {
+	--font-display: 'Pixelify Sans', system-ui, sans-serif;
+	--font-ui: 'Space Grotesk', system-ui, sans-serif;
+	--ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+	--t-flip: 260ms;
+	color-scheme: light;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	:root {
+		--t-flip: 1ms;
+	}
+}
+
+html,
+body {
+	margin: 0;
+	height: 100%;
+	overflow: hidden;
+	overscroll-behavior: none;
+}
+
+body {
+	font-family: var(--font-ui);
+	font-weight: 500;
+	color: var(--panel-ink);
+	background:
+		radial-gradient(ellipse 120% 90% at 50% 30%, var(--felt) 0%, var(--felt-2) 100%) fixed,
+		var(--felt-2);
+	-webkit-tap-highlight-color: transparent;
+	-webkit-font-smoothing: antialiased;
+}
+
+/* Felt: a quiet grid of pixel dots, like the dots between cards on the deck sheet. */
+body::before {
+	content: '';
+	position: fixed;
+	inset: 0;
+	pointer-events: none;
+	background: radial-gradient(var(--felt-dot) 1px, transparent 1.5px) 0 0 / 12px 12px;
+}
+
+#app {
+	position: relative;
+	height: 100%;
+}
+
+[hidden] {
+	display: none !important;
+}
+
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.icon {
+	width: 20px;
+	height: 20px;
+	fill: currentColor;
+	flex: none;
+}
+
+/* The deck's frame: a heavy outline, a thin inner line, a hard shadow. */
+.frame {
+	border: 3px solid var(--ink);
+	background: var(--panel);
+	box-shadow:
+		inset 0 0 0 3px var(--panel),
+		inset 0 0 0 5px var(--ink),
+		6px 6px 0 var(--shadow);
+}
+
+/* ---------- buttons ---------- */
+
+.btn {
+	--b-bg: var(--btn);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	min-height: 46px;
+	padding: 0 18px;
+	border: 3px solid var(--ink);
+	border-radius: 0;
+	background: var(--b-bg);
+	color: var(--panel-ink);
+	font: 700 17px/1 var(--font-display);
+	letter-spacing: 0.02em;
+	text-decoration: none;
+	cursor: pointer;
+	box-shadow:
+		inset 0 -3px 0 rgb(0 0 0 / 0.12),
+		4px 4px 0 var(--shadow);
+	transition:
+		transform 70ms ease,
+		box-shadow 70ms ease;
+	user-select: none;
+}
+
+.btn:hover {
+	transform: translate(-1px, -1px);
+	box-shadow:
+		inset 0 -3px 0 rgb(0 0 0 / 0.12),
+		5px 5px 0 var(--shadow);
+}
+
+.btn:active {
+	transform: translate(3px, 3px);
+	box-shadow:
+		inset 0 3px 0 rgb(0 0 0 / 0.12),
+		1px 1px 0 var(--shadow);
+}
+
+.btn--primary {
+	--b-bg: var(--btn-primary);
+	color: var(--ink);
+}
+
+.btn--ghost {
+	--b-bg: transparent;
+	color: inherit;
+	box-shadow: none;
+	border-color: currentColor;
+}
+
+.btn--ghost:hover {
+	box-shadow: none;
+	background: rgb(255 255 255 / 0.1);
+}
+
+.btn--ghost:active {
+	box-shadow: none;
+}
+
+.btn--small {
+	min-height: 44px;
+	padding: 0 14px;
+	font-size: 16px;
+}
+
+.btn--block {
+	width: 100%;
+}
+
+.btn:disabled {
+	opacity: 0.45;
+	cursor: default;
+	transform: none;
+}
+
+:focus-visible {
+	outline: 3px solid var(--focus);
+	outline-offset: 3px;
+}
+
+.btn:focus-visible {
+	outline: 3px dashed var(--accent);
+	outline-offset: 4px;
+}
+
+kbd {
+	display: inline-block;
+	min-width: 1.7em;
+	padding: 1px 6px;
+	border: 2px solid currentColor;
+	border-bottom-width: 4px;
+	font: 700 0.85em/1.2 var(--font-display);
+	text-align: center;
+}
+
+/* ---------- segmented choice (radio group) ---------- */
+
+.seg {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+.seg legend {
+	width: 100%;
+	margin-bottom: 6px;
+	padding: 0;
+	font: 700 13px/1 var(--font-display);
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.seg__opt {
+	position: relative;
+	flex: 1 1 0;
+}
+
+.seg__opt input {
+	position: absolute;
+	inset: 0;
+	opacity: 0;
+	margin: 0;
+	cursor: pointer;
+}
+
+.seg__opt span {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 42px;
+	padding: 0 10px;
+	border: 3px solid var(--ink);
+	margin-left: -3px;
+	background: var(--panel-2);
+	color: var(--panel-ink);
+	font: 700 15px/1 var(--font-display);
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.seg__opt:first-of-type span {
+	margin-left: 0;
+}
+
+.seg__opt input:checked + span {
+	background: var(--ink);
+	color: var(--paper);
+	box-shadow: inset 0 0 0 2px var(--ink), inset 0 0 0 4px var(--mustard);
+}
+
+.seg__opt input:focus-visible + span {
+	outline: 3px dashed var(--accent);
+	outline-offset: 2px;
+	position: relative;
+	z-index: 1;
+}
+
+/* ---------- stamp: the rubber-stamp motif of wins and bests ---------- */
+
+.stamp {
+	display: inline-block;
+	padding: 3px 7px 2px;
+	border: 3px solid var(--red);
+	color: var(--red);
+	font: 700 13px/1.1 var(--font-display);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	transform: rotate(-6deg);
+	white-space: nowrap;
+}
+
+.stamp--ok {
+	border-color: var(--teal);
+	color: var(--teal);
+}
+
+.pixel-suit {
+	display: block;
+	fill: currentColor;
+}
+
+/* ---------- update note (new version ready) ---------- */
+
+.update-note {
+	position: fixed;
+	z-index: 50;
+	left: 50%;
+	bottom: max(16px, env(safe-area-inset-bottom));
+	transform: translateX(-50%);
+	padding: 12px 18px;
+	border: 3px solid var(--ink);
+	background: var(--btn-primary);
+	color: var(--ink);
+	font: 700 16px/1 var(--font-display);
+	box-shadow: 4px 4px 0 var(--shadow);
+	cursor: pointer;
+	white-space: nowrap;
+}

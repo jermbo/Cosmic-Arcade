@@ -1,0 +1,60 @@
+/* Tables. The UI takes its colors from the Pixel Plebes deck: cream paper, navy ink,
+   red, mustard and teal. A table only changes the felt and a few accents.
+   A new deck adds a block here and an entry in themes/themes.ts (see ASSETS.md). */
+
+:root {
+	--ink: #3b324a;
+	--ink-2: #241e2e;
+	--paper: #ecece0;
+	--paper-2: #dedccd;
+	--red: #c93038;
+	--black: #3b324a;
+	--mustard: #ffbf36;
+	--orange: #de6a38;
+	--teal: #047b96;
+	--lavender: #7884ab;
+	--club: #1f8a4c;
+	--diamond: #2a63c0;
+
+	--accent: var(--mustard);
+	--target: #b9f2d0;
+	--hint: #8fdcff;
+	--focus: #ffffff;
+	--panel: var(--paper);
+	--panel-2: var(--paper-2);
+	--panel-ink: var(--ink);
+	--muted: #6d6579;
+	--hud: var(--paper);
+	--hud-ink: var(--ink);
+	--btn: var(--paper);
+	--btn-primary: var(--mustard);
+	--shadow: var(--ink-2);
+	--card-shadow: rgb(20 14 28 / 0.42);
+	--slot-line: rgb(236 236 224 / 0.3);
+	--slot-fill: rgb(0 0 0 / 0.14);
+
+	/* Plain deck */
+	--back-1: #8e1f2d;
+	--back-2: #e9cf9a;
+	--back-3: #5f121c;
+}
+
+:root,
+[data-theme='teal'] {
+	--felt: #106272;
+	--felt-2: #073945;
+	--felt-dot: rgb(255 255 255 / 0.045);
+}
+
+[data-theme='night'] {
+	--felt: #3a3150;
+	--felt-2: #1b1626;
+	--felt-dot: rgb(255 255 255 / 0.035);
+	--hint: #a9c4ff;
+}
+
+[data-theme='parlour'] {
+	--felt: #22744d;
+	--felt-2: #134129;
+	--felt-dot: rgb(255 255 255 / 0.04);
+}
