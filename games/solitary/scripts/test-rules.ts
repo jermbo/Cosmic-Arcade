@@ -56,7 +56,7 @@ function play(mode: ModeId, opts: DealOptions, seed: number): { won: boolean; st
 {
 	const rules = makeRules('freecell', { draw: 1, suits: 1 }, 1);
 	const s = rules.initial();
-	const firstRow = ['t0', 't1', 't2', 't3', 't4', 't5', 't6', 't7'].map((t) => rules.short(s.piles[t][0].id));
+	const firstRow = ['t0', 't1', 't2', 't3', 't4', 't5', 't6', 't7'].map((t) => rules.cardLabel(s.piles[t][0].id));
 	assert.deepEqual(firstRow, ['J♦', '2♦', '9♥', 'J♣', '5♦', '7♥', '7♣', '5♥']);
 	console.log('FreeCell deal 1 matches.');
 }

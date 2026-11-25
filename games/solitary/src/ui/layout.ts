@@ -1,5 +1,10 @@
 import type { DealOptions, ModeId } from '../core/types.ts';
 
+/**
+ * Table geometry: card size and each pile’s top-left corner in pixels.
+ * Stacked cards add vertical/horizontal offset in `Board.cardPosition()`.
+ */
+
 export interface Point {
 	x: number;
 	y: number;
@@ -73,25 +78,25 @@ export function computeLayout(
 	snap: (cw: number) => number = (cw) => cw,
 ): Layout {
 	const RATIO = ratio;
-	const s = spec(mode);
+	const modeSpec = spec(mode);
 	const fanWaste = mode === 'klondike' && opts.draw === 3;
 	const candidates: Layout[] = [];
 
 	// Standard: a top row above the tableau.
 	{
-		let gap = gapFor(W / s.cols);
-		let cw = (W - (s.cols - 1) * gap) / s.cols;
-		const chByH = (H - gap * 1.4) / (2 + s.extra);
+		let gap = gapFor(W / modeSpec.cols);
+		let cw = (W - (modeSpec.cols - 1) * gap) / modeSpec.cols;
+		const chByH = (H - gap * 1.4) / (2 + modeSpec.extra);
 		cw = snap(Math.min(cw, chByH / RATIO, MAX_CW));
 		gap = gapFor(cw);
 		const ch = cw * RATIO;
-		const width = s.cols * cw + (s.cols - 1) * gap;
+		const width = modeSpec.cols * cw + (modeSpec.cols - 1) * gap;
 		const x0 = (W - width) / 2;
 		const piles: Record<string, Point> = {};
 		const col = (i: number) => x0 + i * (cw + gap);
-		for (const [id, i] of s.top) piles[id] = { x: col(i), y: 0 };
+		for (const [id, i] of modeSpec.top) piles[id] = { x: col(i), y: 0 };
 		const rowY = ch + gap * 1.4;
-		for (let i = 0; i < s.cols; i++) piles[`t${i}`] = { x: col(i), y: rowY };
+		for (let i = 0; i < modeSpec.cols; i++) piles[`t${i}`] = { x: col(i), y: rowY };
 		const fan: Record<string, Point> = {};
 		if (fanWaste) fan.waste = { x: cw * 0.24, y: 0 };
 		if (mode === 'spider') fan.stock = { x: -cw * 0.14, y: 0 };
@@ -103,16 +108,16 @@ export function computeLayout(
 	const railOptions = mode === 'spider' ? [[1, 1]] : [[1, 1], [1, 2], [2, 2]];
 	for (const [lc, rc] of railOptions) {
 		const leftCols = mode === 'klondike' ? 1 : lc;
-		const total = leftCols + s.cols + rc;
+		const total = leftCols + modeSpec.cols + rc;
 		let gap = sideGapFor(W / total);
 		const railGap = gap * RAIL;
 		let cw = (W - (total - 3) * gap - 2 * railGap) / total;
 		const rows = (n: number, c: number) => Math.ceil(n / c);
-		const leftRows = rows(s.left.length, leftCols);
-		const rightRows = rows(s.right.length, rc);
+		const leftRows = rows(modeSpec.left.length, leftCols);
+		const rightRows = rows(modeSpec.right.length, rc);
 		const extraLeft = mode === 'klondike' ? (fanWaste ? 0.5 : 0) : mode === 'spider' ? 7 * 0.13 : 0;
 		const extraRight = mode === 'spider' ? 0.3 : 0;
-		const chByTab = H / (1 + s.extra);
+		const chByTab = H / (1 + modeSpec.extra);
 		const chByLeft = (H - (leftRows - 1) * gap) / (leftRows + extraLeft);
 		const chByRight = (H - (rightRows - 1) * gap) / (rightRows + extraRight);
 		cw = snap(Math.min(cw, chByTab / RATIO, chByLeft / RATIO, chByRight / RATIO, MAX_CW));
@@ -140,12 +145,12 @@ export function computeLayout(
 		if (mode === 'spider') {
 			for (let i = 0; i < 8; i++) piles[`f${i}`] = { x, y: i * ch * 0.13 };
 		} else {
-			place(s.left, leftCols, x);
+			place(modeSpec.left, leftCols, x);
 		}
 		x += leftCols * cw + (leftCols - 1) * gap + rg;
-		for (let i = 0; i < s.cols; i++) piles[`t${i}`] = { x: x + i * (cw + gap), y: 0 };
-		x += s.cols * cw + (s.cols - 1) * gap + rg;
-		place(s.right, rc, x);
+		for (let i = 0; i < modeSpec.cols; i++) piles[`t${i}`] = { x: x + i * (cw + gap), y: 0 };
+		x += modeSpec.cols * cw + (modeSpec.cols - 1) * gap + rg;
+		place(modeSpec.right, rc, x);
 		if (fanWaste) fan.waste = { x: 0, y: ch * 0.22 };
 		if (mode === 'spider') fan.stock = { x: 0, y: ch * 0.075 };
 		candidates.push({ kind: 'side', cw, ch, gap, width: W, height: H, piles, fan, stacked: mode === 'spider' });

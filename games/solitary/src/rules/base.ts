@@ -195,11 +195,11 @@ export abstract class Rules {
 		const cards = state.piles[move.from];
 		const lead = this.card(cards[move.index].id);
 		const count = cards.length - move.index;
-		const what = count > 1 ? `${count} cards from ${this.short(lead.id)}` : this.short(lead.id);
+		const what = count > 1 ? `${count} cards from ${this.cardLabel(lead.id)}` : this.cardLabel(lead.id);
 		return `${what} to ${this.pileName(move.to)}`;
 	}
 
-	short(id: number): string {
+	cardLabel(id: number): string {
 		const c = this.card(id);
 		const ranks = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 		const suits = { S: '♠', H: '♥', D: '♦', C: '♣' };
