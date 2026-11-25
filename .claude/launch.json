@@ -5,6 +5,11 @@
       "name": "planet-hop",
       "url": "http://localhost:4009",
       "port": 4009
+    },
+    {
+      "name": "solitary",
+      "url": "http://localhost:4010",
+      "port": 4010
     }
   ]
 }

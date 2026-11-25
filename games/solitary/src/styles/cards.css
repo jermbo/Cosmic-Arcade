@@ -1,0 +1,376 @@
+/* Cards. Sizes follow --cw (card width), --ch (card height) and --ap (one art pixel of a pixel deck).
+   Position and tilt come from the spring engine (ui/motion.ts) on .card itself.
+   .card__lift carries lifts, squash and hover; .card__inner carries the flip. */
+
+.card {
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: var(--cw);
+	height: var(--ch);
+	will-change: transform;
+	cursor: grab;
+	touch-action: none;
+}
+
+.card.is-dragging {
+	cursor: grabbing;
+}
+
+.card__lift {
+	width: 100%;
+	height: 100%;
+	transition: transform 140ms cubic-bezier(0.3, 1.4, 0.5, 1);
+	perspective: 900px;
+}
+
+.card__inner {
+	position: relative;
+	width: 100%;
+	height: 100%;
+	transform-style: preserve-3d;
+	transform: rotateY(180deg);
+	transition: transform var(--t-flip) cubic-bezier(0.4, 0.1, 0.3, 1);
+}
+
+.card.is-up .card__inner {
+	transform: rotateY(0deg);
+}
+
+.card__face {
+	position: absolute;
+	inset: 0;
+	border-radius: var(--r);
+	backface-visibility: hidden;
+	-webkit-backface-visibility: hidden;
+	overflow: hidden;
+	box-shadow: calc(var(--ap) * 2) calc(var(--ap) * 2.5) 0 var(--card-shadow);
+	transition: box-shadow 140ms ease;
+}
+
+.card__back {
+	transform: rotateY(180deg);
+}
+
+/* ---------- pixel deck ---------- */
+
+[data-deck='sprite'] .card__face {
+	background: var(--paper);
+}
+
+.card__art {
+	position: absolute;
+	inset: 0;
+	background-repeat: no-repeat;
+	image-rendering: pixelated;
+}
+
+[data-pixel='smooth'] .card__art {
+	image-rendering: auto;
+}
+
+/* The suit tag: the deck shows only the rank at the top, so a tight column needs the suit too. */
+.card__tag {
+	position: absolute;
+	right: calc(var(--ap) * 4);
+	top: calc(var(--ap) * 4);
+	padding: var(--ap);
+	background: var(--paper);
+	line-height: 0;
+}
+
+.card__tag .pixel-suit {
+	width: calc(var(--ap) * 10);
+	height: calc(var(--ap) * 10);
+}
+
+[data-size='small'] .card__tag .pixel-suit {
+	width: calc(var(--ap) * 14);
+	height: calc(var(--ap) * 14);
+}
+
+.suit-H,
+.suit-D {
+	color: var(--red);
+}
+
+.suit-S,
+.suit-C {
+	color: var(--black);
+}
+
+.four-color .suit-C {
+	color: var(--club);
+}
+
+.four-color .suit-D {
+	color: var(--diamond);
+}
+
+/* ---------- plain (vector) deck ---------- */
+
+[data-deck='vector'] .card__face {
+	border: max(1.5px, calc(var(--cw) * 0.022)) solid var(--ink);
+}
+
+[data-deck='vector'] .card__front {
+	background: linear-gradient(180deg, var(--paper) 0%, var(--paper) 70%, var(--paper-2) 100%);
+}
+
+.card svg {
+	fill: currentColor;
+	display: block;
+}
+
+.card__corner {
+	position: absolute;
+	left: calc(var(--cw) * 0.06);
+	top: calc(var(--cw) * 0.045);
+	display: flex;
+	align-items: center;
+	gap: calc(var(--cw) * 0.015);
+	line-height: 1;
+}
+
+.card__rank {
+	font: 700 calc(var(--cw) * 0.27) / 1 var(--font-display);
+	letter-spacing: -0.04em;
+}
+
+.card__cpip {
+	width: calc(var(--cw) * 0.17);
+	height: calc(var(--cw) * 0.17);
+}
+
+.card__pips {
+	position: absolute;
+	left: 27%;
+	right: 27%;
+	top: 33%;
+	bottom: 10%;
+}
+
+.card__pips i {
+	position: absolute;
+	left: calc(var(--px) * 100%);
+	top: calc(var(--py) * 100%);
+	transform: translate(-50%, -50%);
+}
+
+.card__pips i.flip {
+	transform: translate(-50%, -50%) rotate(180deg);
+}
+
+.card__pip {
+	width: calc(var(--cw) * 0.19);
+	height: calc(var(--cw) * 0.19);
+}
+
+.card__solo,
+.card__ace {
+	position: absolute;
+	inset: 0;
+	display: grid;
+	place-items: center;
+	padding-top: calc(var(--cw) * 0.2);
+}
+
+.card__solo {
+	display: none;
+}
+
+.card__bigpip {
+	width: calc(var(--cw) * 0.46);
+	height: calc(var(--cw) * 0.46);
+}
+
+.card__ace .card__bigpip {
+	width: calc(var(--cw) * 0.56);
+	height: calc(var(--cw) * 0.56);
+}
+
+.card__court {
+	position: absolute;
+	left: 16%;
+	right: 16%;
+	top: 27%;
+	bottom: 7%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: calc(var(--cw) * 0.02);
+	border: max(1.5px, calc(var(--cw) * 0.022)) solid currentColor;
+	background:
+		repeating-linear-gradient(-45deg, color-mix(in srgb, currentColor 9%, transparent) 0 2px, transparent 2px 6px),
+		color-mix(in srgb, currentColor 6%, var(--paper));
+}
+
+.card__court-letter {
+	font: 700 calc(var(--cw) * 0.46) / 0.9 var(--font-display);
+}
+
+.card__court-pip {
+	width: calc(var(--cw) * 0.16);
+	height: calc(var(--cw) * 0.16);
+}
+
+[data-size='small'] .card__pips {
+	display: none;
+}
+
+[data-size='small'] .card__solo {
+	display: grid;
+}
+
+[data-size='small'] .card__corner {
+	top: calc(var(--cw) * 0.03);
+	left: calc(var(--cw) * 0.05);
+}
+
+[data-size='small'] .card__rank {
+	font-size: calc(var(--cw) * 0.31);
+}
+
+[data-size='small'] .card__cpip {
+	width: calc(var(--cw) * 0.2);
+	height: calc(var(--cw) * 0.2);
+}
+
+[data-size='small'] .card__court {
+	left: 12%;
+	right: 12%;
+	top: 30%;
+	bottom: 10%;
+}
+
+[data-deck='vector'] .card__back {
+	background: var(--paper);
+}
+
+[data-deck='vector'] .card__back::before {
+	content: '';
+	position: absolute;
+	inset: calc(var(--cw) * 0.055);
+	border-radius: calc(var(--r) * 0.6);
+	background:
+		repeating-linear-gradient(45deg, transparent 0 calc(var(--cw) * 0.07), var(--back-2) calc(var(--cw) * 0.07) calc(var(--cw) * 0.085)),
+		repeating-linear-gradient(-45deg, transparent 0 calc(var(--cw) * 0.07), var(--back-2) calc(var(--cw) * 0.07) calc(var(--cw) * 0.085)),
+		var(--back-1);
+	box-shadow: inset 0 0 0 calc(var(--cw) * 0.02) var(--back-3);
+}
+
+/* ---------- states ---------- */
+
+/* Cards you can pick up rise a little under the mouse. */
+@media (hover: hover) {
+	.card.can-pick.is-top:not(.is-dragging):hover .card__lift {
+		transform: translateY(calc(var(--ch) * -0.025));
+	}
+
+	.card.can-pick.is-top:not(.is-dragging):hover .card__face {
+		box-shadow: calc(var(--ap) * 3) calc(var(--ap) * 4.5) 0 var(--card-shadow);
+	}
+}
+
+.card.is-held .card__lift {
+	transform: translateY(calc(var(--ch) * -0.04));
+}
+
+.card.is-held .card__front {
+	box-shadow:
+		0 0 0 calc(var(--ap) * 2 + 1px) var(--mustard),
+		0 0 0 calc(var(--ap) * 2 + 3px) var(--ink),
+		calc(var(--ap) * 3) calc(var(--ap) * 5) 0 var(--card-shadow);
+}
+
+.card.is-dragging .card__lift {
+	transform: scale(1.06);
+	transition-duration: 110ms;
+}
+
+.card.is-dragging .card__front {
+	box-shadow:
+		0 0 0 calc(var(--ap) * 2 + 1px) var(--mustard),
+		0 0 0 calc(var(--ap) * 2 + 3px) var(--ink),
+		calc(var(--ap) * 8) calc(var(--ap) * 12) 0 rgb(20 14 28 / 0.32);
+}
+
+.card.is-hint .card__front {
+	box-shadow: 0 0 0 3px var(--hint);
+	animation: card-hint 900ms ease-in-out infinite;
+}
+
+@keyframes card-hint {
+	50% {
+		box-shadow:
+			0 0 0 5px var(--hint),
+			0 0 16px 3px color-mix(in srgb, var(--hint) 60%, transparent);
+	}
+}
+
+/* Landing: a quick squash, as if the card has a little weight. */
+.card.is-landing .card__lift {
+	animation: land 220ms cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+
+@keyframes land {
+	0% {
+		transform: scale(1.05, 0.95);
+	}
+	55% {
+		transform: scale(0.985, 1.015);
+	}
+}
+
+/* Flip: the card rises while it turns. */
+.card.is-flipping .card__lift {
+	animation: flip-pop 280ms ease-out;
+}
+
+@keyframes flip-pop {
+	45% {
+		transform: translateY(calc(var(--ch) * -0.06)) scale(1.07);
+	}
+}
+
+.card.is-shaking .card__lift,
+.slot.is-shaking {
+	animation: shake 320ms ease;
+}
+
+@keyframes shake {
+	20% {
+		translate: -6px 0;
+	}
+	45% {
+		translate: 5px 0;
+	}
+	70% {
+		translate: -2px 0;
+	}
+}
+
+/* Win: the foundations hop in a wave. */
+.table.is-won .card__lift {
+	animation: hop 560ms var(--hop-delay, 0ms) cubic-bezier(0.3, 0.7, 0.4, 1) 2;
+}
+
+@keyframes hop {
+	40% {
+		transform: translateY(calc(var(--ch) * -0.2)) rotate(-4deg);
+	}
+	70% {
+		transform: translateY(calc(var(--ch) * 0.02)) scale(1.02, 0.98);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.table.is-won .card__lift,
+	.card.is-hint .card__front,
+	.card.is-landing .card__lift,
+	.card.is-flipping .card__lift,
+	.mark--hint {
+		animation: none;
+	}
+}
