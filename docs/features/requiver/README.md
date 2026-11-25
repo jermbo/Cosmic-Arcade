@@ -35,6 +35,10 @@ ReQuiver is a 2D archer roguelike. The player is a lone stick-figure archer on t
 
 Every number and every content entry is data in `games/requiver/src/rules/data/`. See `games/requiver/ARCHITECTURE.md` for how to add a foe, a boost, an event or a node, and how to swap the art.
 
+## PWA
+
+The play build is offline-first: `public/manifest.webmanifest`, maskable icons (`npm run icons -w requiver`), and a service worker Vite emits as `sw.js` on `npm run build -w requiver`. Install from the title screen (or Add to Home Screen on iPhone). Logic lives in `games/requiver/src/game/pwa.ts`.
+
 ## How it is checked
 
 `npm run sim -w requiver` plays full runs with three bot skills and reports win rates, deaths per act, fight lengths, thrower accuracy and map problems. The run fails when it finds a problem.

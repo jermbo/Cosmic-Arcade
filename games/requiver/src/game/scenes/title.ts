@@ -9,7 +9,14 @@ import { music, sfx } from '../audio.ts';
 import { continueRun, startNewRun } from '../flow.ts';
 import { k, sceneSetup, visibleWorld } from '../k.ts';
 import { game } from '../state.ts';
-import { canInstall, promptInstall } from '../pwa.ts';
+import { canInstall, isStandalone, promptInstall } from '../pwa.ts';
+
+let refreshInstallMenu: (() => void) | null = null;
+
+/** Rebuilds the title menu when the browser offers install (or after install). */
+export function refreshInstallMenuIfOpen() {
+	refreshInstallMenu?.();
+}
 
 interface DemoArrow {
 	x: number;
@@ -57,7 +64,7 @@ export function titleScene() {
 			button(h('span', { class: 'row', style: 'gap:8px;align-items:center' }, icon('gear', 18), 'Settings'), () => settingsPanel(fill)),
 		);
 		if (canInstall()) menu.append(button('Install app', () => promptInstall().then(fill), 'btn--small'));
-		menu.append(h('a', { class: 'btn btn--small btn--ink', href: '../', style: 'text-decoration:none' }, icon('back', 16), 'Back to arcade'));
+		if (!isStandalone()) menu.append(h('a', { class: 'btn btn--small btn--ink', href: '../', style: 'text-decoration:none' }, icon('back', 16), 'Back to arcade'));
 		const best = meta.best;
 		menu.append(h('div', { class: 'menu__best' }, best ? `Best ${best.score.toLocaleString('en')} · act ${best.act}${best.won ? ' · won' : ''} · ${meta.runs} runs` : `${META.currency} buy upgrades between runs.`));
 	};
@@ -69,7 +76,11 @@ export function titleScene() {
 		menu,
 	);
 	root.append(screen);
-	k.onSceneLeave(() => screen.remove());
+	refreshInstallMenu = fill;
+	k.onSceneLeave(() => {
+		refreshInstallMenu = null;
+		screen.remove();
+	});
 	onBack(() => {});
 
 	// ---------- The scene ----------

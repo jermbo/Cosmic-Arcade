@@ -11,7 +11,7 @@ import { setupPwa } from './game/pwa.ts';
 import { battleScene } from './game/scenes/battle.ts';
 import { mapScene } from './game/scenes/map.ts';
 import { summaryScene } from './game/scenes/summary.ts';
-import { titleScene } from './game/scenes/title.ts';
+import { refreshInstallMenuIfOpen, titleScene } from './game/scenes/title.ts';
 import { applySettings } from './game/state.ts';
 import { setupBack, setupRotate } from './ui/dom.ts';
 
@@ -28,7 +28,7 @@ k.scene('summary', summaryScene);
 
 setupBack();
 setupRotate();
-setupPwa(() => {});
+setupPwa(refreshInstallMenuIfOpen);
 
 // On a phone, the first tap asks for full screen in landscape.
 const coarse = window.matchMedia('(pointer: coarse)').matches;
