@@ -10,6 +10,17 @@
       "name": "solitary",
       "url": "http://localhost:4010",
       "port": 4010
+    },
+    {
+      "name": "requiver-phone",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "phone",
+        "-w",
+        "requiver"
+      ],
+      "port": 4012
     }
   ]
 }

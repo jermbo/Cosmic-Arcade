@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+	<defs>
+		<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+			<stop offset="0" stop-color="#3a1747"/><stop offset="0.45" stop-color="#a8304f"/><stop offset="0.75" stop-color="#ef7a45"/><stop offset="1" stop-color="#ffcf73"/>
+		</linearGradient>
+		<clipPath id="c"><rect x="10" y="10" width="492" height="492" rx="100"/></clipPath>
+	</defs>
+	<rect x="10" y="10" width="492" height="492" rx="100" fill="url(#sky)" stroke="#0d0a10" stroke-width="14"/>
+	<g clip-path="url(#c)">
+	<g transform="translate(256 256) scale(1) translate(-256 -256)">
+		<circle cx="300" cy="300" r="150" fill="#fff0bd"/>
+		<path d="M0 392 C120 372 200 400 300 384 S440 360 512 380 V512 H0z" fill="#5e1838"/>
+		<path d="M0 430 H512 V512 H0z" fill="#0d0a10"/>
+		<path d="M120 432 L150 408 L250 404 L300 432z" fill="#0d0a10"/>
+		<g stroke="#0d0a10" stroke-linecap="round" stroke-linejoin="round" fill="none">
+			<path d="M190 300 C176 316 150 318 120 312" stroke="#ff5a1f" stroke-width="16"/>
+			<path d="M196 300 L194 352" stroke-width="20"/>
+			<path d="M194 352 L222 380 L232 418 M194 352 L170 384 L160 418" stroke-width="16"/>
+			<path d="M200 316 L258 300" stroke-width="14"/>
+			<path d="M200 316 L214 300 L232 304" stroke-width="13"/>
+			<path d="M262 236 C292 268 292 334 262 366" stroke-width="12"/>
+			<path d="M262 236 L232 304 L262 366" stroke-width="4"/>
+			<path d="M232 304 L330 280" stroke-width="7"/>
+		</g>
+		<circle cx="200" cy="270" r="26" fill="#0d0a10"/>
+		<path d="M346 276 L326 268 L330 290z" fill="#0d0a10"/>
+	</g></g>
+	<rect x="10" y="10" width="492" height="492" rx="100" fill="none" stroke="#0d0a10" stroke-width="14"/>
+</svg>
