@@ -32,21 +32,23 @@ export interface Theme {
 }
 
 // Pixel Plebes (Classic) by Devlyn JD. Rows: hearts, diamonds, spades, clubs.
-// Columns: A, K, Q, J, 2 to 10, then the back. Each card is 80 x 120, on a 90 x 126 grid.
+// Columns: A, K, Q, J, 2 to 10, then the back. Cards sit on a 90 x 126 grid. A card is the
+// cream edge, the frame and the rank that pokes out of it: 88 x 126 from x + 1. The clear
+// pixels at the grid corners round its corners.
 const SUIT_ROW = { H: 0, D: 1, S: 2, C: 3 } as const;
 const plebes: Deck = {
 	kind: 'sprite',
 	sheet: plebesSheet,
 	sheetW: 1260,
 	sheetH: 504,
-	cardW: 80,
-	cardH: 120,
+	cardW: 88,
+	cardH: 126,
 	at: (card) => {
 		const col = card.rank === 1 ? 0 : card.rank >= 11 ? 14 - card.rank : card.rank + 2;
-		return [5 + col * 90, 3 + SUIT_ROW[card.suit] * 126];
+		return [1 + col * 90, SUIT_ROW[card.suit] * 126];
 	},
-	back: [5 + 13 * 90, 3],
-	fanUp: 0.21,
+	back: [1 + 13 * 90, 0],
+	fanUp: 0.2,
 };
 
 export const THEMES: Theme[] = [

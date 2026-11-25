@@ -54,8 +54,10 @@
 
 /* ---------- pixel deck ---------- */
 
+/* The sheet draws the card edge and its rounded corners, so the face itself is clear. */
 [data-deck='sprite'] .card__face {
-	background: var(--paper);
+	border-radius: calc(var(--ap) * 1.5);
+	background: transparent;
 }
 
 .card__art {
@@ -72,8 +74,8 @@
 /* The suit tag: the deck shows only the rank at the top, so a tight column needs the suit too. */
 .card__tag {
 	position: absolute;
-	right: calc(var(--ap) * 4);
-	top: calc(var(--ap) * 4);
+	right: calc(var(--ap) * 8);
+	top: calc(var(--ap) * 8);
 	padding: var(--ap);
 	background: var(--paper);
 	line-height: 0;

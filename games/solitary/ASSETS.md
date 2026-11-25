@@ -4,7 +4,7 @@
 
 - Source: `src/assets/Plebes_CLASSIC_4XSheet.png`, by Devlyn JD. The sheet asks for credit, so the game shows it in Settings.
 - The game uses `src/assets/plebes-1x.png`: the same sheet at one pixel per art pixel (1260 x 504). It is small and draws crisp at any size. Make it again with `npm run deck`.
-- Layout of the sheet: rows are hearts, diamonds, spades, clubs. Columns are A, K, Q, J, 2 to 10, then the back (row 1) and the jokers. Each card is 80 x 120 art pixels on a 90 x 126 grid, starting at (5, 3).
+- Layout of the sheet: rows are hearts, diamonds, spades, clubs. Columns are A, K, Q, J, 2 to 10, then the back (row 1) and the jokers. Cards sit on a 90 x 126 grid. A card is 88 x 126 from (1, 0): the cream edge, the frame and the rank that pokes out of it. Clear pixels at the grid corners round the corners.
 
 ## Adding a deck
 

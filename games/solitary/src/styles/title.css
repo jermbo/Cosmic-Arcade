@@ -114,8 +114,8 @@
 }
 
 .mini {
-	--cw: 64px;
-	--ch: 96px;
+	--cw: 66px;
+	--ch: 94.5px;
 	position: absolute;
 	left: 50%;
 	top: 18px;
