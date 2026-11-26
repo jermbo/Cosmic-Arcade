@@ -16,6 +16,8 @@ export class WordRows {
 	el: HTMLElement;
 	private rowEls: HTMLElement[] = [];
 	private row = 0;
+	/** Reads each guess result to screen readers. */
+	private live: HTMLElement;
 	private text = '';
 	busy = false;
 
@@ -23,12 +25,14 @@ export class WordRows {
 
 	constructor(opts: RowsOpts) {
 		this.opts = opts;
+		this.live = h('p', { class: 'sr-only', 'aria-live': 'polite' });
 		this.el = h('div', { class: 'rows', '--len': opts.length, '--rows': Math.max(1, opts.rows) });
 		for (let r = 0; r < opts.rows; r++) {
 			const row = this.el.appendChild(h('div', { class: 'rows__row' }));
 			for (let i = 0; i < opts.length; i++) row.append(h('div', { class: 'cell' }));
 			this.rowEls.push(row);
 		}
+		this.el.append(this.live);
 		this.paintGhost();
 		this.markCurrent();
 	}
@@ -90,6 +94,8 @@ export class WordRows {
 	async reveal(marks: Mark[]): Promise<void> {
 		this.busy = true;
 		const cells = this.cells();
+		const say: Record<Mark, string> = { hit: 'right spot', near: 'in the word', miss: 'not in it' };
+		this.live.textContent = `${this.text}: ` + [...this.text].map((ch, i) => `${ch} ${say[marks[i]]}`).join(', ');
 		const speed = motionSpeed();
 		const step = calm() ? 60 : 210 * speed;
 		cells.forEach((c, i) => {

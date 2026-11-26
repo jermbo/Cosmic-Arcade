@@ -82,7 +82,7 @@ export class Shell {
 			back,
 			h('div', { class: 'hud__title' }, h('strong', {}, opts.title), h('span', { class: 'hud__tag' }, opts.tag)),
 			this.kipBtn,
-			h('div', { class: 'hud__stats' }, h('span', { class: 'hud__score', 'aria-label': 'Score' }, this.scoreEl), this.hearts.el),
+			h('div', { class: 'hud__stats' }, h('span', { class: 'hud__score' }, h('span', { class: 'sr-only' }, 'Score '), this.scoreEl), this.hearts.el),
 			help,
 		);
 		this.main = h('main', { class: 'game__main' });

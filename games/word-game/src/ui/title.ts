@@ -101,7 +101,8 @@ export function titleScreen(actions: TitleActions): { el: HTMLElement; destroy: 
 		'button',
 		{ class: 'dock__btn dock__btn--shop', type: 'button', on: { click: () => { sfx.ui(); openShop(); } } },
 		icon('shop'),
-		h('span', { class: 'dock__coins' }, icon('coin', 'coin'), coinCount),
+		h('span', { class: 'sr-only' }, 'Shop, '),
+		h('span', { class: 'dock__coins' }, icon('coin', 'coin'), coinCount, h('span', { class: 'sr-only' }, ' coins')),
 	);
 	const stopCoins = onCoins(() => {
 		coinCount.textContent = String(coins());

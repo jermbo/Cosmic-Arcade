@@ -56,7 +56,7 @@ function motionVars(id: string): Record<string, string> {
 }
 
 export function openShop(): void {
-	const wallet = h('span', { class: 'wallet', 'aria-live': 'polite' }, coinIcon(), h('span', {}, String(coins())));
+	const wallet = h('span', { class: 'wallet', 'aria-live': 'polite' }, coinIcon(), h('span', {}, String(coins())), h('span', { class: 'sr-only' }, ` ${CURRENCY.name.toLowerCase()}`));
 	const list = h('div', { class: 'shop__list' });
 	const tabs = SECTIONS.map((s) =>
 		h('button', { class: 'shop__tab', type: 'button', role: 'tab', 'aria-selected': String(s.id === lastTab), on: { click: () => show(s.id) } }, s.title === 'Tile styles' ? 'Tiles' : s.title),
@@ -73,9 +73,9 @@ export function openShop(): void {
 		const have = owns(cat, item.id);
 		const on = inUse(cat) === item.id;
 		let btn: HTMLButtonElement;
-		if (on) btn = h('button', { class: 'btn btn--done', type: 'button', disabled: true }, 'In use');
-		else if (have) btn = h('button', { class: 'btn btn--ghost', type: 'button', on: { click: () => pick() } }, 'Use');
-		else btn = h('button', { class: `btn btn--go${item.price > coins() ? ' btn--short' : ''}`, type: 'button', on: { click: () => purchase() } }, h('span', { class: 'item__price' }, coinIcon(), String(item.price)));
+		if (on) btn = h('button', { class: 'btn btn--done', type: 'button', disabled: true, 'aria-label': `${item.name}, in use` }, 'In use');
+		else if (have) btn = h('button', { class: 'btn btn--ghost', type: 'button', 'aria-label': `Use ${item.name}`, on: { click: () => pick() } }, 'Use');
+		else btn = h('button', { class: `btn btn--go${item.price > coins() ? ' btn--short' : ''}`, type: 'button', 'aria-label': `Buy ${item.name} for ${item.price} ${CURRENCY.name.toLowerCase()}`, on: { click: () => purchase() } }, h('span', { class: 'item__price' }, coinIcon(), String(item.price)));
 
 		const el = h(
 			'div',
@@ -108,7 +108,7 @@ export function openShop(): void {
 	}
 
 	const stop = onCoins(() => {
-		wallet.lastElementChild!.textContent = String(coins());
+		wallet.children[1].textContent = String(coins());
 		pulse(wallet, 'pop-again');
 	});
 

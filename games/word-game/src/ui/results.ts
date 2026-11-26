@@ -67,7 +67,7 @@ export function showResults(opts: ResultsOpts): void {
 	});
 
 	const body = [
-		h('div', { class: 'results__stars' }, ...stars),
+		h('div', { class: 'results__stars', role: 'img', 'aria-label': `${o.stars} of 3 stars` }, ...stars),
 		h('div', { class: 'results__scorebox' }, h('small', {}, 'Score'), score, opts.newBest && h('span', { class: 'badge badge--best' }, 'New best!')),
 		opts.coins > 0 ? h('div', { class: 'results__coins', 'aria-label': `${opts.coins} coins earned` }, icon('coin', 'coin'), '+', coinNum) : null,
 		h('ul', { class: 'results__lines' }, ...o.lines.map((l) => h('li', {}, l))),
