@@ -936,6 +936,9 @@ button:disabled {
 }
 
 .hud__tag {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 	font-size: 11px;
 	font-weight: 700;
 	text-transform: uppercase;
@@ -2558,17 +2561,483 @@ button:disabled {
 	border: 2px solid var(--ink);
 }
 
-/* ---------- Short screens and wide screens ---------- */
+/* ---------- A game fits one screen ----------
+   A game screen never scrolls. It is a column the height of the screen:
+   header, then the board (or a panel), then controls or the keyboard.
+   Parts that can give up height (board rows, guess rows) stretch or shrink;
+   the rest keep their size. */
 
+.game {
+	height: 100dvh;
+	min-height: 0;
+	overflow: hidden;
+	gap: 8px;
+	padding-bottom: max(10px, env(safe-area-inset-bottom));
+}
+
+.game__main {
+	min-height: 0;
+	gap: 8px;
+}
+
+.hint {
+	font-size: 13px;
+	flex: none;
+}
+
+.board {
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.board__area {
+	flex: 1 1 auto;
+	min-height: 0;
+	max-height: 420px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.board__solved {
+	flex: 0 1 0;
+	min-height: 0;
+}
+
+.board__solved .bar {
+	flex: 1 1 0;
+	min-height: 0;
+	padding: 4px 10px;
+}
+
+.board__grid {
+	flex: 1 1 0;
+	min-height: 0;
+}
+
+.tile,
+.bar {
+	min-height: 0;
+}
+
+.board__controls {
+	flex: none;
+}
+
+/* While a guess panel is open, the board shrinks to a short strip of clues. */
+.board--compact {
+	flex: none;
+}
+
+.board--compact .board__area {
+	flex: none;
+	height: clamp(104px, 21dvh, 176px);
+	gap: 4px;
+}
+
+.board--compact .board__grid,
+.board--compact .board__solved {
+	gap: 4px;
+}
+
+.board--compact .tile {
+	min-height: 0;
+	border-width: 2.5px;
+	box-shadow: 1px 1px 0 var(--ink);
+}
+
+/* Guess rows fill the room the panel leaves and size their cells to fit it. */
+.panel {
+	flex: 1 1 auto;
+	min-height: 0;
+	gap: 8px;
+	padding: 8px 8px 10px;
+}
+
+.panel > .rows,
+.link__rows > .rows {
+	flex: 1 1 auto;
+	min-height: 0;
+	container-type: size;
+	align-content: center;
+}
+
+.rows {
+	--vis: var(--rows);
+	--cell: min(52px, calc((100cqw - (var(--len) - 1) * 6px) / var(--len)), calc((100cqh - (var(--vis) - 1) * 6px) / var(--vis)));
+}
+
+.link__rows {
+	flex: 1 1 auto;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.rows--link {
+	--vis: 3;
+	max-height: none;
+	height: 100%;
+	align-content: start;
+}
+
+.kb {
+	flex: none;
+}
+
+.kb__key {
+	height: clamp(38px, 6.2dvh, 52px);
+	min-height: 0;
+}
+
+/* Secret: while guessing, the board hides and the strip shrinks. */
+.secret {
+	flex: none;
+}
+
+.secret--guessing {
+	padding: 8px 10px;
+	gap: 6px;
+}
+
+.round {
+	flex: none;
+}
+
+.slot-word {
+	min-height: 42px;
+}
+
+/* Short phones: tighter header and smaller bits. */
 @media (max-height: 700px) {
-	.tile,
-	.bar {
-		min-height: 58px;
+	.hud .iconbtn {
+		width: 38px;
+		height: 38px;
 	}
-	.board--compact .tile {
-		min-height: 30px;
+	.secret {
+		padding: 8px 10px 10px;
+		gap: 6px;
+	}
+	.slot {
+		font-size: 18px;
+	}
+	.btn {
+		min-height: 42px;
 	}
 }
+
+@media (max-height: 600px) {
+	.hint {
+		display: none;
+	}
+}
+
+/* The chain card in a modal: rows fill the space above the keyboard. */
+.modal__card--chain {
+	display: flex;
+	flex-direction: column;
+	height: min(680px, calc(100dvh - 32px));
+}
+
+.modal__card--chain .modal__body {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.modal__card--chain .modal__body > .rows {
+	flex: 1 1 auto;
+	min-height: 0;
+	container-type: size;
+	align-content: center;
+}
+
+/* ---------- The title fits a phone ----------
+   Logo in one row, mode cards as short rows with their buttons on the right,
+   the daily chain in view, and the menu dock at the bottom in thumb reach. */
+
+.title {
+	gap: 10px;
+	min-height: 100dvh;
+	padding-top: max(14px, env(safe-area-inset-top));
+}
+
+.logo {
+	flex-direction: row;
+	gap: 5px;
+	margin: 2px 0 0;
+}
+
+.logo__row {
+	gap: 5px;
+}
+
+.logo__tile {
+	width: clamp(34px, 10vw, 54px);
+	height: clamp(34px, 10vw, 54px);
+	border-radius: 9px;
+	font-size: clamp(20px, 6.2vw, 32px);
+	box-shadow: 3px 3px 0 var(--ink);
+}
+
+.kip--big {
+	width: clamp(38px, 11vw, 58px);
+	height: clamp(38px, 11vw, 58px);
+	border-radius: 11px;
+	box-shadow: 3px 3px 0 var(--ink);
+	margin-left: 2px;
+}
+
+.title__tag {
+	font-size: 14px;
+}
+
+.diff__btn {
+	min-height: 40px;
+	font-size: 14px;
+}
+
+.diff__blurb {
+	font-size: 12px;
+}
+
+.modes {
+	gap: 10px;
+	margin-top: 2px;
+}
+
+.mode {
+	grid-template-columns: minmax(0, 1fr) auto;
+	grid-template-areas:
+		'head actions'
+		'blurb actions';
+	align-items: center;
+	gap: 2px 10px;
+	padding: 10px 10px 10px 22px;
+}
+
+.mode > * {
+	margin-left: 0;
+}
+
+.mode .mini {
+	display: none;
+}
+
+.mode__name {
+	font-size: 21px;
+}
+
+.mode__blurb {
+	font-size: 12.5px;
+	line-height: 1.3;
+}
+
+.mode__actions {
+	display: flex;
+	gap: 6px;
+	margin: 0;
+}
+
+.mode__actions .btn {
+	min-height: 42px;
+	padding: 0 11px;
+	font-size: 14px;
+}
+
+.mode__actions .btn--done {
+	min-width: 64px;
+}
+
+.btn__stars {
+	font-size: 13px;
+}
+
+.btn--done-lost {
+	background: var(--miss);
+}
+
+/* Wider phones and up: the little art comes back. */
+@media (min-width: 440px) {
+	.mode {
+		grid-template-columns: auto minmax(0, 1fr) auto;
+		grid-template-areas:
+			'mini head actions'
+			'mini blurb actions';
+	}
+	.mode .mini {
+		display: grid;
+	}
+}
+
+.chain {
+	gap: 8px;
+	padding: 10px 12px 12px;
+}
+
+.chain__head {
+	flex-wrap: wrap;
+	gap: 2px 10px;
+}
+
+.chain__title {
+	font-size: 17px;
+}
+
+.chain__note {
+	flex: 1;
+	min-width: 0;
+	font-size: 12.5px;
+	text-align: right;
+}
+
+.chain__slots {
+	grid-template-columns: repeat(6, minmax(0, 40px));
+	gap: 5px;
+}
+
+.chain__slot {
+	font-size: 18px;
+	border-width: 2.5px;
+	border-bottom-width: 6px;
+}
+
+.chain__key {
+	font-size: 11px;
+}
+
+.chain .btn {
+	min-height: 42px;
+}
+
+.dock {
+	display: flex;
+	justify-content: center;
+	gap: 8px;
+	width: 100%;
+	margin-top: auto;
+}
+
+.dock__btn {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	flex: 1;
+	max-width: 110px;
+	padding: 6px 4px 5px;
+	border: var(--line) solid var(--ink);
+	border-radius: 10px;
+	background: var(--card);
+	box-shadow: var(--shadow-sm);
+	font-size: 11.5px;
+	font-weight: 700;
+	transition: transform 0.12s var(--out), box-shadow 0.12s var(--out);
+}
+
+.dock__btn .icon {
+	width: 20px;
+	height: 20px;
+}
+
+.dock__btn:active {
+	transform: translate(2px, 2px);
+	box-shadow: none;
+}
+
+.dock__btn--install {
+	background: var(--l1);
+}
+
+/* Short phones: tighter still, so the chain stays in view. */
+@media (max-height: 700px) {
+	.title {
+		gap: 8px;
+	}
+	.title__tag,
+	.diff__blurb {
+		display: none;
+	}
+	.mode {
+		padding-top: 8px;
+		padding-bottom: 8px;
+	}
+}
+
+/* ---------- Small fixes from the phone check ---------- */
+
+/* Big phones: the board may grow taller, and words grow with their tiles. */
+.board__area {
+	max-height: 540px;
+}
+
+.board__grid {
+	container-type: inline-size;
+}
+
+.board .tile { font-size: clamp(12px, 4.4cqi, 19px); }
+.board .tile.len-m { font-size: clamp(11.5px, 3.9cqi, 17px); }
+.board .tile.len-l { font-size: clamp(10.5px, 3.4cqi, 15px); }
+.board .tile.len-xl { font-size: clamp(9.5px, 3cqi, 14px); }
+
+.board--compact .tile,
+.board--compact .tile.len-m { font-size: 12px; }
+.board--compact .tile.len-l,
+.board--compact .tile.len-xl { font-size: 10px; }
+
+/* A lock on the shrunk board: icon and given letters side by side. */
+.board--compact .tile__lock {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.board--compact .tile__dots b {
+	font-size: 11px;
+}
+
+/* The mark cues sit in the corner, clear of the letter. */
+.cell[data-mark='hit']::after,
+.cell[data-mark='near']::after {
+	right: 2px;
+	top: 2px;
+	bottom: auto;
+	width: 5px;
+	height: 5px;
+}
+
+.cell[data-mark='near']::after {
+	width: 3px;
+	height: 3px;
+	border-width: 1.5px;
+}
+
+/* Long cards scroll inside; their title and close button stay put. */
+.modal__head {
+	position: sticky;
+	top: -16px;
+	z-index: 2;
+	margin: -16px -16px 12px;
+	padding: 16px 16px 10px;
+	background: var(--card);
+}
+
+.bookset__grid {
+	grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+}
+
+.sticker {
+	min-height: 44px;
+	font-size: 11.5px;
+}
+
+.results__grid {
+	font-size: 15px;
+	line-height: 1.15;
+}
+
+/* ---------- Wide screens ---------- */
 
 @media (min-width: 520px) {
 	.tile {

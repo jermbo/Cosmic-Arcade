@@ -16,7 +16,7 @@ export const MODES: ModeMeta[] = [
 	{
 		id: 'crack',
 		name: 'Crack',
-		blurb: 'Crack 4 locked words, then sort all 16 into groups.',
+		blurb: 'Crack the locks, then sort 16 words.',
 		steps: (d) => [
 			'The board has **16 words** in **4 hidden groups**. One word in each group is **locked**.',
 			`Tap a lock to crack it. You get **${d.crack.guesses} guesses**. Colors show which letters are right.` +
@@ -28,7 +28,7 @@ export const MODES: ModeMeta[] = [
 	{
 		id: 'secret',
 		name: 'Secret',
-		blurb: 'Sort the groups. Each one shows a letter of a secret word.',
+		blurb: 'Sort groups to find a secret word.',
 		steps: (d) => [
 			'Sort **16 words** into **4 groups** of 4. Pick 4, then tap **Submit**.',
 			'Each group you solve shows **one letter** of the secret word.',
@@ -43,7 +43,7 @@ export const MODES: ModeMeta[] = [
 	{
 		id: 'link',
 		name: 'Link',
-		blurb: 'Guess words to find the hidden link, then name it.',
+		blurb: 'Guess words, then name their link.',
 		steps: (d) => [
 			`Each round hides **4 words** that share a link. You see the **first${d.link.showLast ? ' and last' : ''} letter** of each.`,
 			`Tap a word and guess it. Colors show which letters are right. You have **${d.link.guesses} guesses** per round.`,

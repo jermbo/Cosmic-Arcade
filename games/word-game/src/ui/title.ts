@@ -50,7 +50,7 @@ export function titleScreen(onPlay: (mode: ModeId, daily: boolean) => void): { e
 		const daily = h(
 			'button',
 			{
-				class: `btn ${done ? 'btn--done' : 'btn--go'}`,
+				class: `btn ${done ? `btn--done${done.won ? '' : ' btn--done-lost'}` : 'btn--go'}`,
 				type: 'button',
 				on: {
 					click: () => {
@@ -84,7 +84,9 @@ export function titleScreen(onPlay: (mode: ModeId, daily: boolean) => void): { e
 		chainEl.replaceWith(next);
 		chainEl = next;
 	};
-	const installBtn = h('button', { class: 'btn btn--small btn--ghost', type: 'button', hidden: true, on: { click: () => void promptInstall() } }, 'Install');
+	const dockBtn = (name: 'book' | 'chart' | 'gear', label: string, open: () => void) =>
+		h('button', { class: 'dock__btn', type: 'button', on: { click: () => { sfx.ui(); open(); } } }, icon(name), h('span', {}, label));
+	const installBtn = h('button', { class: 'dock__btn dock__btn--install', type: 'button', hidden: true, on: { click: () => void promptInstall() } }, icon('share'), h('span', {}, 'Install'));
 	const syncInstall = () => (installBtn.hidden = isStandalone() || !canInstall());
 	syncInstall();
 	addEventListener('pwa-change', syncInstall);
@@ -113,21 +115,20 @@ export function titleScreen(onPlay: (mode: ModeId, daily: boolean) => void): { e
 	const el = h(
 		'div',
 		{ class: 'screen title' },
-		h(
-			'div',
-			{ class: 'title__bar' },
-			installBtn,
-			h('span', { class: 'title__spacer' }),
-			h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Kin Book', on: { click: () => { sfx.ui(); openBook(() => kip.setHat(wornHat()?.hat ?? null)); } } }, icon('book')),
-			h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Stats', on: { click: () => { sfx.ui(); openStats(); } } }, icon('chart')),
-			h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Settings', on: { click: () => { sfx.ui(); openSettings(); } } }, icon('gear')),
-		),
 		logo,
 		h('p', { class: 'title__tag' }, 'Find the kin. Crack the words.'),
 		diffPicker(),
 		modes,
 		chainEl,
-		h('p', { class: 'title__foot' }, `New daily puzzles every day · ${today}`),
+		// The dock sits at the bottom, in thumb reach. Labels, not just icons.
+		h(
+			'nav',
+			{ class: 'dock', 'aria-label': 'More' },
+			dockBtn('book', 'Kin Book', () => openBook(() => kip.setHat(wornHat()?.hat ?? null))),
+			dockBtn('chart', 'Stats', openStats),
+			dockBtn('gear', 'Settings', openSettings),
+			installBtn,
+		),
 	);
 
 	const onMove = (e: PointerEvent) => kip.look(e.clientX, e.clientY);

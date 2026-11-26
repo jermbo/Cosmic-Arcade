@@ -139,7 +139,8 @@ export function startSecret(ctx: GameCtx): ModeGame {
 		if (over || panel) return;
 		rows = new WordRows({ length: word.length, rows: T.tries, ghost: known });
 		guesses.forEach((g, i) => rows!.fill(g, marks[i]));
-		board.setCompact(true);
+		// The letters are in the strip, so the board steps aside to give the rows room.
+		board.el.hidden = true;
 		strip.classList.add('secret--guessing');
 		shell.kip.react('think', 900);
 		panel = new GuessPanel({
@@ -154,7 +155,7 @@ export function startSecret(ctx: GameCtx): ModeGame {
 			onClose: () => {
 				panel = null;
 				rows = null;
-				board.setCompact(false);
+				board.el.hidden = false;
 				strip.classList.remove('secret--guessing');
 			},
 			onGuess: async (guess) => {

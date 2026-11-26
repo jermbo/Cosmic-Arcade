@@ -22,7 +22,7 @@ export class WordRows {
 
 	constructor(opts: RowsOpts) {
 		this.opts = opts;
-		this.el = h('div', { class: 'rows', '--len': opts.length });
+		this.el = h('div', { class: 'rows', '--len': opts.length, '--rows': Math.max(1, opts.rows) });
 		for (let r = 0; r < opts.rows; r++) {
 			const row = this.el.appendChild(h('div', { class: 'rows__row' }));
 			for (let i = 0; i < opts.length; i++) row.append(h('div', { class: 'cell' }));
@@ -126,6 +126,7 @@ export class WordRows {
 		for (let i = 0; i < this.opts.length; i++) row.append(h('div', { class: 'cell' }));
 		this.rowEls.push(row);
 		this.opts.rows++;
+		this.el.style.setProperty('--rows', String(this.opts.rows));
 		this.markCurrent();
 		this.paintGhost();
 		pulse(row, 'rows__row--in');

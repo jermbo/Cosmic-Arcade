@@ -46,11 +46,12 @@ export class SortBoard {
 		this.solvedEl = h('div', { class: 'board__solved' });
 		this.gridEl = h('div', { class: 'board__grid', role: 'group', 'aria-label': 'Word tiles' });
 		for (const word of this.order) this.gridEl.append(this.makeTile(word));
+		this.fitRows();
 
 		this.shuffleBtn = h('button', { class: 'btn btn--ghost', type: 'button', on: { click: () => this.shuffle() } }, icon('shuffle'), 'Shuffle');
 		this.clearBtn = h('button', { class: 'btn btn--ghost', type: 'button', disabled: true, on: { click: () => this.clear() } }, 'Clear');
 		this.submitBtn = h('button', { class: 'btn btn--go', type: 'button', disabled: true, on: { click: () => void this.submit() } }, 'Submit');
-		this.el = h('div', { class: 'board' }, this.solvedEl, this.gridEl, h('div', { class: 'board__controls' }, this.shuffleBtn, this.clearBtn, this.submitBtn));
+		this.el = h('div', { class: 'board' }, h('div', { class: 'board__area' }, this.solvedEl, this.gridEl), h('div', { class: 'board__controls' }, this.shuffleBtn, this.clearBtn, this.submitBtn));
 	}
 
 	get done(): boolean {
@@ -201,6 +202,7 @@ export class SortBoard {
 		);
 		this.solvedEl.append(bar);
 		this.solved.push(group);
+		this.fitRows();
 		glide(before, 380);
 		pulse(bar, 'bar--stamp');
 		if (!given) {
@@ -289,6 +291,14 @@ export class SortBoard {
 	setEnabled(on: boolean): void {
 		this.el.classList.toggle('board--off', !on);
 		[this.submitBtn, this.clearBtn, this.shuffleBtn].forEach((b) => (b.hidden = !on));
+	}
+
+	/** Solved bars and tile rows share the board height: 4 rows in all, each the same height. */
+	private fitRows() {
+		const solved = this.solved.length;
+		this.solvedEl.style.flexGrow = String(solved);
+		this.gridEl.style.flexGrow = String(this.board.groups.length - solved);
+		this.gridEl.style.gridTemplateRows = `repeat(${Math.ceil(this.order.length / 4)}, minmax(0, 1fr))`;
 	}
 
 	setCompact(on: boolean): void {

@@ -50,21 +50,26 @@ export function chainCard(diff: Difficulty, date: string, refresh: () => void): 
 	let note: string;
 	let action: HTMLElement | null = null;
 	if (st.done) {
-		note = st.won ? `Solved in ${st.guesses.length}! Come back tomorrow.` : `It was ${v.chain.word}. New chain tomorrow.`;
+		note = st.won ? `Solved in ${st.guesses.length}! New chain tomorrow.` : 'New chain tomorrow.';
 	} else if (v.played < 3) {
-		note = `Win today's ${DIFFICULTY[diff].name.toLowerCase()} dailies to fill it in. ${v.played}/3 played.`;
+		note = `Win dailies to fill it · ${v.played}/3`;
 	} else {
-		note = 'All 3 dailies played. Time to crack the chain!';
+		note = 'All 3 dailies played!';
 		action = h('button', { class: 'btn btn--go btn--wide btn--ready', type: 'button', on: { click: () => openChain(diff, date, refresh) } }, 'Solve the chain');
 	}
 	const streak = save.chainStreak.streak;
 	return h(
 		'section',
 		{ class: `chain${st.won ? ' chain--won' : ''}` },
-		h('div', { class: 'chain__head' }, h('h2', { class: 'chain__title' }, '🔗 Daily chain'), streak > 0 && h('span', { class: 'chip chip--streak' }, `🔥 ${streak}`)),
+		h(
+			'div',
+			{ class: 'chain__head' },
+			h('h2', { class: 'chain__title' }, '🔗 Daily chain'),
+			h('span', { class: 'chain__note' }, note),
+			streak > 0 && h('span', { class: 'chip chip--streak' }, `🔥 ${streak}`),
+		),
 		h('div', { class: 'chain__slots' }, ...slots),
-		h('div', { class: 'chain__key' }, ...CHAIN_MODES.map((m) => h('span', { class: `chain__keyitem chain__keyitem--${m}` }, MODE_BY_ID[m].name))),
-		h('p', { class: 'chain__note' }, note),
+		!action && h('div', { class: 'chain__key' }, ...CHAIN_MODES.map((m) => h('span', { class: `chain__keyitem chain__keyitem--${m}` }, MODE_BY_ID[m].name))),
 		action,
 	);
 }
