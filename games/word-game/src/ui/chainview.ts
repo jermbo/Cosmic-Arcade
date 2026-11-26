@@ -1,7 +1,9 @@
 // The daily chain card on the title screen, and the card to guess it.
 import { sfx } from '../audio.ts';
 import { buildChain, CHAIN_MODES, type Chain } from '../core/chain.ts';
+import { EARN } from '../core/economy.ts';
 import { DIFFICULTY, TUNING } from '../core/tuning.ts';
+import { earn } from '../shop/wallet.ts';
 import type { Difficulty, Mark } from '../core/types.ts';
 import { isWord, mergeKeyMarks, scoreGuess } from '../core/words.ts';
 import { MODE_BY_ID } from '../modes/meta.ts';
@@ -120,7 +122,8 @@ function openChain(diff: Difficulty, date: string, refresh: () => void): void {
 			await rows.bounce();
 			sfx.win();
 			confetti();
-			toast(`Chain solved! 🔥 ${save.chainStreak.streak}`, 2200);
+			const got = earn(EARN.chain);
+			toast(`Chain solved! +${got} coins · 🔥 ${save.chainStreak.streak}`, 2400);
 			await wait(1200);
 			modal.close();
 		} else if (done) {

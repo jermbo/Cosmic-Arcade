@@ -7,8 +7,10 @@ import { unlockAudio } from './audio.ts';
 import { loadDictionary } from './core/dictionary.ts';
 import { save } from './save.ts';
 import { setupPwa } from './ui/pwa.ts';
+import { applyLooks } from './shop/wallet.ts';
 
 document.documentElement.classList.toggle('calm', save.settings.lessMotion);
+applyLooks();
 
 // Browsers start audio only after a tap or key press.
 addEventListener('pointerdown', unlockAudio, { capture: true });

@@ -1,4 +1,5 @@
 // Names, blurbs and how-to-play steps for each mode.
+import { BLITZ } from '../core/economy.ts';
 import type { DiffTuning } from '../core/tuning.ts';
 import type { ModeId } from '../core/types.ts';
 
@@ -51,6 +52,20 @@ export const MODES: ModeMeta[] = [
 			`A wrong name costs a heart. You have **${d.link.hearts}** for all 4 rounds.`,
 		],
 	},
+	{
+		id: 'blitz',
+		name: 'Blitz',
+		blurb: 'Sort groups against the clock.',
+		steps: () => [
+			'Sort **16 words** into **groups of 4**, as fast as you can.',
+			`You start with **${BLITZ.seconds} seconds**. Each right group adds **${BLITZ.solveBonus}s**.`,
+			`A wrong pick takes **${BLITZ.mistakePenalty}s** away. No hearts here: time is your health.`,
+			'Clear a board and a new one drops in, with a bonus. Go!',
+		],
+	},
 ];
+
+/** The modes with a daily and a card of their own on the title. */
+export const PUZZLE_MODES = MODES.filter((m) => m.id !== 'blitz');
 
 export const MODE_BY_ID = Object.fromEntries(MODES.map((m) => [m.id, m])) as Record<ModeId, ModeMeta>;

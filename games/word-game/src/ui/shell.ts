@@ -12,11 +12,11 @@ export class Hearts {
 
 	max: number;
 
-	constructor(max: number) {
+	constructor(max: number, left = max) {
 		this.max = max;
-		this.left = max;
+		this.left = left;
 		this.el = h('div', { class: 'hearts', role: 'img', 'aria-label': `${max} hearts left` });
-		for (let i = 0; i < max; i++) this.icons.push(this.el.appendChild(icon('heart', 'heart')));
+		for (let i = 0; i < max; i++) this.icons.push(this.el.appendChild(icon('heart', `heart${i >= left ? ' heart--lost' : ''}`)));
 	}
 
 	lose(): void {
@@ -36,6 +36,8 @@ export interface ShellOpts {
 	title: string;
 	tag: string;
 	hearts: number;
+	/** Hearts already lost before this game (Endless Run). */
+	heartsLeft?: number;
 	onBack: () => void;
 	onHelp: () => void;
 	/** Points are multiplied by this (harder games score more). */
@@ -70,7 +72,7 @@ export class Shell {
 		this.bubble = h('span', { class: 'bubble', role: 'status', 'aria-live': 'polite' });
 		this.kipBtn = h('button', { class: 'kipbtn', type: 'button', on: { click: () => this.askKip(opts.onHint) } }, this.kip.el, this.badge, this.bubble);
 		this.syncKip();
-		this.hearts = new Hearts(opts.hearts);
+		this.hearts = new Hearts(opts.hearts, opts.heartsLeft ?? opts.hearts);
 		this.scoreEl = h('span', { class: 'hud__score-num' }, '0');
 		const back = h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Back to menu', on: { click: opts.onBack } }, icon('back'));
 		const help = h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'How to play', on: { click: opts.onHelp } }, icon('help'));

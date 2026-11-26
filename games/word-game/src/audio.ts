@@ -10,8 +10,8 @@ const buffers = new Map<string, AudioBuffer>();
 
 const PENTA = [0, 2, 4, 7, 9];
 const NOTES = 15;
-/** Frequency of pentatonic step n, from C4. */
-const noteHz = (n: number) => 261.63 * 2 ** ((Math.floor(n / 5) * 12 + PENTA[((n % 5) + 5) % 5]) / 12);
+/** Frequency of pentatonic step n, from a root note. */
+const stepHz = (root: number, n: number) => root * 2 ** ((Math.floor(n / 5) * 12 + PENTA[((n % 5) + 5) % 5]) / 12);
 
 type Voice = (c: OfflineAudioContext, out: AudioNode) => void;
 
@@ -126,6 +126,122 @@ const whoosh: Voice = (c, out) => {
 	n.start(0);
 };
 
+// ---- Sound packs (shop items). Each gives the two pitched voices and a root note. ----
+
+/** A bell: sine plus a high partial, quick and bright. */
+const bell = (hz: number, decay: number): Voice => (c, out) => {
+	const a = c.createOscillator();
+	a.frequency.value = hz;
+	a.connect(env(c, out, 0.4, 0.002, decay));
+	const b = c.createOscillator();
+	b.frequency.value = hz * 3;
+	b.connect(env(c, out, 0.08, 0.002, decay * 0.35));
+	const d = c.createOscillator();
+	d.frequency.value = hz * 2;
+	d.connect(env(c, out, 0.1, 0.002, decay * 0.6));
+	[a, b, d].forEach((o) => o.start(0));
+};
+
+/** A marimba bar: warm sine body with a woody 4x knock. */
+const marimba = (hz: number, decay: number): Voice => (c, out) => {
+	const body = c.createOscillator();
+	body.frequency.value = hz;
+	body.connect(env(c, out, 0.55, 0.004, decay));
+	const knock = c.createOscillator();
+	knock.frequency.value = hz * 4;
+	knock.connect(env(c, out, 0.16, 0.002, 0.05));
+	const sub = c.createOscillator();
+	sub.frequency.value = hz * 10;
+	sub.connect(env(c, out, 0.03, 0.001, 0.02));
+	[body, knock, sub].forEach((o) => o.start(0));
+};
+
+/** A kalimba tine: a sine that settles into pitch, plus a metallic 5.4x ring. */
+const kalimba = (hz: number, decay: number): Voice => (c, out) => {
+	const tine = c.createOscillator();
+	tine.frequency.setValueAtTime(hz * 1.02, 0);
+	tine.frequency.exponentialRampToValueAtTime(hz, 0.04);
+	tine.connect(env(c, out, 0.45, 0.003, decay));
+	const ring = c.createOscillator();
+	ring.frequency.value = hz * 5.4;
+	ring.connect(env(c, out, 0.07, 0.002, decay * 0.25));
+	[tine, ring].forEach((o) => o.start(0));
+};
+
+/** Glass: pure sine with an off-harmonic shimmer, long and clear. */
+const glass = (hz: number, decay: number): Voice => (c, out) => {
+	const a = c.createOscillator();
+	a.frequency.value = hz;
+	a.connect(env(c, out, 0.32, 0.006, decay));
+	const b = c.createOscillator();
+	b.frequency.value = hz * 2.76;
+	b.connect(env(c, out, 0.07, 0.004, decay * 0.5));
+	[a, b].forEach((o) => o.start(0));
+};
+
+interface Pack {
+	root: number;
+	pluck: (hz: number) => Voice;
+	mallet: (hz: number) => Voice;
+}
+
+const PACKS: Record<string, Pack> = {
+	paper: { root: 261.63, pluck: (hz) => pluck(hz), mallet: (hz) => mallet(hz) },
+	musicbox: { root: 523.25, pluck: (hz) => bell(hz, 0.9), mallet: (hz) => bell(hz, 0.35) },
+	marimba: { root: 196, pluck: (hz) => marimba(hz, 0.8), mallet: (hz) => marimba(hz, 0.35) },
+	kalimba: { root: 293.66, pluck: (hz) => kalimba(hz, 1), mallet: (hz) => kalimba(hz, 0.4) },
+	glass: { root: 392, pluck: (hz) => glass(hz, 1.4), mallet: (hz) => glass(hz, 0.5) },
+};
+
+let packId = 'paper';
+let packJob = 0;
+
+const breathe = () => new Promise<void>((r) => ('requestIdleCallback' in window ? requestIdleCallback(() => r(), { timeout: 200 }) : setTimeout(r, 16)));
+
+/** Renders the pitched notes of a pack under a name prefix, one note at a time in idle moments. */
+async function renderPack(id: string, prefix: string, count = NOTES): Promise<void> {
+	const pack = PACKS[id] ?? PACKS.paper;
+	for (let n = 0; n < count; n++) {
+		await breathe();
+		await render(`${prefix}mallet${n}`, 0.6, pack.mallet(stepHz(pack.root, n)));
+		await render(`${prefix}pluck${n}`, 1.5, pack.pluck(stepHz(pack.root, n)));
+	}
+}
+
+/** Switches the sound pack. Notes play from the old pack until the new one is ready. */
+export function setSoundPack(id: string): void {
+	if (id === packId && buffers.has('pluck0')) return;
+	packId = id;
+	if (!ctx) return;
+	const job = ++packJob;
+	void (async () => {
+		const pack = PACKS[id] ?? PACKS.paper;
+		for (let n = 0; n < NOTES; n++) {
+			await breathe();
+			if (job !== packJob) return;
+			const off = (secs: number, v: Voice) => {
+				const o = new OfflineAudioContext(1, Math.ceil(ctx!.sampleRate * secs), ctx!.sampleRate);
+				v(o, o.destination);
+				return o.startRendering();
+			};
+			const [m, p] = await Promise.all([off(0.6, pack.mallet(stepHz(pack.root, n))), off(1.5, pack.pluck(stepHz(pack.root, n)))]);
+			if (job !== packJob) return;
+			buffers.set(`mallet${n}`, m);
+			buffers.set(`pluck${n}`, p);
+		}
+	})();
+}
+
+/** Plays a short tune in a pack, for the shop. */
+export async function previewPack(id: string): Promise<void> {
+	unlockAudio();
+	if (!ctx) return;
+	const prefix = `prev-${id}-`;
+	if (!buffers.has(`${prefix}pluck9`)) await renderPack(id, prefix, 10);
+	[5, 7, 9, 7].forEach((n, i) => play(`${prefix}pluck${n}`, i * 0.13, 0.8));
+	play(`${prefix}mallet4`, 0.6, 0.6);
+}
+
 function makeReverb(c: AudioContext): ConvolverNode {
 	const seconds = 1.6;
 	const buf = c.createBuffer(2, Math.ceil(c.sampleRate * seconds), c.sampleRate);
@@ -166,12 +282,7 @@ export function unlockAudio(): void {
 	void (async () => {
 		await Promise.all([render('tap', 0.08, tap), render('pop', 0.15, pop), render('thud', 0.4, thud), render('whoosh', 0.45, whoosh)]);
 		// One note at a time, with a pause between, so building sounds never blocks a frame.
-		const breathe = () => new Promise<void>((r) => ('requestIdleCallback' in window ? requestIdleCallback(() => r(), { timeout: 200 }) : setTimeout(r, 16)));
-		for (let n = 0; n < NOTES; n++) {
-			await breathe();
-			await render(`mallet${n}`, 0.5, mallet(noteHz(n)));
-			await render(`pluck${n}`, 1, pluck(noteHz(n)));
-		}
+		await renderPack(packId, '');
 	})();
 }
 

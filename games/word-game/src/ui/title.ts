@@ -2,13 +2,15 @@
 import { sfx } from '../audio.ts';
 import { todayKey } from '../core/rng.ts';
 import type { ModeId } from '../core/types.ts';
-import { MODES } from '../modes/meta.ts';
+import { PUZZLE_MODES as MODES } from '../modes/meta.ts';
 import { DIFFICULTIES, DIFFICULTY } from '../core/tuning.ts';
 import { dailyResult, persist, save } from '../save.ts';
 import { h, icon } from './dom.ts';
 import { calm, pulse, toast } from './fx.ts';
 import { Kip } from './kip.ts';
 import { openBook } from './bookview.ts';
+import { openShop } from './shopview.ts';
+import { coins, onCoins } from '../shop/wallet.ts';
 import { chainCard } from './chainview.ts';
 import { openSettings, openStats } from './menus.ts';
 import { wornHat } from '../book.ts';
@@ -25,7 +27,13 @@ function mini(mode: ModeId): HTMLElement {
 
 let introPlayed = false;
 
-export function titleScreen(onPlay: (mode: ModeId, daily: boolean) => void): { el: HTMLElement; destroy: () => void } {
+export interface TitleActions {
+	play: (mode: ModeId, daily: boolean) => void;
+	run: () => void;
+}
+
+export function titleScreen(actions: TitleActions): { el: HTMLElement; destroy: () => void } {
+	const onPlay = actions.play;
 	const kip = new Kip('big');
 	const today = todayKey();
 	let note = 0;
@@ -88,6 +96,36 @@ export function titleScreen(onPlay: (mode: ModeId, daily: boolean) => void): { e
 	};
 	const dockBtn = (name: 'book' | 'chart' | 'gear', label: string, open: () => void) =>
 		h('button', { class: 'dock__btn', type: 'button', on: { click: () => { sfx.ui(); open(); } } }, icon(name), h('span', {}, label));
+	const coinCount = h('span', {}, String(coins()));
+	const shopBtn = h(
+		'button',
+		{ class: 'dock__btn dock__btn--shop', type: 'button', on: { click: () => { sfx.ui(); openShop(); } } },
+		icon('shop'),
+		h('span', { class: 'dock__coins' }, icon('coin', 'coin'), coinCount),
+	);
+	const stopCoins = onCoins(() => {
+		coinCount.textContent = String(coins());
+		pulse(shopBtn, 'pop-again');
+	});
+
+	/** Endless play: a Run of puzzles, or a Blitz against the clock. */
+	function endlessCard(): HTMLElement {
+		const best = save.best;
+		const bests = best.runPuzzles || best.blitz ? `Best run ${best.runPuzzles} · Best blitz ${best.blitz}` : 'Play as long as you like.';
+		return h(
+			'article',
+			{ class: 'mode mode--endless' },
+			h('div', { class: 'mode__head' }, h('h2', { class: 'mode__name' }, 'Endless')),
+			h('p', { class: 'mode__blurb' }, bests),
+			h(
+				'div',
+				{ class: 'mode__actions' },
+				h('button', { class: 'btn btn--go', type: 'button', on: { click: actions.run } }, 'Run'),
+				h('button', { class: 'btn btn--ghost', type: 'button', on: { click: () => onPlay('blitz', false) } }, 'Blitz'),
+			),
+		);
+	}
+
 	const installBtn = h('button', { class: 'dock__btn dock__btn--install', type: 'button', hidden: true, on: { click: () => void promptInstall() } }, icon('share'), h('span', {}, 'Install'));
 	const syncInstall = () => (installBtn.hidden = isStandalone() || !canInstall());
 	syncInstall();
@@ -121,6 +159,7 @@ export function titleScreen(onPlay: (mode: ModeId, daily: boolean) => void): { e
 		h('p', { class: 'title__tag' }, 'Find the kin. Crack the words.'),
 		diffPicker(),
 		modes,
+		endlessCard(),
 		chainEl,
 		// The dock sits at the bottom, in thumb reach. Labels, not just icons.
 		h(
@@ -129,6 +168,7 @@ export function titleScreen(onPlay: (mode: ModeId, daily: boolean) => void): { e
 			dockBtn('book', 'Kin Book', () => openBook(() => kip.setHat(wornHat()?.hat ?? null))),
 			dockBtn('chart', 'Stats', openStats),
 			dockBtn('gear', 'Settings', openSettings),
+			shopBtn,
 			installBtn,
 		),
 	);
@@ -143,6 +183,7 @@ export function titleScreen(onPlay: (mode: ModeId, daily: boolean) => void): { e
 		destroy: () => {
 			removeEventListener('pointermove', onMove);
 			removeEventListener('pwa-change', syncInstall);
+			stopCoins();
 			kip.destroy();
 		},
 	};

@@ -26,7 +26,7 @@ interface Slot {
 export function startLink(ctx: GameCtx): ModeGame {
 	const T = { ...TUNING.link, ...DIFFICULTY[ctx.difficulty].link };
 	const puzzle = buildLink(ctx.seed, ctx.difficulty, ctx.date ?? undefined);
-	const shell = new Shell({ title: 'Link', tag: `${ctx.date ? 'Daily' : 'Practice'} · ${DIFFICULTY[ctx.difficulty].name}`, hearts: T.hearts, scale: TUNING.scoreScale[ctx.difficulty], hints: DIFFICULTY[ctx.difficulty].hints, onHint: () => hint(), onBack: ctx.exit, onHelp: ctx.help });
+	const shell = new Shell({ title: 'Link', tag: ctx.tag ?? `${ctx.date ? 'Daily' : 'Practice'} · ${DIFFICULTY[ctx.difficulty].name}`, hearts: ctx.hearts?.max ?? T.hearts, heartsLeft: ctx.hearts?.left, scale: TUNING.scoreScale[ctx.difficulty], hints: DIFFICULTY[ctx.difficulty].hints, onHint: () => hint(), onBack: ctx.exit, onHelp: ctx.help });
 	let over = false;
 	let roundIndex = 0;
 	let round: LinkRound;
@@ -287,6 +287,7 @@ export function startLink(ctx: GameCtx): ModeGame {
 		shell.kip.react('wow', 0);
 		await wait(500);
 		ctx.finish({
+			heartsLeft: shell.hearts.left,
 			won: true,
 			score: shell.score,
 			stars: starsFor(shell.hearts.left, shell.hearts.max),
@@ -306,6 +307,7 @@ export function startLink(ctx: GameCtx): ModeGame {
 		shell.kip.react('oops', 0);
 		await wait(1600);
 		ctx.finish({
+			heartsLeft: shell.hearts.left,
 			won: false,
 			score: shell.score,
 			stars: 0,

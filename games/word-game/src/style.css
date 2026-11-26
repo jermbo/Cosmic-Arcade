@@ -2,6 +2,13 @@
 
 :root {
 	--ink: #141414;
+	/* Hard shadows. Same as the ink, except on dark themes. */
+	--shade: var(--ink);
+	/* Text that sits right on the page (header, hints), not on a card. */
+	--page-text: var(--ink);
+	--page-muted: #5e574c;
+	/* Speed of the motion style: 1 is normal, lower is faster. */
+	--t: 1;
 	--paper: #fff4de;
 	--paper-dot: #ecdcbc;
 	--card: #fffdf7;
@@ -16,8 +23,8 @@
 	--pink: #ff6b9a;
 	--go: #ff6b9a;
 	--line: 3px;
-	--shadow: 4px 4px 0 var(--ink);
-	--shadow-sm: 2px 2px 0 var(--ink);
+	--shadow: 4px 4px 0 var(--shade);
+	--shadow-sm: 2px 2px 0 var(--shade);
 	--radius: 12px;
 	--display: 'Archivo Black', system-ui, sans-serif;
 	--body: 'Space Grotesk', system-ui, sans-serif;
@@ -137,7 +144,7 @@ button:disabled {
 
 .btn:not(:disabled):active {
 	transform: translate(2px, 2px);
-	box-shadow: 0 0 0 var(--ink);
+	box-shadow: 0 0 0 var(--shade);
 }
 
 .btn:disabled {
@@ -691,6 +698,11 @@ button:disabled {
 .mode--crack::before { background: var(--l1); }
 .mode--secret::before { background: var(--l3); }
 .mode--link::before { background: var(--l4); }
+.mode--endless::before { background: var(--l2); }
+
+.title > .mode {
+	align-self: stretch;
+}
 
 .mode > * {
 	margin-left: 8px;
@@ -755,7 +767,7 @@ button:disabled {
 	border: 2px solid var(--ink);
 	border-radius: 6px;
 	background: var(--card);
-	box-shadow: 2px 2px 0 var(--ink);
+	box-shadow: 2px 2px 0 var(--shade);
 	font-weight: 700;
 	font-size: 10px;
 }
@@ -1122,7 +1134,7 @@ button:disabled {
 	background: var(--ink);
 	color: var(--paper);
 	transform: translate(2px, 2px);
-	box-shadow: 0 0 0 var(--ink);
+	box-shadow: 0 0 0 var(--shade);
 }
 
 .tile--squish {
@@ -1540,7 +1552,7 @@ button:disabled {
 	border: 2.5px solid var(--ink);
 	border-radius: 8px;
 	background: var(--card);
-	box-shadow: 0 3px 0 var(--ink);
+	box-shadow: 0 3px 0 var(--shade);
 	font-weight: 700;
 	font-size: 15px;
 	display: grid;
@@ -2047,7 +2059,7 @@ button:disabled {
 	border: var(--line) solid var(--ink);
 	border-radius: 14px;
 	background: var(--card);
-	box-shadow: 6px 6px 0 var(--ink);
+	box-shadow: 6px 6px 0 var(--shade);
 	animation: modal-in 0.36s var(--spring);
 }
 
@@ -2363,7 +2375,7 @@ button:disabled {
 	padding: 6px;
 	border: 2.5px solid var(--ink);
 	border-radius: 9px;
-	box-shadow: 2px 2px 0 var(--ink);
+	box-shadow: 2px 2px 0 var(--shade);
 	text-align: center;
 	font-size: 12px;
 	line-height: 1.15;
@@ -2641,7 +2653,7 @@ button:disabled {
 .board--compact .tile {
 	min-height: 0;
 	border-width: 2.5px;
-	box-shadow: 1px 1px 0 var(--ink);
+	box-shadow: 1px 1px 0 var(--shade);
 }
 
 /* Guess rows fill the room the panel leaves and size their cells to fit it. */
@@ -2776,14 +2788,14 @@ button:disabled {
 	height: clamp(34px, 10vw, 54px);
 	border-radius: 9px;
 	font-size: clamp(20px, 6.2vw, 32px);
-	box-shadow: 3px 3px 0 var(--ink);
+	box-shadow: 3px 3px 0 var(--shade);
 }
 
 .kip--big {
 	width: clamp(38px, 11vw, 58px);
 	height: clamp(38px, 11vw, 58px);
 	border-radius: 11px;
-	box-shadow: 3px 3px 0 var(--ink);
+	box-shadow: 3px 3px 0 var(--shade);
 	margin-left: 2px;
 }
 
@@ -2944,11 +2956,45 @@ button:disabled {
 	box-shadow: none;
 }
 
+.step__hearts {
+	display: flex;
+	justify-content: center;
+}
+
+.step__hearts .heart {
+	width: 30px;
+	height: 30px;
+}
+
+.step__line,
+.step__next {
+	font-size: 15px;
+}
+
+.step__perfect {
+	font-family: var(--display);
+	font-size: 18px;
+	color: #1f9a5e;
+}
+
 .dock__btn--install {
 	background: var(--l1);
 }
 
 /* Short phones: tighter still, so the chain stays in view. */
+@media (max-height: 760px) {
+	/* Five rows of cards must fit: the blurbs go, the names stay. */
+	.mode__blurb {
+		display: none;
+	}
+	.mode {
+		grid-template-areas: 'head actions';
+	}
+	.mode .mini {
+		display: none;
+	}
+}
+
 @media (max-height: 700px) {
 	.title {
 		gap: 8px;
@@ -3058,7 +3104,7 @@ button:disabled {
 }
 
 .kb__key:active {
-	box-shadow: 0 1px 0 var(--ink);
+	box-shadow: 0 1px 0 var(--shade);
 }
 
 /* The score keeps its width while it counts, so the header does not shuffle. */
@@ -3088,6 +3134,471 @@ button:disabled {
 .title--again .chain,
 .title--again .chain__slot--on {
 	animation: none;
+}
+
+/* ---------- Shop looks: themes ----------
+   A theme only sets color tokens. It works on <html> and on any shop preview box. */
+
+[data-theme='sorbet'] {
+	--paper: #ffeaf1;
+	--paper-dot: #f7cada;
+	--card: #fffafc;
+	--muted: #6d5260;
+	--page-muted: #6d5260;
+	--l1: #ffd86b;
+	--l2: #ff9fb6;
+	--l3: #8dd3ff;
+	--l4: #c9a8ff;
+	--go: #ff7aa8;
+	--pink: #ff7aa8;
+}
+
+[data-theme='meadow'] {
+	--paper: #ecf6e2;
+	--paper-dot: #cfe4bd;
+	--card: #fbfff6;
+	--muted: #4f5d46;
+	--page-muted: #4f5d46;
+	--l1: #f4d843;
+	--l2: #f59b5d;
+	--l3: #5cc6b8;
+	--l4: #a592f2;
+	--go: #66d68f;
+	--hit: #49c97a;
+}
+
+[data-theme='sky'] {
+	--paper: #e4f1ff;
+	--paper-dot: #c3dbf5;
+	--card: #fafdff;
+	--muted: #4d5a6b;
+	--page-muted: #4d5a6b;
+	--l1: #ffd23f;
+	--l2: #ff8f70;
+	--l3: #4fb6f0;
+	--l4: #9d8cff;
+	--go: #6c96ff;
+}
+
+[data-theme='dusk'] {
+	--paper: #2c2850;
+	--paper-dot: #3f3a6c;
+	--card: #fff6e6;
+	--shade: #100d24;
+	--page-text: #fff4de;
+	--page-muted: #c8c0e8;
+	--l1: #ffd23f;
+	--l2: #ff9a62;
+	--l3: #5cc8f2;
+	--l4: #c0a0ff;
+	--go: #ff6b9a;
+}
+
+/* Text that sits on the page, not on a card, follows the theme. */
+.hud,
+.title__tag,
+.hint,
+.hint b {
+	color: var(--page-text);
+}
+
+.hud__tag,
+.diff__blurb {
+	color: var(--page-muted);
+}
+
+/* The chain card is dark on light themes; on Dusk it lifts off with a bright edge. */
+[data-theme='dusk'] .chain {
+	border-color: var(--page-text);
+}
+
+/* ---------- Shop looks: tile styles ---------- */
+
+[data-tiles='pillow'] :is(.tile, .cell, .bar, .slot-word, .mini__t) {
+	border-radius: 18px;
+}
+
+[data-tiles='pillow'] :is(.tile, .bar, .slot-word) {
+	box-shadow: 0 4px 0 var(--shade);
+}
+
+[data-tiles='sticker'] :is(.tile, .bar, .slot-word) {
+	border-width: 3.5px;
+	box-shadow:
+		inset 0 0 0 2.5px rgba(255, 255, 255, 0.85),
+		3px 3px 0 var(--shade);
+}
+
+[data-tiles='sticker'] .tile:nth-child(3n) {
+	rotate: -1.5deg;
+}
+
+[data-tiles='sticker'] .tile:nth-child(3n + 1) {
+	rotate: 1.2deg;
+}
+
+[data-tiles='stamp'] :is(.tile, .bar, .slot-word) {
+	outline: 2px dashed rgba(20, 20, 20, 0.3);
+	outline-offset: -7px;
+}
+
+[data-tiles='stamp'] .tile--on {
+	outline-color: rgba(255, 255, 255, 0.45);
+}
+
+[data-tiles='block'] :is(.tile, .bar, .slot-word) {
+	border-radius: 8px;
+	box-shadow: 0 6px 0 var(--shade);
+}
+
+[data-tiles='block'] .tile--on {
+	transform: translateY(5px);
+	box-shadow: 0 1px 0 var(--shade);
+}
+
+/* ---------- Shop looks: motion styles ----------
+   `--t` scales the length of the main animations. The spring curve comes from
+   the style too (set on <html> by the wallet). */
+
+.tile--hop,
+.cell--bounce,
+.slot--hop { animation-duration: calc(0.45s * var(--t)); }
+.tile--squish,
+.tile--unsquish { animation-duration: calc(0.28s * var(--t)); }
+.bar--stamp,
+.slot--pop,
+.slot-word--in,
+.option--yes,
+.bar__letter--pop { animation-duration: calc(0.45s * var(--t)); }
+.cell--flip { animation-duration: calc(0.42s * var(--t)); }
+.tile--shake,
+.rows__row--shake { animation-duration: calc(0.42s * var(--t)); }
+.panel--in { animation-duration: calc(0.32s * var(--t)); }
+.modal__card { animation-duration: calc(0.36s * var(--t)); }
+.round__banner--stamp,
+.rstar--stamp { animation-duration: calc(0.5s * var(--t)); }
+
+[data-motion='jelly'] .tile--squish {
+	animation-name: jelly-squish;
+}
+
+@keyframes jelly-squish {
+	30% { scale: 0.86 0.96; }
+	60% { scale: 1.05 0.95; }
+}
+
+[data-motion='floaty'] .kip {
+	animation-duration: 5s;
+}
+
+/* ---------- Shop screen ---------- */
+
+.modal__card--shop {
+	width: min(100%, 520px);
+}
+
+.wallet {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 12px 4px 6px;
+	border: var(--line) solid var(--ink);
+	border-radius: 999px;
+	background: var(--l1);
+	font-family: var(--display);
+	font-size: 16px;
+	box-shadow: var(--shadow-sm);
+}
+
+.coin {
+	display: inline-block;
+	flex: none;
+	width: 20px;
+	height: 20px;
+}
+
+.coin svg {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+.shop__tabs {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	border: var(--line) solid var(--ink);
+	border-radius: 10px;
+	overflow: hidden;
+}
+
+.shop__tab {
+	min-height: 40px;
+	border: 0;
+	border-right: 2.5px solid var(--ink);
+	background: var(--card);
+	font-size: 13px;
+	font-weight: 700;
+}
+
+.shop__tab:last-child {
+	border-right: 0;
+}
+
+.shop__tab[aria-selected='true'] {
+	background: var(--ink);
+	color: var(--card);
+}
+
+.shop__list {
+	display: grid;
+	gap: 10px;
+}
+
+.item {
+	display: grid;
+	grid-template-columns: 88px minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 10px;
+	padding: 8px;
+	border: 2.5px solid var(--ink);
+	border-radius: 12px;
+	background: var(--card);
+}
+
+.item--on {
+	box-shadow: 0 0 0 3px var(--l1);
+}
+
+.item__text strong {
+	display: block;
+	font-size: 15px;
+}
+
+.item__text small {
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.item .btn {
+	min-height: 38px;
+	padding: 0 10px;
+	font-size: 13px;
+	white-space: nowrap;
+}
+
+.item .btn--done:disabled {
+	opacity: 1;
+	transform: none;
+}
+
+/* Not enough coins yet: still tappable (it says how many more), but quieter. */
+.item .btn--short {
+	background: var(--card);
+	color: var(--muted);
+}
+
+.item__price {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+}
+
+.item__price .coin {
+	width: 16px;
+	height: 16px;
+}
+
+.preview {
+	display: grid;
+	place-items: center;
+	height: 60px;
+	border: 2px solid var(--ink);
+	border-radius: 8px;
+	background-color: var(--paper);
+	background-image: radial-gradient(var(--paper-dot) 1.2px, transparent 1.4px);
+	background-size: 10px 10px;
+	overflow: hidden;
+	padding: 4px;
+}
+
+button.preview {
+	cursor: pointer;
+	font: inherit;
+}
+
+.preview__row {
+	display: flex;
+	gap: 4px;
+}
+
+.preview .tile {
+	min-height: 0;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	font-size: 10px;
+	border-width: 2px;
+	box-shadow: 2px 2px 0 var(--shade);
+}
+
+.preview .tile {
+	width: 22px;
+	height: 22px;
+	border-radius: 5px;
+}
+
+.preview[data-tiles='pillow'] .tile {
+	border-radius: 10px;
+}
+
+.preview[data-tiles='block'] .tile {
+	box-shadow: 0 4px 0 var(--shade);
+}
+
+.preview .tile.preview__go {
+	background: var(--go);
+}
+
+.preview__swatch {
+	width: 11px;
+	height: 24px;
+	border: 2px solid var(--ink);
+	border-radius: 4px;
+}
+
+.preview__label {
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--page-text);
+}
+
+.preview--sound .icon {
+	width: 26px;
+	height: 26px;
+}
+
+.dock__btn--shop {
+	background: var(--l1);
+}
+
+.dock__coins {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.dock__coins .coin {
+	width: 13px;
+	height: 13px;
+}
+
+/* Coins earned, on the results card. */
+.results__coins {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	margin: 0 auto;
+	padding: 4px 14px 4px 8px;
+	border: var(--line) solid var(--ink);
+	border-radius: 999px;
+	background: var(--l1);
+	font-family: var(--display);
+	font-size: 18px;
+	box-shadow: var(--shadow-sm);
+}
+
+.results__coins .coin {
+	width: 22px;
+	height: 22px;
+}
+
+/* ---------- Blitz clock ---------- */
+
+.clock {
+	position: relative;
+	flex: none;
+	display: grid;
+	gap: 4px;
+}
+
+.clock__bar {
+	height: 16px;
+	border: var(--line) solid var(--ink);
+	border-radius: 999px;
+	background: var(--card);
+	overflow: hidden;
+}
+
+.clock__fill {
+	display: block;
+	height: 100%;
+	background: var(--hit);
+	transform-origin: 0 50%;
+	will-change: transform;
+}
+
+.clock--low .clock__fill {
+	background: var(--l2);
+}
+
+.clock__row {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	color: var(--page-text);
+}
+
+.clock__secs {
+	font-family: var(--display);
+	font-weight: 400;
+	font-size: 22px;
+	font-variant-numeric: tabular-nums;
+}
+
+.clock--low .clock__secs {
+	color: #d6336c;
+	animation: bump 1s ease-in-out infinite;
+}
+
+.clock__count {
+	font-weight: 700;
+	font-size: 14px;
+}
+
+.clock__delta {
+	position: absolute;
+	left: 50%;
+	top: 18px;
+	translate: -50% 0;
+	font-family: var(--display);
+	font-size: 18px;
+	color: #1f9a5e;
+	pointer-events: none;
+	animation: float-up 0.9s var(--out) forwards;
+}
+
+.clock__delta--minus {
+	color: #d6336c;
+}
+
+.clock--hit {
+	animation: shake 0.35s;
+}
+
+.clock--plus .clock__bar {
+	animation: cell-pop 0.3s var(--spring);
+}
+
+.blitz__board {
+	flex: 1 1 auto;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.blitz__board > .board {
+	flex: 1 1 auto;
 }
 
 /* ---------- Wide screens ---------- */

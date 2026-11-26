@@ -24,7 +24,7 @@ interface LockState {
 export function startCrack(ctx: GameCtx): ModeGame {
 	const T = { ...TUNING.crack, ...DIFFICULTY[ctx.difficulty].crack };
 	const puzzle = buildCrack(ctx.seed, ctx.difficulty, ctx.date ?? undefined);
-	const shell = new Shell({ title: 'Crack', tag: `${ctx.date ? 'Daily' : 'Practice'} · ${DIFFICULTY[ctx.difficulty].name}`, hearts: T.hearts, scale: TUNING.scoreScale[ctx.difficulty], hints: DIFFICULTY[ctx.difficulty].hints, onHint: () => askKip(), onBack: ctx.exit, onHelp: ctx.help });
+	const shell = new Shell({ title: 'Crack', tag: ctx.tag ?? `${ctx.date ? 'Daily' : 'Practice'} · ${DIFFICULTY[ctx.difficulty].name}`, hearts: ctx.hearts?.max ?? T.hearts, heartsLeft: ctx.hearts?.left, scale: TUNING.scoreScale[ctx.difficulty], hints: DIFFICULTY[ctx.difficulty].hints, onHint: () => askKip(), onBack: ctx.exit, onHelp: ctx.help });
 	const hints = new Map(puzzle.locked.map((w, i) => [w, puzzle.hints[i]]));
 	const locks = new Map<string, LockState>(puzzle.locked.map((w) => [w, { guesses: [], marks: [], done: false, cracked: false }]));
 	let panel: GuessPanel | null = null;
@@ -172,7 +172,7 @@ export function startCrack(ctx: GameCtx): ModeGame {
 		shell.addScore(shell.hearts.left * T.points.perHeart);
 		shell.kip.react('wow', 0);
 		await wait(700);
-		ctx.finish({ won: true, score: shell.score, stars: starsFor(shell.hearts.left, shell.hearts.max), lines: lines(), grid: grid() });
+		ctx.finish({ heartsLeft: shell.hearts.left, won: true, score: shell.score, stars: starsFor(shell.hearts.left, shell.hearts.max), lines: lines(), grid: grid() });
 	}
 
 	async function lose() {
@@ -186,7 +186,7 @@ export function startCrack(ctx: GameCtx): ModeGame {
 		await wait(500);
 		const out = lines();
 		out[1] = `Sorted ${sorted} of 4 groups · out of hearts`;
-		ctx.finish({ won: false, score: shell.score, stars: 0, lines: out, grid: grid() });
+		ctx.finish({ heartsLeft: shell.hearts.left, won: false, score: shell.score, stars: 0, lines: out, grid: grid() });
 	}
 
 	return {

@@ -3,6 +3,7 @@ import { sfx } from '../audio.ts';
 import type { Mark } from '../core/types.ts';
 import { h, wait } from './dom.ts';
 import { calm, pulse } from './fx.ts';
+import { motionSpeed } from '../shop/wallet.ts';
 
 export interface RowsOpts {
 	length: number;
@@ -89,16 +90,17 @@ export class WordRows {
 	async reveal(marks: Mark[]): Promise<void> {
 		this.busy = true;
 		const cells = this.cells();
-		const step = calm() ? 60 : 210;
+		const speed = motionSpeed();
+		const step = calm() ? 60 : 210 * speed;
 		cells.forEach((c, i) => {
 			c.style.setProperty('--d', `${i * step}ms`);
 			setTimeout(() => {
 				c.dataset.mark = marks[i];
 				sfx.flip(i, marks[i]);
-			}, i * step + (calm() ? 0 : 160));
+			}, i * step + (calm() ? 0 : 160 * speed));
 			c.classList.add('cell--flip');
 		});
-		await wait(cells.length * step + (calm() ? 120 : 380));
+		await wait(cells.length * step + (calm() ? 120 : 380 * speed));
 		cells.forEach((c) => c.classList.remove('cell--flip'));
 		this.row++;
 		this.text = '';

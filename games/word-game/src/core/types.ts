@@ -1,7 +1,7 @@
 // Data shapes shared by the builder, the modes and the test script.
 
 export type Level = 1 | 2 | 3 | 4;
-export type ModeId = 'crack' | 'secret' | 'link';
+export type ModeId = 'crack' | 'secret' | 'link' | 'blitz';
 export type Difficulty = 'easy' | 'medium' | 'hard';
 export type Mark = 'hit' | 'near' | 'miss';
 

@@ -9,6 +9,8 @@ import { isWord, scoreGuess, setDictionary } from '../src/core/words.ts';
 import type { Board } from '../src/core/types.ts';
 import { buildChain, CHAIN_MODES } from '../src/core/chain.ts';
 import setsData from '../src/data/sets.json' with { type: 'json' };
+import { MOTION_FEEL, MOTIONS, SECTIONS } from '../src/shop/catalog.ts';
+import { RUN } from '../src/core/economy.ts';
 
 // The bank.
 const ids = new Set<string>();
@@ -99,6 +101,15 @@ for (const diff of DIFFICULTIES) {
 		assert.deepEqual(buildChain(diff, date), chain, 'chain must be the same each time');
 	}
 }
+
+// Shop: each section starts with a free item, ids are unique, prices are whole numbers.
+for (const s of SECTIONS) {
+	assert.equal(s.items[0].price, 0, `${s.id}: the first item must be free`);
+	assert.equal(new Set(s.items.map((i) => i.id)).size, s.items.length, `${s.id}: an id twice`);
+	for (const i of s.items) assert(Number.isInteger(i.price) && i.price >= 0, `${s.id}/${i.id}: bad price`);
+}
+for (const m of MOTIONS) assert(MOTION_FEEL[m.id], `motion ${m.id} has no feel`);
+assert(RUN.tiers.length > 0 && RUN.rotation.length > 0 && RUN.hearts <= RUN.maxHearts, 'RUN settings look wrong');
 
 // Same seed, same puzzle.
 assert.deepEqual(buildCrack('same', 'medium'), buildCrack('same', 'medium'));

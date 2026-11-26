@@ -18,7 +18,7 @@ export function startSecret(ctx: GameCtx): ModeGame {
 	const T = { ...TUNING.secret, ...DIFFICULTY[ctx.difficulty].secret };
 	const puzzle = buildSecret(ctx.seed, ctx.difficulty, ctx.date ?? undefined);
 	const word = puzzle.word;
-	const shell = new Shell({ title: 'Secret', tag: `${ctx.date ? 'Daily' : 'Practice'} · ${DIFFICULTY[ctx.difficulty].name}`, hearts: T.hearts, scale: TUNING.scoreScale[ctx.difficulty], hints: DIFFICULTY[ctx.difficulty].hints, onHint: () => hint(), onBack: ctx.exit, onHelp: ctx.help });
+	const shell = new Shell({ title: 'Secret', tag: ctx.tag ?? `${ctx.date ? 'Daily' : 'Practice'} · ${DIFFICULTY[ctx.difficulty].name}`, hearts: ctx.hearts?.max ?? T.hearts, heartsLeft: ctx.hearts?.left, scale: TUNING.scoreScale[ctx.difficulty], hints: DIFFICULTY[ctx.difficulty].hints, onHint: () => hint(), onBack: ctx.exit, onHelp: ctx.help });
 	const known: (string | null)[] = Array(word.length).fill(null);
 	const guesses: string[] = [];
 	const marks: Mark[][] = [];
@@ -213,6 +213,7 @@ export function startSecret(ctx: GameCtx): ModeGame {
 		if (!board.done) await board.revealRest();
 		await wait(400);
 		ctx.finish({
+			heartsLeft: shell.hearts.left,
 			won: true,
 			score: shell.score,
 			stars: starsFor(shell.hearts.left, shell.hearts.max),
@@ -239,6 +240,7 @@ export function startSecret(ctx: GameCtx): ModeGame {
 		if (!board.done) await board.revealRest();
 		await wait(300);
 		ctx.finish({
+			heartsLeft: shell.hearts.left,
 			won: false,
 			score: shell.score,
 			stars: 0,

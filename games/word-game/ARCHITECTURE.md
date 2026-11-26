@@ -42,6 +42,18 @@ Easy, Medium and Hard live in `DIFFICULTY` in `src/core/tuning.ts`. Each one set
 - **Ask Kip**: tap Kip in the header. In a guess panel or Link, Kip shows one letter. On a board, Kip marks two words of one group with the same number (or adds one more). Hints per game are `hints` in `DIFFICULTY`, the cost is `TUNING.hintCost`.
 - **Daily chain** (`src/core/chain.ts`, `src/ui/chainview.ts`): a 6 letter word per day and difficulty. Each daily you win shows 2 of its letters. After all 3 dailies are played, you get 4 tries. Its streak is separate.
 
+## Coins, shop, Endless Run, Blitz
+
+- **All the numbers** for coins, Endless Run and Blitz are in `src/core/economy.ts` (`EARN`, `RUN`, `BLITZ`).
+- **Shop items and prices** are in `src/shop/catalog.ts`. The first item of each section is free. Add an item there, then give it a look:
+  - theme: a `[data-theme='id']` block of color tokens in `style.css`;
+  - tile style: `[data-tiles='id']` rules in `style.css`;
+  - sound: an entry in `PACKS` in `src/audio.ts`;
+  - motion: an entry in `MOTION_FEEL` in `catalog.ts`.
+- `src/shop/wallet.ts` holds coins, buying, and `applyLooks()`, which puts the chosen looks on `<html>`.
+- **Endless Run** lives in `src/app.ts` (`playRun`): it runs the normal modes with carried-over hearts (`ctx.hearts`).
+- **Blitz** is `src/modes/blitz.ts`.
+
 ## Offline (PWA)
 
 `vite.config.ts` writes `sw.js` at build time with every built file, so the game (and the word list) plays offline. `public/manifest.webmanifest` and `public/icons/` make it installable; the title shows **Install** when the browser offers it. Redraw the icons with `npm run icons -w word-game`. Add `?dev` to a build URL to turn the service worker off.

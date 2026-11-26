@@ -8,6 +8,10 @@ export interface GameCtx {
 	date: string | null;
 	difficulty: Difficulty;
 	seed: string;
+	/** Endless Run: hearts carried in from the last puzzle. */
+	hearts?: { left: number; max: number };
+	/** Text under the mode name in the header. */
+	tag?: string;
 	exit: () => void;
 	help: () => void;
 	finish: (outcome: Outcome) => void;

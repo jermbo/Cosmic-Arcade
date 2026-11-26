@@ -20,15 +20,15 @@ function legend(): HTMLElement {
 	return h('div', { class: 'legend' }, item('hit', 'A', 'Right spot'), item('near', 'B', 'In the word'), item('miss', 'C', 'Not in it'));
 }
 
-export function openHelp(mode: ModeId, parent?: HTMLElement, onClose?: () => void): ModalHandle {
+export function openHelp(mode: ModeId, parent?: HTMLElement, onClose?: () => void, diff = save.settings.difficulty): ModalHandle {
 	const meta = MODE_BY_ID[mode];
 	let handle: ModalHandle;
 	const body = [
-		h('ol', { class: 'steps' }, ...meta.steps(DIFFICULTY[save.settings.difficulty]).map((s) => h('li', {}, rich(s)))),
-		mode !== 'secret' ? legend() : h('div', { class: 'legend legend--groups' }, ...[1, 2, 3, 4].map((l) => h('span', { class: `chip chip--l${l}` }, LEVEL_NAMES[l as 1 | 2 | 3 | 4]))),
+		h('ol', { class: 'steps' }, ...meta.steps(DIFFICULTY[diff]).map((s) => h('li', {}, rich(s)))),
+		mode === 'blitz' ? null : mode !== 'secret' ? legend() : h('div', { class: 'legend legend--groups' }, ...[1, 2, 3, 4].map((l) => h('span', { class: `chip chip--l${l}` }, LEVEL_NAMES[l as 1 | 2 | 3 | 4]))),
 		h('button', { class: 'btn btn--go btn--wide', type: 'button', on: { click: () => handle.close() } }, "Let's go"),
 	];
-	handle = openModal({ title: `${meta.name} · ${DIFFICULTY[save.settings.difficulty].name}`, body, parent, cls: 'modal__card--help', onClose });
+	handle = openModal({ title: mode === 'blitz' ? meta.name : `${meta.name} · ${DIFFICULTY[diff].name}`, body: body.filter((b): b is HTMLElement => !!b), parent, cls: 'modal__card--help', onClose });
 	save.seenHelp[mode] = true;
 	persist();
 	return handle;

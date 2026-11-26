@@ -1,5 +1,6 @@
 // Settings, daily results and stats in localStorage. A new version wipes old saves.
 import { dayBefore } from './core/rng.ts';
+import { EARN } from './core/economy.ts';
 import type { Difficulty, ModeId } from './core/types.ts';
 
 const KEY = 'wordkin';
@@ -42,6 +43,13 @@ interface SaveData {
 	chain: Record<string, { guesses: string[]; won: boolean; done: boolean }>;
 	/** Wins of the daily chain in a row, per difficulty does not matter. */
 	chainStreak: { streak: number; best: number; last: string | null };
+	/** Shop: the coin balance, what is owned in each section, and what is in use. */
+	coins: number;
+	owned: Record<string, string[]>;
+	looks: { theme: string; tiles: string; sound: string; motion: string };
+	/** Endless Run and Blitz bests. */
+	best: { runPuzzles: number; runScore: number; blitz: number };
+	seenRun: boolean;
 }
 
 const freshStats = (): ModeStats => ({ played: 0, won: 0, bestScore: 0, streak: 0, bestStreak: 0, lastDaily: null });
@@ -53,11 +61,16 @@ function fresh(): SaveData {
 		settings: { sound: true, haptics: true, lessMotion: reduced, difficulty: 'medium' },
 		seenHelp: {},
 		daily: {},
-		stats: { crack: freshStats(), secret: freshStats(), link: freshStats() },
+		stats: { crack: freshStats(), secret: freshStats(), link: freshStats(), blitz: freshStats() },
 		book: {},
 		hat: null,
 		chain: {},
 		chainStreak: { streak: 0, best: 0, last: null },
+		coins: EARN.start,
+		owned: { theme: ['paper'], tiles: ['classic'], sound: ['paper'], motion: ['bouncy'] },
+		looks: { theme: 'paper', tiles: 'classic', sound: 'paper', motion: 'bouncy' },
+		best: { runPuzzles: 0, runScore: 0, blitz: 0 },
+		seenRun: false,
 	};
 }
 
@@ -73,6 +86,12 @@ function load(): SaveData {
 				data.hat ??= null;
 				data.chain ??= base.chain;
 				data.chainStreak ??= base.chainStreak;
+				data.stats.blitz ??= freshStats();
+				data.coins ??= base.coins;
+				data.owned ??= base.owned;
+				data.looks ??= base.looks;
+				data.best ??= base.best;
+				data.seenRun ??= false;
 				return data;
 			}
 		}
@@ -139,8 +158,8 @@ export function recordChain(diff: Difficulty, date: string, guesses: string[], w
 
 export function resetAll(): void {
 	const settings = save.settings;
-	const { book, hat } = save;
-	// The Kin Book is a collection, not a stat: it stays.
-	Object.assign(save, fresh(), { settings, book, hat });
+	const { book, hat, coins, owned, looks } = save;
+	// The Kin Book and the shop are things you own, not stats: they stay.
+	Object.assign(save, fresh(), { settings, book, hat, coins, owned, looks });
 	persist();
 }
