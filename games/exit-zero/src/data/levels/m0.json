@@ -1,0 +1,212 @@
+{
+	"id": "m0",
+	"name": "level.m0",
+	"next": "m1",
+	"cell": 2,
+	"fog": { "color": [0.1, 0.09, 0.05], "near": 5, "far": 24 },
+	"start": "cp.start",
+	"initialFlags": ["brk.B2"],
+	"startItems": ["flashlight"],
+	"map": [
+		"##################################",
+		"##eee#############################",
+		"##eee#######kk###########bbbbbb###",
+		"##eee#######kk#########c#bbbbbb###",
+		"###e########k##########c#bbbbbb###",
+		"#................######cbbbbbbb###",
+		"########.#######.######c#bbbbbb###",
+		"########.#.....#.######c#bbbbbb###",
+		"####...#....#..#.#tttt#c####p#####",
+		"####.....#.#...#.=tttttc####p#####",
+		"####...#.#...#.#.=tttt#c#ppppppp##",
+		"########.#.......#tttt#c#ppppppp##",
+		"########.#.....#.######cpppppppp##",
+		"########.#######.######c#ppppppp##",
+		"########.#######.######c#ppppppp##",
+		"########.........ccccccc#####w####",
+		"########.###,##########c#####w####",
+		"########.###,##########c#wwwwwwww#",
+		"##ssss##.##ooooo#######c#wwwwwwww#",
+		"##ssssss.##ooooo#######c#wwwwwwww#",
+		"##ssss##.##ooooo#######cwwwwwwwww#",
+		"##ssss##.##ooooo#########wwwwwwww#",
+		"###########ooooo#########wwwwwwww#",
+		"#########################wwwwwwww#",
+		"##################################",
+		"##################################"
+	],
+	"zones": {
+		"#": { "area": "", "solid": true, "floor": "", "wall": "", "ceiling": "", "height": 0, "ambient": [0, 0, 0], "step": "concrete", "hum": 0 },
+		"=": { "area": "", "solid": true, "window": true, "floor": "", "wall": "", "ceiling": "", "height": 0, "ambient": [0, 0, 0], "step": "concrete", "hum": 0 },
+		".": {
+			"area": "halls", "floor": "carpet", "wall": "wallpaper", "ceiling": "ceilingTile", "height": 2.6,
+			"ambient": [0.3, 0.27, 0.16], "step": "carpet", "hum": 1,
+			"lights": { "every": 3, "color": [1.0, 0.94, 0.7], "range": 7.5, "cond": { "flag": "brk.B2" }, "flicker": 0.12, "dead": [[16, 13]] }
+		},
+		"s": {
+			"area": "halls", "floor": "carpet", "wall": "wallpaper", "ceiling": "ceilingTile", "height": 2.6,
+			"ambient": [0.3, 0.27, 0.16], "step": "carpet", "hum": 1,
+			"lights": { "every": 3, "color": [1.0, 0.94, 0.7], "range": 7.5, "cond": { "flag": "brk.B2" }, "flicker": 0.1 }
+		},
+		"k": {
+			"area": "closet", "floor": "carpet", "wall": "wallpaper", "ceiling": "ceilingTile", "height": 2.6,
+			"ambient": [0.24, 0.21, 0.13], "step": "carpet", "hum": 0.7,
+			"lights": { "every": 2, "color": [1.0, 0.92, 0.66], "range": 5, "cond": { "flag": "brk.B2" }, "flicker": 0.5 }
+		},
+		",": {
+			"area": "office", "floor": "carpet", "wall": "wallpaperStained", "ceiling": "ceilingTile", "height": 2.6,
+			"ambient": [0.045, 0.04, 0.03], "step": "carpet", "hum": 0.3
+		},
+		"o": {
+			"area": "office", "floor": "carpetDark", "wall": "wallpaperStained", "ceiling": "ceilingTile", "height": 2.6,
+			"ambient": [0.03, 0.03, 0.04], "step": "carpet", "hum": 0.15,
+			"lights": { "every": 2, "color": [0.95, 0.97, 1.0], "range": 6, "cond": { "all": [{ "flag": "brk.B1" }, { "flag": "box.fixed" }] }, "flicker": 0.3 }
+		},
+		"t": {
+			"area": "tenant", "floor": "carpetDark", "wall": "wallpaperStained", "ceiling": "ceilingTile", "height": 2.6,
+			"ambient": [0.1, 0.09, 0.07], "step": "carpet", "hum": 0.5
+		},
+		"e": {
+			"area": "exit", "floor": "tileWhite", "wall": "tileGreen", "ceiling": "ceilingTile", "height": 2.6,
+			"ambient": [0.14, 0.28, 0.17], "step": "concrete", "hum": 0.2, "fog": [0.04, 0.12, 0.07],
+			"lights": { "every": 2, "color": [0.45, 1.0, 0.6], "range": 7 }
+		},
+		"c": {
+			"area": "maint", "floor": "concrete", "wall": "cinder", "ceiling": "concreteCeil", "height": 3,
+			"ambient": [0.09, 0.1, 0.13], "step": "concrete", "hum": 0.6, "fog": [0.04, 0.045, 0.06],
+			"lights": { "every": 4, "color": [1.0, 0.52, 0.3], "range": 7.5, "flicker": 0.2, "dead": [[23, 17]] }
+		},
+		"b": {
+			"area": "breaker", "floor": "concrete", "wall": "cinder", "ceiling": "concreteCeil", "height": 3,
+			"ambient": [0.12, 0.13, 0.15], "step": "concrete", "hum": 0.8, "fog": [0.04, 0.05, 0.06],
+			"lights": { "every": 3, "color": [0.78, 0.95, 1.0], "range": 7.5, "flicker": 0.1 }
+		},
+		"p": {
+			"area": "pipes", "floor": "grating", "wall": "metalPanel", "ceiling": "concreteCeil", "height": 4.5,
+			"ambient": [0.07, 0.11, 0.11], "step": "metal", "hum": 0.5, "fog": [0.03, 0.06, 0.06],
+			"lights": { "every": 3, "color": [0.42, 1.0, 0.85], "range": 9, "flicker": 0.15 }
+		},
+		"w": {
+			"area": "flood", "floor": "concrete", "wall": "tileGreen", "ceiling": "concreteCeil", "height": 3.4, "water": 0.4,
+			"ambient": [0.06, 0.08, 0.11], "step": "water", "hum": 0.3, "fog": [0.03, 0.05, 0.07],
+			"lights": { "every": 4, "color": [0.6, 0.85, 1.0], "range": 8.5, "flicker": 0.35, "dead": [[32, 18]] }
+		}
+	},
+	"checkpoints": {
+		"cp.start": { "at": [3.5, 19.5], "yaw": 1.5708 },
+		"cp.maint": { "at": [18.6, 15.5], "yaw": 1.5708 },
+		"cp.repair": { "at": [28.5, 4.6], "yaw": 0 }
+	},
+	"entities": [
+		{ "id": "hole", "type": "decor", "model": "ceilingHole", "at": [3.5, 19.5] },
+		{ "id": "debris1", "type": "decor", "model": "debris", "at": [3.0, 19.9], "rot": 20 },
+		{ "id": "debris2", "type": "decor", "model": "debris", "at": [4.1, 19.0], "rot": 70 },
+		{ "id": "n.welcome", "type": "pickup", "note": "note.welcome", "model": "note", "at": [4.6, 19.7], "rot": 25, "onPick": [{ "do": "tutorial", "id": "inventory" }] },
+		{ "id": "t.move", "type": "trigger", "at": [3.5, 19.5], "size": [1, 1], "actions": [{ "do": "tutorial", "id": "move" }] },
+		{ "id": "t.interact", "type": "trigger", "at": [4.5, 19.5], "size": [1.4, 1.4], "actions": [{ "do": "tutorial", "id": "interact" }] },
+		{ "id": "chair.start", "type": "decor", "model": "chairTipped", "at": [2.5, 21.3], "rot": 140 },
+		{ "id": "plant.start", "type": "decor", "model": "plant", "at": [5.6, 18.4] },
+
+		{ "id": "t.sprint", "type": "trigger", "at": [8.5, 19.5], "size": [1, 1], "actions": [{ "do": "tutorial", "id": "sprint" }] },
+		{ "id": "fake1", "type": "fakeExit", "at": [8.5, 21.5], "facing": "s", "sign": "sign.exit1", "text": "fake.exit1" },
+		{ "id": "wet1", "type": "decor", "model": "wetFloor", "at": [8.3, 17.2], "rot": 30 },
+
+		{ "id": "cooler", "type": "decor", "model": "cooler", "at": [4.45, 8.2], "solid": true },
+		{ "id": "n.cooler", "type": "pickup", "note": "note.cooler", "model": "sticky", "at": [4.45, 8.1], "y": 1.5, "wall": "n" },
+		{ "id": "chair.cooler", "type": "decor", "model": "chair", "at": [5.6, 9.7], "rot": 200 },
+		{ "id": "plant.cooler", "type": "decor", "model": "plant", "at": [6.6, 8.4] },
+
+		{ "id": "fake2", "type": "fakeExit", "at": [1.5, 5.5], "facing": "w", "sign": "sign.exit2", "text": "fake.exit2" },
+		{ "id": "gate", "type": "gate", "at": [3.5, 4.5], "axis": "z", "open": { "all": [{ "flag": "brk.B4" }, { "flag": "box.fixed" }] }, "sign": "sign.gate", "lockedText": "gate.locked", "openText": "gate.open" },
+		{ "id": "t.gate", "type": "trigger", "at": [3.5, 5.5], "size": [3, 1], "when": { "not": { "flag": "box.fixed" } }, "actions": [{ "do": "say", "text": "gate.look" }] },
+		{ "id": "exit", "type": "exit", "at": [3.5, 1.5], "facing": "n", "sign": "sign.exit0" },
+		{ "id": "t.view", "type": "trigger", "at": [8.5, 11.5], "size": [1, 1], "actions": [{ "do": "tutorial", "id": "view" }] },
+
+		{ "id": "locker3", "type": "keypad", "at": [13.5, 2.5], "facing": "n", "code": "1997", "sign": "sign.locker", "onSolve": [{ "do": "say", "text": "keypad.ok" }] },
+		{ "id": "n.locker", "type": "pickup", "note": "note.locker", "model": "map", "at": [13.5, 2.15], "y": 1.0, "rot": 0, "when": { "flag": "solved.locker3" } },
+		{ "id": "shelf.closet", "type": "decor", "model": "shelf", "at": [12.5, 2.12], "rot": 0, "solid": true },
+		{ "id": "boxes.closet", "type": "decor", "model": "boxes", "at": [13.6, 3.6], "rot": 10, "solid": true },
+
+		{ "id": "fake7", "type": "fakeExit", "at": [14.5, 7.5], "facing": "n", "sign": "sign.exit7", "text": "fake.exit7" },
+		{ "id": "desk.pillar", "type": "decor", "model": "desk", "at": [10.7, 11.4], "rot": 0, "solid": true },
+		{ "id": "chair.pillar1", "type": "decor", "model": "chair", "at": [10.7, 10.8], "rot": 180 },
+		{ "id": "chair.pillar2", "type": "decor", "model": "chairTipped", "at": [13.4, 8.4], "rot": 60 },
+		{ "id": "part.pillar", "type": "decor", "model": "partition", "at": [12.5, 11.7], "rot": 90, "solid": true },
+		{ "id": "plant.pillar", "type": "decor", "model": "plant", "at": [14.6, 12.6] },
+
+		{ "id": "n.tenant", "type": "pickup", "note": "note.tenant", "model": "note", "at": [16.75, 8.6], "y": 1.1, "rot": 0, "wall": "e" },
+		{ "id": "t.listen", "type": "trigger", "at": [16.5, 9.5], "size": [1, 4], "actions": [{ "do": "tutorial", "id": "listen" }] },
+		{ "id": "sign.room0b", "type": "sign", "at": [23.5, 8.5], "facing": "w", "text": "sign.room0b", "color": "white", "y": 2.1 },
+		{ "id": "chair.tenant", "type": "decor", "model": "chair", "at": [20.6, 10.6], "rot": 0 },
+		{ "id": "light.tenant", "type": "light", "at": [20, 10], "y": 2.5, "color": [1.0, 0.85, 0.6], "range": 6, "flicker": 1 },
+
+		{ "id": "t.dark", "type": "trigger", "at": [12.5, 16.5], "size": [1, 1], "actions": [{ "do": "tutorial", "id": "flashlight" }] },
+		{ "id": "desk.o1", "type": "decor", "model": "desk", "at": [12.5, 19.6], "rot": 0, "solid": true },
+		{ "id": "desk.o2", "type": "decor", "model": "desk", "at": [14.5, 19.6], "rot": 0, "solid": true },
+		{ "id": "desk.o3", "type": "decor", "model": "desk", "at": [12.5, 21.6], "rot": 0, "solid": true },
+		{ "id": "desk.o4", "type": "decor", "model": "desk", "at": [14.5, 21.6], "rot": 0, "solid": true },
+		{ "id": "sign.desk4", "type": "decor", "model": "deskSign", "at": [14.95, 21.4], "y": 0.76, "rot": 0 },
+		{ "id": "chair.o1", "type": "decor", "model": "chair", "at": [12.5, 19.0], "rot": 180 },
+		{ "id": "chair.o2", "type": "decor", "model": "chair", "at": [14.5, 19.0], "rot": 180 },
+		{ "id": "chair.o3", "type": "decor", "model": "chair", "at": [12.5, 21.0], "rot": 180 },
+		{ "id": "chair.o4", "type": "decor", "model": "chair", "at": [14.5, 21.0], "rot": 180 },
+		{ "id": "cab.o1", "type": "decor", "model": "cabinet", "at": [15.65, 18.4], "rot": 270, "solid": true },
+		{ "id": "cab.o2", "type": "decor", "model": "cabinet", "at": [11.35, 22.6], "rot": 90, "solid": true },
+		{ "id": "key", "type": "pickup", "item": "key.maint", "model": "key", "at": [14.5, 21.75], "y": 0.79, "rot": 30 },
+		{ "id": "n.office", "type": "pickup", "note": "note.office", "model": "memo", "at": [12.3, 19.75], "y": 0.79, "rot": -10 },
+
+		{ "id": "door.maint", "type": "door", "at": [17.5, 15.5], "axis": "x", "requires": { "item": "key.maint" }, "sign": "sign.maint", "lockedText": "locked.maint", "onOpen": [{ "do": "say", "text": "open.maint" }, { "do": "sound", "sound": "unlock" }, { "do": "checkpoint", "id": "cp.maint" }] },
+
+		{ "id": "pipe.c1", "type": "decor", "model": "pipeRun", "at": [18.1, 15.15], "to": [23.9, 15.15], "y": 2.75, "radius": 0.1, "color": [0.55, 0.6, 0.62] },
+		{ "id": "pipe.c2", "type": "decor", "model": "pipeRun", "at": [23.85, 3.1], "to": [23.85, 20.9], "y": 2.7, "radius": 0.12, "color": [0.75, 0.25, 0.18] },
+		{ "id": "pipe.c3", "type": "decor", "model": "pipeRun", "at": [23.15, 3.1], "to": [23.15, 20.9], "y": 2.8, "radius": 0.07, "color": [0.55, 0.6, 0.62] },
+		{ "id": "bucket.c", "type": "decor", "model": "bucket", "at": [23.3, 13.4] },
+		{ "id": "sign.pump", "type": "sign", "at": [23.5, 19.5], "facing": "e", "text": "sign.pump", "color": "yellow", "y": 1.6 },
+		{ "id": "creature", "type": "creature", "at": [18.9, 9.5], "facing": "e", "roamFlag": "fixture.roam",
+			"patrol": [[23.5, 4.5], [23.5, 10.5], [23.5, 15.5], [19.5, 15.5], [23.5, 15.5], [23.5, 19.5], [23.5, 12.5], [23.5, 7.5]] },
+
+		{ "id": "panel", "type": "breakers", "at": [27.5, 2.5], "facing": "n",
+			"switches": [
+				{ "id": "B1", "label": "brk.B1", "flag": "brk.B1", "needsPower": true, "onOn": [{ "do": "say", "text": "brk.B1.on" }] },
+				{ "id": "B2", "label": "brk.B2", "flag": "brk.B2", "onOn": [{ "do": "say", "text": "brk.B2.on" }], "onOff": [{ "do": "say", "text": "brk.B2.off" }] },
+				{ "id": "B3", "label": "brk.B3", "flag": "brk.B3", "onOn": [{ "do": "say", "text": "brk.B3.on" }, { "do": "sound", "sound": "zap" }], "onOff": [{ "do": "say", "text": "brk.B3.off" }] },
+				{ "id": "B4", "label": "brk.B4", "flag": "brk.B4", "needsPower": true, "onOn": [{ "do": "say", "text": "brk.B4.on" }, { "do": "setFlag", "flag": "fixture.roam" }, { "do": "alarm" }] }
+			],
+			"power": { "flag": "box.fixed" }, "deadText": "brk.dead" },
+		{ "id": "n.breaker", "type": "pickup", "note": "note.breaker", "model": "memo", "at": [26.6, 2.25], "y": 1.25, "rot": 0, "wall": "n" },
+		{ "id": "box", "type": "repair", "at": [29.5, 2.5], "facing": "n", "name": "repair.name", "doneFlag": "box.fixed",
+			"steps": [
+				{ "needs": "wrench", "hold": 1.4, "prompt": "repair.unbolt", "done": "repair.unbolt.done", "sound": "ratchet" },
+				{ "needs": "fuse", "consume": true, "hold": 0.8, "prompt": "repair.fuse", "done": "repair.fuse.done", "sound": "click" },
+				{ "needs": "wrench", "hold": 1.4, "prompt": "repair.bolt", "sound": "ratchet" }
+			],
+			"onDone": [{ "do": "say", "text": "repair.done" }, { "do": "sound", "sound": "powerUp" }, { "do": "checkpoint", "id": "cp.repair" }] },
+		{ "id": "desk.brk", "type": "decor", "model": "desk", "at": [26.0, 6.4], "rot": 90, "solid": true },
+		{ "id": "chair.brk", "type": "decor", "model": "chair", "at": [26.7, 6.2], "rot": 260 },
+		{ "id": "lockers.brk", "type": "decor", "model": "lockers", "at": [30.85, 5.5], "rot": 270, "solid": true },
+		{ "id": "pipe.b1", "type": "decor", "model": "pipeRun", "at": [25.1, 2.15], "to": [30.9, 2.15], "y": 2.7, "radius": 0.12, "color": [0.3, 0.45, 0.6] },
+
+		{ "id": "bench", "type": "decor", "model": "workbench", "at": [30.4, 14.62], "rot": 0, "solid": true },
+		{ "id": "wrench", "type": "pickup", "item": "wrench", "model": "wrench", "at": [30.85, 14.5], "y": 0.92, "rot": 60 },
+		{ "id": "n.repair", "type": "pickup", "note": "note.repair", "model": "note", "at": [29.85, 14.55], "y": 0.92, "rot": -15 },
+		{ "id": "pipe.p1", "type": "decor", "model": "pipeRun", "at": [25.1, 10.3], "to": [31.9, 10.3], "y": 3.8, "radius": 0.35, "color": [0.32, 0.5, 0.42] },
+		{ "id": "pipe.p2", "type": "decor", "model": "pipeRun", "at": [25.1, 14.6], "to": [31.9, 14.6], "y": 3.3, "radius": 0.25, "color": [0.7, 0.32, 0.2] },
+		{ "id": "pipe.p3", "type": "decor", "model": "pipeRun", "at": [26.4, 10.4], "to": [26.4, 10.4], "y": 0, "top": 4.5, "radius": 0.22, "color": [0.55, 0.58, 0.6], "vertical": true },
+		{ "id": "pipe.p4", "type": "decor", "model": "pipeRun", "at": [31.6, 11.4], "to": [31.6, 11.4], "y": 0, "top": 4.5, "radius": 0.3, "color": [0.32, 0.5, 0.42], "vertical": true },
+		{ "id": "valve.p", "type": "decor", "model": "valve", "at": [26.4, 10.75], "y": 1.3, "rot": 0 },
+		{ "id": "steam.p", "type": "decor", "model": "steam", "at": [27.6, 12.5] },
+		{ "id": "barrel.p", "type": "decor", "model": "barrel", "at": [25.6, 13.8], "solid": true },
+		{ "id": "sign.flood", "type": "sign", "at": [29.5, 15.5], "facing": "w", "text": "sign.flood", "color": "white", "y": 1.9 },
+
+		{ "id": "water", "type": "hazardWater", "at": [28.5, 20.5], "char": "w", "cable": [31.3, 18.4], "live": { "flag": "brk.B3" } },
+		{ "id": "shelf.fuse", "type": "decor", "model": "shelf", "at": [32.78, 22.0], "rot": 270, "solid": true },
+		{ "id": "fuse", "type": "pickup", "item": "fuse", "model": "fuse", "at": [32.75, 21.875], "y": 0.7, "rot": 90 },
+		{ "id": "shelf.flood", "type": "decor", "model": "shelf", "at": [25.45, 17.6], "rot": 90, "solid": true },
+		{ "id": "n.flood", "type": "pickup", "note": "note.flood", "model": "note", "at": [25.45, 17.725], "y": 0.69, "rot": 80 },
+		{ "id": "barrel.w1", "type": "decor", "model": "barrel", "at": [27.2, 21.6], "solid": true, "rot": 0 },
+		{ "id": "barrel.w2", "type": "decor", "model": "barrelTipped", "at": [30.3, 18.6], "rot": 35 },
+		{ "id": "pump", "type": "decor", "model": "pump", "at": [31.6, 17.6], "solid": true },
+		{ "id": "mop", "type": "decor", "model": "mop", "at": [28.7, 19.2], "rot": 50 },
+		{ "id": "pipe.w1", "type": "decor", "model": "pipeRun", "at": [25.1, 17.2], "to": [32.9, 17.2], "y": 2.9, "radius": 0.2, "color": [0.32, 0.5, 0.42] }
+	]
+}

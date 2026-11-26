@@ -1,0 +1,26 @@
+{
+	"name": "exit-zero",
+	"private": true,
+	"version": "0.1.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vite --open --port 4012",
+		"build": "npm run validate && tsc && vite build",
+		"preview": "vite preview",
+		"validate": "node scripts/validate-level.ts"
+	},
+	"arcade": {
+		"engine": "three",
+		"outDir": "dist"
+	},
+	"dependencies": {
+		"@fontsource/dm-mono": "5.3.0",
+		"@fontsource/pixelify-sans": "5.3.0",
+		"three": "0.187.0"
+	},
+	"devDependencies": {
+		"@types/three": "0.186.0",
+		"typescript": "7.0.2",
+		"vite": "8.3.6"
+	}
+}

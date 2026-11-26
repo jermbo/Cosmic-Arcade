@@ -10,6 +10,11 @@
       "name": "solitary",
       "url": "http://localhost:4010",
       "port": 4010
+    },
+    {
+      "name": "exit-zero",
+      "url": "http://localhost:4012",
+      "port": 4012
     }
   ]
 }

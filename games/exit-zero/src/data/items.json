@@ -1,0 +1,22 @@
+{
+	"flashlight": {
+		"name": "Keychain Flashlight",
+		"desc": "Small but bright. You have had it for years. Press F.",
+		"icon": "flashlight"
+	},
+	"key.maint": {
+		"name": "Maintenance Key",
+		"desc": "Brass. The paper tag says: DESK 4 - RETURN AT END OF SHIFT.",
+		"icon": "key"
+	},
+	"wrench": {
+		"name": "Pipe Wrench",
+		"desc": "Heavy, cold and red. Good for bolts.",
+		"icon": "wrench"
+	},
+	"fuse": {
+		"name": "30A Fuse",
+		"desc": "A glass fuse with copper caps, still in its paper.",
+		"icon": "fuse"
+	}
+}
