@@ -1,4 +1,6 @@
 {
+	"lang": "en",
+	"dir": "ltr",
 	"name": "Wordkin",
 	"short_name": "Wordkin",
 	"description": "Three word puzzles: crack locked words, find a secret word, name the hidden link. Plays offline.",

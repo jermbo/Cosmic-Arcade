@@ -27,7 +27,7 @@ Three word puzzles on one shared core. Plain TypeScript and DOM, no engine. Cont
 
 ## Add content
 
-- **A group:** add an entry to `groups.json`. Run `npm test -w word-game`. It checks the bank and builds 1200 puzzles.
+- **A group:** add an entry to `groups.json`. Run `npm test -w wordkin`. It checks the bank and builds 1200 puzzles.
 - **A hand-made puzzle:** add to `puzzles.json`:
   `{ "id": "nov-26", "date": "2026-11-26", "mode": "crack", "groups": [{ "theme": "...", "level": 1, "words": ["A", "B", "C", "D"] }, ...] }`.
   Leave out `mode` to use it for all three modes. On that date it replaces the built daily.
@@ -56,7 +56,7 @@ Easy, Medium and Hard live in `DIFFICULTY` in `src/core/tuning.ts`. Each one set
 
 ## Offline (PWA)
 
-`vite.config.ts` writes `sw.js` at build time with every built file, so the game (and the word list) plays offline. `public/manifest.webmanifest` and `public/icons/` make it installable; the title shows **Install** when the browser offers it. Redraw the icons with `npm run icons -w word-game`. Add `?dev` to a build URL to turn the service worker off.
+`vite.config.ts` writes `sw.js` at build time with every built file, so the game (and the word list) plays offline. `public/manifest.webmanifest` and `public/icons/` make it installable; the title shows **Install** when the browser offers it. Redraw the icons with `npm run icons -w wordkin`. Add `?dev` to a build URL to turn the service worker off.
 
 ## Tune
 

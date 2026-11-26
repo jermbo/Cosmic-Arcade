@@ -3,7 +3,7 @@ title: Wordkin
 tagline: Three word puzzles in one. Crack locked words, find a secret word, name the hidden link.
 status: prototype
 kind: video
-build: "word-game"
+build: "wordkin"
 platforms: [desktop, mobile]
 inputs: [mouse, keyboard, touch]
 tags: [words, puzzle, daily, pwa]
