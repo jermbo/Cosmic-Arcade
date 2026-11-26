@@ -33,7 +33,10 @@ export class SortBoard {
 	private board: Board;
 	private events: BoardEvents;
 
-	constructor(board: Board, events: BoardEvents, locked: string[] = []) {
+	private hints: Map<string, (string | null)[]>;
+
+	constructor(board: Board, events: BoardEvents, locked: string[] = [], hints = new Map<string, (string | null)[]>()) {
+		this.hints = hints;
 		this.board = board;
 		this.events = events;
 		this.locked = new Set(locked);
@@ -65,14 +68,17 @@ export class SortBoard {
 				'aria-label': isLocked ? `Locked word, ${word.length} letters` : word,
 				on: { click: () => this.tap(word) },
 			},
-			isLocked ? this.lockFace(word.length) : h('span', { class: 'tile__word' }, word),
+			isLocked ? this.lockFace(word) : h('span', { class: 'tile__word' }, word),
 		);
 		this.tiles.set(word, tile);
 		return tile;
 	}
 
-	private lockFace(n: number): HTMLElement {
-		return h('span', { class: 'tile__lock' }, icon('lock', 'tile__lockicon'), h('span', { class: 'tile__dots' }, ...Array.from({ length: n }, () => h('i'))));
+	/** The lock, plus a dot per letter. Letters given by the difficulty show in place of their dot. */
+	private lockFace(word: string): HTMLElement {
+		const hint = this.hints.get(word) ?? [];
+		const marks = [...word].map((_, i) => (hint[i] ? h('b', {}, hint[i]!) : h('i')));
+		return h('span', { class: 'tile__lock' }, icon('lock', 'tile__lockicon'), h('span', { class: 'tile__dots' }, ...marks));
 	}
 
 	private tap(word: string) {

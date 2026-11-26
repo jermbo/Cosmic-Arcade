@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { BY_LEVEL, GROUPS, GROUPS_OF_WORD, BANK_WORDS } from '../src/core/bank.ts';
 import { buildCrack, buildLink, buildSecret } from '../src/core/builder.ts';
-import { TUNING } from '../src/core/tuning.ts';
+import { DIFFICULTIES, DIFFICULTY, TUNING } from '../src/core/tuning.ts';
 import { isWord, scoreGuess, setDictionary } from '../src/core/words.ts';
 import type { Board } from '../src/core/types.ts';
 
@@ -32,7 +32,7 @@ assert(!isWord('QXZRT'), 'QXZRT is not a word');
 
 function checkBoard(board: Board, maxLength = 8) {
 	assert.equal(board.groups.length, 4);
-	assert.deepEqual(board.groups.map((g) => g.level), [1, 2, 3, 4]);
+	assert.deepEqual(board.groups.map((g) => g.level), [1, 2, 3, 4], 'board colors go 1 to 4');
 	assert.equal(new Set(board.tiles).size, 16, 'tiles must be 16 different words');
 	const onBoard = new Set(board.groups.map((g) => g.id));
 	for (const g of board.groups) {
@@ -44,31 +44,39 @@ function checkBoard(board: Board, maxLength = 8) {
 	}
 }
 
-const RUNS = 400;
+const RUNS = 300;
 const seen = new Set<string>();
-for (let i = 0; i < RUNS; i++) {
-	const crack = buildCrack(`t-crack-${i}`);
-	checkBoard(crack.board);
-	crack.locked.forEach((w, k) => assert(crack.board.groups[k].words.includes(w), 'locked word not in its group'));
-	seen.add(crack.board.groups.map((g) => g.id).join(','));
+for (const diff of DIFFICULTIES) {
+	const D = DIFFICULTY[diff];
+	for (let i = 0; i < RUNS; i++) {
+		const crack = buildCrack(`t-crack-${i}`, diff);
+		checkBoard(crack.board);
+		crack.locked.forEach((w, k) => {
+			assert(crack.board.groups[k].words.includes(w), 'locked word not in its group');
+			assert(w.length >= D.crack.minLength && w.length <= D.crack.maxLength, `${diff}: locked ${w} has the wrong length`);
+			const shown = crack.hints[k].filter(Boolean).length;
+			assert.equal(shown, D.crack.showFirst ? 1 + D.crack.showExtra : 0, `${diff}: wrong number of given letters`);
+		});
+		seen.add(diff + crack.board.groups.map((g) => g.id).join(','));
 
-	const secret = buildSecret(`t-secret-${i}`);
-	checkBoard(secret.board);
-	assert(secret.word.length >= TUNING.secret.minLength && secret.word.length <= TUNING.secret.maxLength);
-	assert(!secret.board.tiles.includes(secret.word), 'secret word is on the board');
-	assert.equal(new Set(secret.reveal).size, 4);
+		const secret = buildSecret(`t-secret-${i}`, diff);
+		checkBoard(secret.board);
+		assert(secret.word.length >= D.secret.minLength && secret.word.length <= D.secret.maxLength);
+		assert(!secret.board.tiles.includes(secret.word), 'secret word is on the board');
+		assert.equal(new Set(secret.reveal).size, 4);
 
-	const link = buildLink(`t-link-${i}`);
-	assert.equal(link.rounds.length, 4);
-	for (const r of link.rounds) {
-		assert.equal(r.options.length, TUNING.link.options);
-		assert(r.options.includes(r.group.theme));
-		assert.equal(new Set(r.options).size, r.options.length, 'two options are the same');
-		for (const w of r.group.words) assert(w.length <= TUNING.link.maxLength);
+		const link = buildLink(`t-link-${i}`, diff);
+		assert.equal(link.rounds.length, 4);
+		for (const r of link.rounds) {
+			assert.equal(r.options.length, D.link.options);
+			assert(r.options.includes(r.group.theme));
+			assert.equal(new Set(r.options).size, r.options.length, 'two options are the same');
+			for (const w of r.group.words) assert(w.length <= TUNING.link.maxLength);
+		}
 	}
 }
 
 // Same seed, same puzzle.
-assert.deepEqual(buildCrack('same'), buildCrack('same'));
+assert.deepEqual(buildCrack('same', 'medium'), buildCrack('same', 'medium'));
 
-console.log(`OK: ${GROUPS.length} groups, ${RUNS * 3} puzzles, ${seen.size} different crack boards.`);
+console.log(`OK: ${GROUPS.length} groups, ${RUNS * 9} puzzles over 3 difficulties, ${seen.size} different crack boards.`);

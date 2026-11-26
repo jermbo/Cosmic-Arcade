@@ -3,7 +3,8 @@ import { sfx } from '../audio.ts';
 import { todayKey } from '../core/rng.ts';
 import type { ModeId } from '../core/types.ts';
 import { MODES } from '../modes/meta.ts';
-import { dailyResult, save } from '../save.ts';
+import { DIFFICULTIES, DIFFICULTY } from '../core/tuning.ts';
+import { dailyResult, persist, save } from '../save.ts';
 import { h, icon } from './dom.ts';
 import { calm, pulse, toast } from './fx.ts';
 import { Kip } from './kip.ts';
@@ -39,8 +40,8 @@ export function titleScreen(onPlay: (mode: ModeId, daily: boolean) => void): { e
 		h('span', { class: 'logo__row' }, ...letters.slice(4), kip.el),
 	);
 
-	const cards = MODES.map((m) => {
-		const done = dailyResult(m.id, today);
+	const makeCards = () => MODES.map((m) => {
+		const done = dailyResult(m.id, save.settings.difficulty, today);
 		const streak = save.stats[m.id].streak;
 		const daily = h(
 			'button',
@@ -51,7 +52,7 @@ export function titleScreen(onPlay: (mode: ModeId, daily: boolean) => void): { e
 					click: () => {
 						if (done) {
 							sfx.ui();
-							toast('Done for today. A new one comes tomorrow!', 2000);
+							toast(`${DIFFICULTY[save.settings.difficulty].name} daily done. Try another level!`, 2200);
 							return;
 						}
 						onPlay(m.id, true);
@@ -72,6 +73,28 @@ export function titleScreen(onPlay: (mode: ModeId, daily: boolean) => void): { e
 		);
 	});
 
+	const modes = h('div', { class: 'modes' }, ...makeCards());
+	const blurb = h('p', { class: 'diff__blurb' }, DIFFICULTY[save.settings.difficulty].blurb);
+
+	function diffPicker(): HTMLElement {
+		const buttons = DIFFICULTIES.map((d) => {
+			const b = h('button', { class: `diff__btn diff__btn--${d}`, type: 'button', role: 'radio', 'aria-checked': String(d === save.settings.difficulty) }, DIFFICULTY[d].name);
+			b.addEventListener('click', () => {
+				if (save.settings.difficulty === d) return;
+				save.settings.difficulty = d;
+				persist();
+				sfx.select(DIFFICULTIES.indexOf(d) + 2);
+				buttons.forEach((x, i) => x.setAttribute('aria-checked', String(DIFFICULTIES[i] === d)));
+				pulse(b, 'diff__btn--pop');
+				blurb.textContent = DIFFICULTY[d].blurb;
+				modes.replaceChildren(...makeCards());
+				kip.react(d === 'hard' ? 'think' : 'happy', 800);
+			});
+			return b;
+		});
+		return h('div', { class: 'diff' }, h('div', { class: 'diff__group', role: 'radiogroup', 'aria-label': 'Difficulty' }, ...buttons), blurb);
+	}
+
 	const el = h(
 		'div',
 		{ class: 'screen title' },
@@ -83,7 +106,8 @@ export function titleScreen(onPlay: (mode: ModeId, daily: boolean) => void): { e
 		),
 		logo,
 		h('p', { class: 'title__tag' }, 'Find the kin. Crack the words.'),
-		h('div', { class: 'modes' }, ...cards),
+		diffPicker(),
+		modes,
 		h('p', { class: 'title__foot' }, `New daily puzzles every day · ${today}`),
 	);
 

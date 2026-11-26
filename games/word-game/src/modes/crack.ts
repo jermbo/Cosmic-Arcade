@@ -1,7 +1,7 @@
 // Crack: open 4 locked words with Wordle-style guesses, then sort all 16.
 import { sfx } from '../audio.ts';
 import { buildCrack } from '../core/builder.ts';
-import { LEVEL_EMOJI, starsFor, TUNING } from '../core/tuning.ts';
+import { LEVEL_EMOJI, DIFFICULTY, starsFor, TUNING } from '../core/tuning.ts';
 import type { Mark } from '../core/types.ts';
 import { mergeKeyMarks, scoreGuess } from '../core/words.ts';
 import { SortBoard } from '../ui/board.ts';
@@ -21,9 +21,10 @@ interface LockState {
 }
 
 export function startCrack(ctx: GameCtx): ModeGame {
-	const T = TUNING.crack;
-	const puzzle = buildCrack(ctx.seed, ctx.date ?? undefined);
-	const shell = new Shell({ title: 'Crack', tag: ctx.date ? 'Daily' : 'Practice', hearts: TUNING.hearts.crack, onBack: ctx.exit, onHelp: ctx.help });
+	const T = { ...TUNING.crack, ...DIFFICULTY[ctx.difficulty].crack };
+	const puzzle = buildCrack(ctx.seed, ctx.difficulty, ctx.date ?? undefined);
+	const shell = new Shell({ title: 'Crack', tag: `${ctx.date ? 'Daily' : 'Practice'} · ${DIFFICULTY[ctx.difficulty].name}`, hearts: T.hearts, scale: TUNING.scoreScale[ctx.difficulty], onBack: ctx.exit, onHelp: ctx.help });
+	const hints = new Map(puzzle.locked.map((w, i) => [w, puzzle.hints[i]]));
 	const locks = new Map<string, LockState>(puzzle.locked.map((w) => [w, { guesses: [], marks: [], done: false, cracked: false }]));
 	let panel: GuessPanel | null = null;
 	let over = false;
@@ -55,6 +56,7 @@ export function startCrack(ctx: GameCtx): ModeGame {
 			},
 		},
 		puzzle.locked,
+		hints,
 	);
 	shell.main.append(hint, board.el);
 	const releaseKeys = pushKeys((key) => {
@@ -64,7 +66,7 @@ export function startCrack(ctx: GameCtx): ModeGame {
 	function openLock(word: string) {
 		const st = locks.get(word)!;
 		if (st.done || panel) return;
-		const rows = new WordRows({ length: word.length, rows: T.guesses });
+		const rows = new WordRows({ length: word.length, rows: T.guesses, ghost: hints.get(word) });
 		const keyMarks = new Map<string, Mark>();
 		st.guesses.forEach((g, i) => {
 			rows.fill(g, st.marks[i]);
@@ -81,6 +83,7 @@ export function startCrack(ctx: GameCtx): ModeGame {
 			length: word.length,
 			keyMarks,
 			closable: true,
+			checkWords: DIFFICULTY[ctx.difficulty].checkWords,
 			parent: shell.main,
 			onClose: () => {
 				panel = null;

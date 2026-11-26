@@ -16,6 +16,8 @@ export interface PanelOpts {
 	keyMarks: Map<string, Mark>;
 	/** False: no close button, back does not close it. */
 	closable: boolean;
+	/** False: any letters count as a guess. */
+	checkWords: boolean;
 	parent: HTMLElement;
 	onGuess: (guess: string) => Promise<void>;
 	onClose: () => void;
@@ -62,7 +64,7 @@ export class GuessPanel {
 			rows.shake();
 			sfx.invalid();
 			toast('Not enough letters');
-		} else if (!isWord(rows.guess)) {
+		} else if (this.opts.checkWords && !isWord(rows.guess)) {
 			rows.shake();
 			sfx.invalid();
 			toast('Not in the word list');

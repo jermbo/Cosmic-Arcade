@@ -2,6 +2,7 @@
 
 export type Level = 1 | 2 | 3 | 4;
 export type ModeId = 'crack' | 'secret' | 'link';
+export type Difficulty = 'easy' | 'medium' | 'hard';
 export type Mark = 'hit' | 'near' | 'miss';
 
 /** One entry in the group bank: a theme with 5 to 8 words. */
@@ -30,6 +31,8 @@ export interface CrackPuzzle {
 	board: Board;
 	/** One locked word per group, in the order of board.groups. */
 	locked: string[];
+	/** For each locked word, the letters shown from the start (null = hidden). */
+	hints: (string | null)[][];
 }
 
 export interface SecretPuzzle {

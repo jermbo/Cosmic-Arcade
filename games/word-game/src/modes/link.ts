@@ -1,7 +1,7 @@
 // Link: 4 rounds. Guess hidden words to find what links them, then name the link.
 import { sfx } from '../audio.ts';
 import { buildLink } from '../core/builder.ts';
-import { LEVEL_EMOJI, LEVEL_NAMES, starsFor, TUNING } from '../core/tuning.ts';
+import { LEVEL_EMOJI, LEVEL_NAMES, DIFFICULTY, starsFor, TUNING } from '../core/tuning.ts';
 import type { LinkRound, Mark } from '../core/types.ts';
 import { isWord, mergeKeyMarks, scoreGuess } from '../core/words.ts';
 import { h, lengthClass, wait } from '../ui/dom.ts';
@@ -21,9 +21,9 @@ interface Slot {
 }
 
 export function startLink(ctx: GameCtx): ModeGame {
-	const T = TUNING.link;
-	const puzzle = buildLink(ctx.seed, ctx.date ?? undefined);
-	const shell = new Shell({ title: 'Link', tag: ctx.date ? 'Daily' : 'Practice', hearts: TUNING.hearts.link, onBack: ctx.exit, onHelp: ctx.help });
+	const T = { ...TUNING.link, ...DIFFICULTY[ctx.difficulty].link };
+	const puzzle = buildLink(ctx.seed, ctx.difficulty, ctx.date ?? undefined);
+	const shell = new Shell({ title: 'Link', tag: `${ctx.date ? 'Daily' : 'Practice'} · ${DIFFICULTY[ctx.difficulty].name}`, hearts: T.hearts, scale: TUNING.scoreScale[ctx.difficulty], onBack: ctx.exit, onHelp: ctx.help });
 	let over = false;
 	let roundIndex = 0;
 	let round: LinkRound;
@@ -92,7 +92,8 @@ export function startLink(ctx: GameCtx): ModeGame {
 
 	/** First letter, plus any letter a past guess put in the right spot. */
 	function ghostFor(s: Slot): (string | null)[] {
-		const g: (string | null)[] = [...s.word].map((_, i) => (i === 0 ? s.word[0] : null));
+		const last = s.word.length - 1;
+		const g: (string | null)[] = [...s.word].map((ch, i) => (i === 0 || (T.showLast && i === last) ? ch : null));
 		s.marks.forEach((m) => m.forEach((mark, i) => mark === 'hit' && (g[i] = s.word[i])));
 		return g;
 	}
@@ -129,7 +130,7 @@ export function startLink(ctx: GameCtx): ModeGame {
 			sfx.invalid();
 			return toast('Not enough letters');
 		}
-		if (!isWord(guess)) {
+		if (DIFFICULTY[ctx.difficulty].checkWords && !isWord(guess)) {
 			rows.shake();
 			sfx.invalid();
 			return toast('Not in the word list');

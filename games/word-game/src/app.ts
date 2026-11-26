@@ -31,6 +31,7 @@ function home() {
 
 function play(mode: ModeId, daily: boolean) {
 	let game: ModeGame | null = null;
+	const difficulty = save.settings.difficulty;
 	const depth = pushLayer(() => {
 		game = null;
 		home();
@@ -40,14 +41,16 @@ function play(mode: ModeId, daily: boolean) {
 		const ctx: GameCtx = {
 			mode,
 			date,
-			seed: seedFor(mode, date),
+			difficulty,
+			seed: seedFor(mode, difficulty, date),
 			exit: () => closeLayer(depth),
 			help: () => game && openHelp(mode, game.el),
 			finish: (outcome) => {
 				if (!game) return;
-				const newBest = recordGame(mode, date, { won: outcome.won, stars: outcome.stars, score: outcome.score, share: shareText(mode, date, outcome) });
+				const newBest = recordGame(mode, difficulty, date, { won: outcome.won, stars: outcome.stars, score: outcome.score, share: shareText(mode, difficulty, date, outcome) });
 				showResults({
 					mode,
+					difficulty,
 					date,
 					outcome,
 					newBest,

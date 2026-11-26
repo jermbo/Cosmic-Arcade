@@ -1,7 +1,7 @@
 // Secret: sort the board; each solved group shows a letter of a secret word.
 import { sfx } from '../audio.ts';
 import { buildSecret } from '../core/builder.ts';
-import { LEVEL_EMOJI, starsFor, TUNING } from '../core/tuning.ts';
+import { LEVEL_EMOJI, DIFFICULTY, starsFor, TUNING } from '../core/tuning.ts';
 import type { Mark } from '../core/types.ts';
 import { mergeKeyMarks, scoreGuess } from '../core/words.ts';
 import { SortBoard } from '../ui/board.ts';
@@ -14,10 +14,10 @@ import { WordRows } from '../ui/wordrows.ts';
 import { MARK_EMOJI, type GameCtx, type ModeGame } from './ctx.ts';
 
 export function startSecret(ctx: GameCtx): ModeGame {
-	const T = TUNING.secret;
-	const puzzle = buildSecret(ctx.seed, ctx.date ?? undefined);
+	const T = { ...TUNING.secret, ...DIFFICULTY[ctx.difficulty].secret };
+	const puzzle = buildSecret(ctx.seed, ctx.difficulty, ctx.date ?? undefined);
 	const word = puzzle.word;
-	const shell = new Shell({ title: 'Secret', tag: ctx.date ? 'Daily' : 'Practice', hearts: TUNING.hearts.secret, onBack: ctx.exit, onHelp: ctx.help });
+	const shell = new Shell({ title: 'Secret', tag: `${ctx.date ? 'Daily' : 'Practice'} · ${DIFFICULTY[ctx.difficulty].name}`, hearts: T.hearts, scale: TUNING.scoreScale[ctx.difficulty], onBack: ctx.exit, onHelp: ctx.help });
 	const known: (string | null)[] = Array(word.length).fill(null);
 	const guesses: string[] = [];
 	const marks: Mark[][] = [];
@@ -47,7 +47,7 @@ export function startSecret(ctx: GameCtx): ModeGame {
 	const syncStrip = () => {
 		const left = T.tries - guesses.length;
 		triesEl.textContent = `${left} ${left === 1 ? 'try' : 'tries'} left`;
-		clueBtn.disabled = clueUsed || over || shell.hearts.left <= T.clueCost;
+		clueBtn.disabled = clueUsed || over || shell.hearts.left <= T.cluePrice;
 		guessBtn.disabled = over;
 	};
 
@@ -75,6 +75,11 @@ export function startSecret(ctx: GameCtx): ModeGame {
 		},
 	});
 	shell.main.append(strip, board.el);
+	if (T.clue !== 'paid') clueBtn.hidden = true;
+	if (T.clue === 'free') {
+		clueText.hidden = false;
+		clueText.replaceChildren('It is one of: ', h('strong', {}, puzzle.clue));
+	}
 	syncStrip();
 	const releaseKeys = pushKeys((key) => {
 		if (key === 'Enter') board.submitKey();
@@ -114,7 +119,7 @@ export function startSecret(ctx: GameCtx): ModeGame {
 	function useClue() {
 		if (clueBtn.disabled) return;
 		clueUsed = true;
-		shell.hearts.lose();
+		for (let i = 0; i < T.cluePrice; i++) shell.hearts.lose();
 		clueText.hidden = false;
 		clueText.replaceChildren('It is one of: ', h('strong', {}, puzzle.clue));
 		pulse(clueText, 'secret__clue--stamp');
@@ -142,6 +147,7 @@ export function startSecret(ctx: GameCtx): ModeGame {
 			length: word.length,
 			keyMarks,
 			closable: !forced,
+			checkWords: DIFFICULTY[ctx.difficulty].checkWords,
 			parent: shell.main,
 			onClose: () => {
 				panel = null;
@@ -197,8 +203,8 @@ export function startSecret(ctx: GameCtx): ModeGame {
 			lines: [
 				`Secret: ${word} in ${guesses.length} ${guesses.length === 1 ? 'try' : 'tries'}`,
 				`Sorted ${solved} of 4 groups · ${mistakes} wrong ${mistakes === 1 ? 'pick' : 'picks'}`,
-				early ? `Early guess bonus: ${early} ${early === 1 ? 'group' : 'groups'} to spare` : clueUsed ? 'Used the clue' : 'No clue used',
-			],
+				early ? `Early guess bonus: ${early} ${early === 1 ? 'group' : 'groups'} to spare` : T.clue !== 'paid' ? '' : clueUsed ? 'Used the clue' : 'No clue used',
+			].filter(Boolean),
 			grid: grid(),
 		});
 	}

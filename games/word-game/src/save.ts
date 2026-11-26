@@ -1,6 +1,6 @@
 // Settings, daily results and stats in localStorage. A new version wipes old saves.
 import { dayBefore } from './core/rng.ts';
-import type { ModeId } from './core/types.ts';
+import type { Difficulty, ModeId } from './core/types.ts';
 
 const KEY = 'wordkin';
 const VERSION = 1;
@@ -9,6 +9,7 @@ export interface Settings {
 	sound: boolean;
 	haptics: boolean;
 	lessMotion: boolean;
+	difficulty: Difficulty;
 }
 
 export interface DailyResult {
@@ -41,7 +42,7 @@ function fresh(): SaveData {
 	const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 	return {
 		version: VERSION,
-		settings: { sound: true, haptics: true, lessMotion: reduced },
+		settings: { sound: true, haptics: true, lessMotion: reduced, difficulty: 'medium' },
 		seenHelp: {},
 		daily: {},
 		stats: { crack: freshStats(), secret: freshStats(), link: freshStats() },
@@ -53,7 +54,10 @@ function load(): SaveData {
 		const raw = localStorage.getItem(KEY);
 		if (raw) {
 			const data = JSON.parse(raw) as SaveData;
-			if (data.version === VERSION) return data;
+			if (data.version === VERSION) {
+				data.settings.difficulty ??= 'medium';
+				return data;
+			}
 		}
 	} catch {
 		// Private mode or bad data: start fresh.
@@ -71,28 +75,30 @@ export function persist(): void {
 	}
 }
 
-const dailyKey = (mode: ModeId, date: string) => `${mode}|${date}`;
+// One daily per mode and difficulty. Older saves have keys without a difficulty: those were medium-like, so they are ignored.
+const dailyKey = (mode: ModeId, diff: Difficulty, date: string) => `${mode}|${diff}|${date}`;
 
-export function dailyResult(mode: ModeId, date: string): DailyResult | undefined {
-	return save.daily[dailyKey(mode, date)];
+export function dailyResult(mode: ModeId, diff: Difficulty, date: string): DailyResult | undefined {
+	return save.daily[dailyKey(mode, diff, date)];
 }
 
 /** Records a finished game. Returns true for a new best score. */
-export function recordGame(mode: ModeId, date: string | null, result: DailyResult): boolean {
+export function recordGame(mode: ModeId, diff: Difficulty, date: string | null, result: DailyResult): boolean {
 	const s = save.stats[mode];
 	s.played++;
 	if (result.won) s.won++;
 	const best = result.score > s.bestScore;
 	if (best) s.bestScore = result.score;
 	if (date) {
-		save.daily[dailyKey(mode, date)] = result;
+		save.daily[dailyKey(mode, diff, date)] = result;
 		if (result.won) {
-			s.streak = s.lastDaily === dayBefore(date) ? s.streak + 1 : 1;
+			// A second win on the same day (another difficulty) keeps the streak as it is.
+			if (s.lastDaily !== date) s.streak = s.lastDaily === dayBefore(date) ? s.streak + 1 : 1;
 			s.bestStreak = Math.max(s.bestStreak, s.streak);
-		} else {
+			s.lastDaily = date;
+		} else if (s.lastDaily !== date) {
 			s.streak = 0;
 		}
-		s.lastDaily = date;
 	}
 	persist();
 	return best;

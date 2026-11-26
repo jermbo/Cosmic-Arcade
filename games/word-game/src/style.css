@@ -447,6 +447,58 @@ button:disabled {
 	font-size: 16px;
 }
 
+.diff {
+	display: grid;
+	justify-items: center;
+	gap: 6px;
+	width: 100%;
+}
+
+.diff__group {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	width: min(100%, 360px);
+	border: var(--line) solid var(--ink);
+	border-radius: 12px;
+	background: var(--card);
+	box-shadow: var(--shadow-sm);
+	overflow: hidden;
+}
+
+.diff__btn {
+	min-height: 44px;
+	border: 0;
+	border-right: var(--line) solid var(--ink);
+	background: transparent;
+	font-weight: 700;
+	font-size: 15px;
+	transition: background-color 0.2s;
+}
+
+.diff__btn:last-child {
+	border-right: 0;
+}
+
+.diff__btn[aria-checked='true'].diff__btn--easy { background: var(--hit); }
+.diff__btn[aria-checked='true'].diff__btn--medium { background: var(--l1); }
+.diff__btn[aria-checked='true'].diff__btn--hard { background: var(--l2); }
+
+.diff__btn[aria-checked='true'] {
+	font-family: var(--display);
+	font-weight: 400;
+}
+
+.diff__btn--pop {
+	animation: cell-pop 0.25s var(--spring);
+}
+
+.diff__blurb {
+	margin: 0;
+	font-size: 13px;
+	color: var(--muted);
+	text-align: center;
+}
+
 .modes {
 	display: grid;
 	gap: 14px;
@@ -900,11 +952,23 @@ button:disabled {
 	gap: 3px;
 }
 
+.tile__dots {
+	align-items: center;
+}
+
 .tile__dots i {
 	width: 6px;
 	height: 6px;
 	border-radius: 2px;
 	background: var(--l1);
+}
+
+.tile__dots b {
+	font-family: var(--display);
+	font-weight: 400;
+	font-size: 12px;
+	line-height: 1;
+	color: var(--l1);
 }
 
 .tile--unlocking {
@@ -960,7 +1024,7 @@ button:disabled {
 	height: 15px;
 }
 
-.board--compact .tile__dots {
+.board--compact .tile__dots i {
 	display: none;
 }
 

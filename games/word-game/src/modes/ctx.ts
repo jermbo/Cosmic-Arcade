@@ -1,11 +1,12 @@
 // What a mode gets from the app, and what it gives back.
-import type { Mark, ModeId } from '../core/types.ts';
+import type { Difficulty, Mark, ModeId } from '../core/types.ts';
 import type { Outcome } from '../ui/results.ts';
 
 export interface GameCtx {
 	mode: ModeId;
 	/** The daily date, or null for practice. */
 	date: string | null;
+	difficulty: Difficulty;
 	seed: string;
 	exit: () => void;
 	help: () => void;

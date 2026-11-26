@@ -32,6 +32,10 @@ Three word puzzles on one shared core. Plain TypeScript and DOM, no engine. Cont
   `{ "id": "nov-26", "date": "2026-11-26", "mode": "crack", "groups": [{ "theme": "...", "level": 1, "words": ["A", "B", "C", "D"] }, ...] }`.
   Leave out `mode` to use it for all three modes. On that date it replaces the built daily.
 
+## Difficulty
+
+Easy, Medium and Hard live in `DIFFICULTY` in `src/core/tuning.ts`. Each one sets the bank levels of the 4 groups, whether guesses must be real words, and per mode: hearts, guesses or tries, letters given at the start, the Secret clue (free, paid, none) and the number of Link choices. A board colors its groups by place (easiest first), not by bank level. Each difficulty has its own daily puzzle.
+
 ## Tune
 
-All numbers (hearts, guesses, tries, points, combo) are in `src/core/tuning.ts`.
+Points, the combo bonus and the score scale per difficulty are in `TUNING` in `src/core/tuning.ts`.

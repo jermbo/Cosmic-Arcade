@@ -1,6 +1,7 @@
 // The end card: stars stamp in, the score counts up, then share and next.
 import { sfx } from '../audio.ts';
-import type { ModeId } from '../core/types.ts';
+import { DIFFICULTY } from '../core/tuning.ts';
+import type { Difficulty, ModeId } from '../core/types.ts';
 import { MODE_BY_ID } from '../modes/meta.ts';
 import { h, icon, wait } from './dom.ts';
 import { calm, confetti, countUp, pulse, toast } from './fx.ts';
@@ -18,6 +19,7 @@ export interface Outcome {
 
 export interface ResultsOpts {
 	mode: ModeId;
+	difficulty: Difficulty;
 	date: string | null;
 	outcome: Outcome;
 	newBest: boolean;
@@ -27,16 +29,16 @@ export interface ResultsOpts {
 	onHome: () => void;
 }
 
-export function shareText(mode: ModeId, date: string | null, o: Outcome): string {
+export function shareText(mode: ModeId, diff: Difficulty, date: string | null, o: Outcome): string {
 	const stars = '★'.repeat(o.stars) + '☆'.repeat(3 - o.stars);
-	return [`Wordkin · ${MODE_BY_ID[mode].name}${date ? ` · ${date}` : ''}`, `${stars} ${o.score}`, o.grid].filter(Boolean).join('\n');
+	return [`Wordkin · ${MODE_BY_ID[mode].name} · ${DIFFICULTY[diff].name}${date ? ` · ${date}` : ''}`, `${stars} ${o.score}`, o.grid].filter(Boolean).join('\n');
 }
 
 export function showResults(opts: ResultsOpts): void {
 	const { outcome: o } = opts;
 	const stars = [0, 1, 2].map(() => h('span', { class: 'rstar' }, icon('star', 'rstar__icon')));
 	const score = h('strong', { class: 'results__score' }, '0');
-	const share = shareText(opts.mode, opts.date, o);
+	const share = shareText(opts.mode, opts.difficulty, opts.date, o);
 
 	const shareBtn = h('button', { class: 'btn btn--ghost', type: 'button' }, icon('share'), 'Share');
 	shareBtn.addEventListener('click', async () => {

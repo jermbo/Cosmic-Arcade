@@ -37,6 +37,8 @@ export interface ShellOpts {
 	hearts: number;
 	onBack: () => void;
 	onHelp: () => void;
+	/** Points are multiplied by this (harder games score more). */
+	scale: number;
 }
 
 export class Shell {
@@ -46,8 +48,10 @@ export class Shell {
 	kip = new Kip('small');
 	private scoreEl: HTMLElement;
 	score = 0;
+	private scale: number;
 
 	constructor(opts: ShellOpts) {
+		this.scale = opts.scale;
 		this.hearts = new Hearts(opts.hearts);
 		this.scoreEl = h('span', { class: 'hud__score-num' }, '0');
 		const back = h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Back to menu', on: { click: opts.onBack } }, icon('back'));
@@ -66,6 +70,7 @@ export class Shell {
 	}
 
 	addScore(points: number): void {
+		points = Math.round(points * this.scale);
 		if (points <= 0) return;
 		const from = this.score;
 		this.score += points;

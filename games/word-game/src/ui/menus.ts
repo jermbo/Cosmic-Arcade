@@ -1,5 +1,6 @@
 // Help, settings and stats cards.
 import { sfx } from '../audio.ts';
+import { DIFFICULTY, LEVEL_NAMES } from '../core/tuning.ts';
 import type { ModeId } from '../core/types.ts';
 import { MODE_BY_ID, MODES } from '../modes/meta.ts';
 import { persist, resetAll, save, type Settings } from '../save.ts';
@@ -23,18 +24,18 @@ export function openHelp(mode: ModeId, parent?: HTMLElement, onClose?: () => voi
 	const meta = MODE_BY_ID[mode];
 	let handle: ModalHandle;
 	const body = [
-		h('ol', { class: 'steps' }, ...meta.steps.map((s) => h('li', {}, rich(s)))),
-		mode !== 'secret' ? legend() : h('div', { class: 'legend legend--groups' }, ...[1, 2, 3, 4].map((l) => h('span', { class: `chip chip--l${l}` }, ['Easy', 'Medium', 'Tricky', 'Sneaky'][l - 1]))),
+		h('ol', { class: 'steps' }, ...meta.steps(DIFFICULTY[save.settings.difficulty]).map((s) => h('li', {}, rich(s)))),
+		mode !== 'secret' ? legend() : h('div', { class: 'legend legend--groups' }, ...[1, 2, 3, 4].map((l) => h('span', { class: `chip chip--l${l}` }, LEVEL_NAMES[l as 1 | 2 | 3 | 4]))),
 		h('button', { class: 'btn btn--go btn--wide', type: 'button', on: { click: () => handle.close() } }, "Let's go"),
 	];
-	handle = openModal({ title: `How to play ${meta.name}`, body, parent, cls: 'modal__card--help', onClose });
+	handle = openModal({ title: `${meta.name} · ${DIFFICULTY[save.settings.difficulty].name}`, body, parent, cls: 'modal__card--help', onClose });
 	save.seenHelp[mode] = true;
 	persist();
 	return handle;
 }
 
 export function openSettings(): void {
-	const toggle = (key: keyof Settings, label: string, note: string) => {
+	const toggle = (key: Exclude<keyof Settings, 'difficulty'>, label: string, note: string) => {
 		const input = h('input', { type: 'checkbox', class: 'switch__input', checked: save.settings[key] });
 		input.addEventListener('change', () => {
 			save.settings[key] = input.checked;
