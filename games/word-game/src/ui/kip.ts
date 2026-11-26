@@ -48,14 +48,33 @@ export class Kip {
 
 	react(mood: Mood, ms = 1100): void {
 		clearTimeout(this.timer);
-		this.el.classList.remove('kip--happy', 'kip--sad', 'kip--wow', 'kip--think', 'kip--oops');
-		void this.el.offsetWidth;
-		this.el.classList.add(`kip--${mood}`);
+		for (const m of ['happy', 'sad', 'wow', 'think', 'oops']) if (m !== mood) this.el.classList.remove(`kip--${m}`);
+		if (this.el.classList.contains(`kip--${mood}`)) {
+			// Same mood again: restart it next frame, without a forced layout.
+			this.el.classList.remove(`kip--${mood}`);
+			requestAnimationFrame(() => this.el.classList.add(`kip--${mood}`));
+		} else {
+			this.el.classList.add(`kip--${mood}`);
+		}
 		if (ms > 0) this.timer = window.setTimeout(() => this.el.classList.remove(`kip--${mood}`), ms);
 	}
 
 	/** Pupils look toward a point on the screen. */
 	look(x: number, y: number): void {
+		// At most once a frame: pointer moves can fire far faster than the screen draws.
+		this.lookAt = [x, y];
+		if (this.lookQueued) return;
+		this.lookQueued = true;
+		requestAnimationFrame(() => {
+			this.lookQueued = false;
+			this.applyLook(...this.lookAt);
+		});
+	}
+
+	private lookAt: [number, number] = [0, 0];
+	private lookQueued = false;
+
+	private applyLook(x: number, y: number): void {
 		const r = this.el.getBoundingClientRect();
 		const dx = Math.max(-1, Math.min(1, (x - (r.left + r.width / 2)) / 200));
 		const dy = Math.max(-1, Math.min(1, (y - (r.top + r.height / 2)) / 200));

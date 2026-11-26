@@ -2,7 +2,7 @@
 import { buzz, sfx } from '../audio.ts';
 import { TUNING } from '../core/tuning.ts';
 import { h, icon } from './dom.ts';
-import { countUp, pulse } from './fx.ts';
+import { countUp, pulse, showPop } from './fx.ts';
 import { Kip } from './kip.ts';
 
 export class Hearts {
@@ -107,9 +107,7 @@ export class Shell {
 
 	say(text: string, ms = 2400): void {
 		this.bubble.textContent = text;
-		this.bubble.classList.remove('bubble--show');
-		void this.bubble.offsetWidth;
-		this.bubble.classList.add('bubble--show');
+		showPop(this.bubble, 'bubble--show');
 		clearTimeout(this.bubbleTimer);
 		this.bubbleTimer = window.setTimeout(() => this.bubble.classList.remove('bubble--show'), ms);
 	}

@@ -4,17 +4,42 @@ import { h } from './dom.ts';
 
 export const calm = () => save.settings.lessMotion;
 
-/** Plays a CSS animation class once. */
+const ends = new WeakMap<Element, Map<string, (e: Event) => void>>();
+
+/**
+ * Plays a CSS animation class once.
+ * No forced layout: reading offsetWidth to restart an animation makes the browser
+ * lay out the whole page, and many of those in one frame is what made play stutter.
+ * If the class is already on, it comes off now and goes back on next frame.
+ */
 export function pulse(el: Element, cls: string): void {
-	el.classList.remove(cls);
-	void (el as HTMLElement).offsetWidth;
-	el.classList.add(cls);
+	let map = ends.get(el);
+	if (!map) ends.set(el, (map = new Map()));
+	const old = map.get(cls);
+	if (old) el.removeEventListener('animationend', old);
 	const done = (e: Event) => {
 		if (e.target !== el) return;
 		el.classList.remove(cls);
 		el.removeEventListener('animationend', done);
+		map!.delete(cls);
 	};
-	el.addEventListener('animationend', done);
+	map.set(cls, done);
+	const add = () => {
+		el.classList.add(cls);
+		el.addEventListener('animationend', done);
+	};
+	if (el.classList.contains(cls)) {
+		el.classList.remove(cls);
+		requestAnimationFrame(add);
+	} else {
+		add();
+	}
+}
+
+/** Shows a popup by class. If it is already up, it gets a little pop instead of a restart. */
+export function showPop(el: HTMLElement, showCls: string): void {
+	if (el.classList.contains(showCls)) pulse(el, 'pop-again');
+	else el.classList.add(showCls);
 }
 
 let toastEl: HTMLElement | null = null;
@@ -23,9 +48,7 @@ let toastTimer = 0;
 export function toast(text: string, ms = 1500): void {
 	toastEl ??= document.body.appendChild(h('div', { class: 'toast', role: 'status', 'aria-live': 'polite' }));
 	toastEl.textContent = text;
-	toastEl.classList.remove('toast--show');
-	void toastEl.offsetWidth;
-	toastEl.classList.add('toast--show');
+	showPop(toastEl, 'toast--show');
 	clearTimeout(toastTimer);
 	toastTimer = window.setTimeout(() => toastEl?.classList.remove('toast--show'), ms);
 }
@@ -35,6 +58,8 @@ const CONFETTI = ['#FFD23F', '#FF9A62', '#5CC8F2', '#B993FF', '#3BD68D', '#FF6B9
 /** A burst of bordered paper bits from a point, or from the top of the screen. */
 export function confetti(x?: number, y?: number, count = 36): void {
 	if (calm()) count = Math.min(count, 10);
+	// Small screens are often slower phones: fewer bits, same feel.
+	if (innerWidth < 500) count = Math.round(count * 0.7);
 	const layer = document.body.appendChild(h('div', { class: 'confetti', 'aria-hidden': 'true' }));
 	const fromTop = x === undefined;
 	for (let i = 0; i < count; i++) {
@@ -93,6 +118,28 @@ export function glide(before: Map<HTMLElement, DOMRect>, ms = 360, tilt = 0): vo
 			delay: i++ * 12,
 			easing: 'cubic-bezier(.3,1.35,.5,1)',
 			fill: 'backwards',
+		});
+	}
+}
+
+/**
+ * FLIP with size: each element grows or shrinks from its old box to its new one.
+ * Used when the board shrinks for a guess panel, so tiles ease down instead of jumping.
+ */
+export function morph(before: Map<HTMLElement, DOMRect>, ms = 280): void {
+	if (calm()) return;
+	for (const [el, old] of before) {
+		if (!el.isConnected) continue;
+		const now = el.getBoundingClientRect();
+		if (!now.width || !now.height) continue;
+		const dx = old.left - now.left;
+		const dy = old.top - now.top;
+		const sx = old.width / now.width;
+		const sy = old.height / now.height;
+		if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) continue;
+		el.animate([{ transformOrigin: '0 0', transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})` }, { transformOrigin: '0 0', transform: 'none' }], {
+			duration: ms,
+			easing: 'cubic-bezier(.2,.8,.2,1)',
 		});
 	}
 }

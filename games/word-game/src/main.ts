@@ -19,5 +19,7 @@ boot(document.getElementById('app')!);
 // Offline play and the install button. The title screen listens for `pwa-change`.
 setupPwa(() => dispatchEvent(new Event('pwa-change')));
 
-// The word list is big: load it once the title is on screen.
-setTimeout(() => void loadDictionary(), 300);
+// The word list is big (76k words). Load it when the phone is idle, so its parse
+// never lands in the middle of an animation. Guesses before then are all accepted.
+const idle = (fn: () => void) => ('requestIdleCallback' in window ? requestIdleCallback(fn, { timeout: 4000 }) : setTimeout(fn, 1500));
+idle(() => void loadDictionary());

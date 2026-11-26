@@ -177,8 +177,7 @@ button:disabled {
 
 @keyframes ready {
 	50% {
-		transform: translateY(-2px);
-		box-shadow: 4px 5px 0 var(--ink);
+		translate: 0 -2px;
 	}
 }
 
@@ -254,7 +253,7 @@ button:disabled {
 	border-radius: 14px;
 	background: var(--pink);
 	box-shadow: var(--shadow-sm);
-	animation: kip-bob 3.2s ease-in-out infinite;
+	animation: kip-bob 3.6s ease-in-out infinite;
 	transform-origin: 50% 100%;
 }
 
@@ -311,7 +310,7 @@ button:disabled {
 
 @keyframes kip-bob {
 	50% {
-		transform: translateY(-2px) rotate(-1.5deg);
+		transform: translateY(-2px);
 	}
 }
 
@@ -1546,7 +1545,7 @@ button:disabled {
 	font-size: 15px;
 	display: grid;
 	place-items: center;
-	transition: background-color 0.3s, transform 0.08s, box-shadow 0.08s;
+	transition: background-color 0.3s;
 }
 
 .kb__key--wide {
@@ -1566,8 +1565,7 @@ button:disabled {
 
 @keyframes key-press {
 	50% {
-		transform: translateY(3px);
-		box-shadow: 0 0 0 var(--ink);
+		translate: 0 2px;
 	}
 }
 
@@ -1762,7 +1760,7 @@ button:disabled {
 	border: 2.5px solid var(--ink);
 	border-radius: 999px;
 	background: var(--card);
-	transition: width 0.3s var(--spring), background-color 0.3s;
+	transition: background-color 0.3s;
 }
 
 .pip--now {
@@ -3035,6 +3033,61 @@ button:disabled {
 .results__grid {
 	font-size: 15px;
 	line-height: 1.15;
+}
+
+/* ---------- Smooth motion ----------
+   Animate only transform and opacity (the GPU moves those without new layout or paint).
+   `contain` keeps a change inside a tile, cell or key from re-laying out its neighbours. */
+
+.tile {
+	transition:
+		background-color 0.15s,
+		color 0.15s,
+		transform 0.15s var(--out),
+		box-shadow 0.15s var(--out);
+	contain: layout style;
+}
+
+.cell,
+.kb__key,
+.slot,
+.chain__slot,
+.slot-word,
+.sticker {
+	contain: layout style;
+}
+
+.kb__key:active {
+	box-shadow: 0 1px 0 var(--ink);
+}
+
+/* The score keeps its width while it counts, so the header does not shuffle. */
+.hud__score {
+	min-width: 4.5ch;
+	text-align: right;
+}
+
+.confetti i {
+	will-change: transform, opacity;
+}
+
+/* A toast or bubble that is already up gets a small pop for new text. */
+.pop-again {
+	animation: cell-pop 0.22s var(--out);
+}
+
+.toast {
+	max-width: calc(100vw - 32px);
+	white-space: normal;
+	text-align: center;
+}
+
+/* The title's entrance plays once per visit, not each time you come back. */
+.title--again .logo__tile,
+.title--again .mode,
+.title--again .chain,
+.title--again .chain__slot--on {
+	animation: none;
 }
 
 /* ---------- Wide screens ---------- */

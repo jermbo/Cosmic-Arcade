@@ -23,6 +23,8 @@ function mini(mode: ModeId): HTMLElement {
 	return h('div', { class: 'mini mini--link', 'aria-hidden': 'true' }, t('B'), t('M'), t('S'), t('D'));
 }
 
+let introPlayed = false;
+
 export function titleScreen(onPlay: (mode: ModeId, daily: boolean) => void): { el: HTMLElement; destroy: () => void } {
 	const kip = new Kip('big');
 	const today = todayKey();
@@ -114,7 +116,7 @@ export function titleScreen(onPlay: (mode: ModeId, daily: boolean) => void): { e
 
 	const el = h(
 		'div',
-		{ class: 'screen title' },
+		{ class: `screen title${introPlayed ? ' title--again' : ''}` },
 		logo,
 		h('p', { class: 'title__tag' }, 'Find the kin. Crack the words.'),
 		diffPicker(),
@@ -131,6 +133,7 @@ export function titleScreen(onPlay: (mode: ModeId, daily: boolean) => void): { e
 		),
 	);
 
+	introPlayed = true;
 	const onMove = (e: PointerEvent) => kip.look(e.clientX, e.clientY);
 	addEventListener('pointermove', onMove);
 	if (!calm()) setTimeout(() => kip.react('happy', 900), 700);

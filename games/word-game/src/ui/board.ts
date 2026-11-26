@@ -2,7 +2,7 @@
 import { buzz, sfx } from '../audio.ts';
 import type { Board, BoardGroup, Level } from '../core/types.ts';
 import { h, icon, lengthClass, wait } from './dom.ts';
-import { calm, confetti, glide, measure, pulse, toast } from './fx.ts';
+import { calm, confetti, glide, measure, morph, pulse, toast } from './fx.ts';
 
 export interface BoardEvents {
 	onSolve: (group: BoardGroup, bar: HTMLElement, given: boolean) => void;
@@ -302,7 +302,11 @@ export class SortBoard {
 	}
 
 	setCompact(on: boolean): void {
+		if (this.el.classList.contains('board--compact') === on) return;
+		const parts = [...this.gridEl.children, ...this.solvedEl.children] as HTMLElement[];
+		const before = measure(parts);
 		this.el.classList.toggle('board--compact', on);
+		morph(before);
 	}
 
 	/** Submit with Enter, when no keyboard panel has the keys. */

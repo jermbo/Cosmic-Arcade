@@ -165,7 +165,10 @@ export function unlockAudio(): void {
 
 	void (async () => {
 		await Promise.all([render('tap', 0.08, tap), render('pop', 0.15, pop), render('thud', 0.4, thud), render('whoosh', 0.45, whoosh)]);
+		// One note at a time, with a pause between, so building sounds never blocks a frame.
+		const breathe = () => new Promise<void>((r) => ('requestIdleCallback' in window ? requestIdleCallback(() => r(), { timeout: 200 }) : setTimeout(r, 16)));
 		for (let n = 0; n < NOTES; n++) {
+			await breathe();
 			await render(`mallet${n}`, 0.5, mallet(noteHz(n)));
 			await render(`pluck${n}`, 1, pluck(noteHz(n)));
 		}
