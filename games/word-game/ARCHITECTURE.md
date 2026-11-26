@@ -36,6 +36,16 @@ Three word puzzles on one shared core. Plain TypeScript and DOM, no engine. Cont
 
 Easy, Medium and Hard live in `DIFFICULTY` in `src/core/tuning.ts`. Each one sets the bank levels of the 4 groups, whether guesses must be real words, and per mode: hearts, guesses or tries, letters given at the start, the Secret clue (free, paid, none) and the number of Link choices. A board colors its groups by place (easiest first), not by bank level. Each difficulty has its own daily puzzle.
 
+## Kin Book, Ask Kip, daily chain
+
+- **Kin Book** (`src/book.ts`, `src/data/sets.json`, `src/ui/bookview.ts`): each bank group you solve yourself is a sticker. Each set in `sets.json` gives Kip a hat (`src/ui/hats.ts`) when full. A new group must go in one set; the test checks this.
+- **Ask Kip**: tap Kip in the header. In a guess panel or Link, Kip shows one letter. On a board, Kip marks two words of one group with the same number (or adds one more). Hints per game are `hints` in `DIFFICULTY`, the cost is `TUNING.hintCost`.
+- **Daily chain** (`src/core/chain.ts`, `src/ui/chainview.ts`): a 6 letter word per day and difficulty. Each daily you win shows 2 of its letters. After all 3 dailies are played, you get 4 tries. Its streak is separate.
+
+## Offline (PWA)
+
+`vite.config.ts` writes `sw.js` at build time with every built file, so the game (and the word list) plays offline. `public/manifest.webmanifest` and `public/icons/` make it installable; the title shows **Install** when the browser offers it. Redraw the icons with `npm run icons -w word-game`. Add `?dev` to a build URL to turn the service worker off.
+
 ## Tune
 
 Points, the combo bonus and the score scale per difficulty are in `TUNING` in `src/core/tuning.ts`.

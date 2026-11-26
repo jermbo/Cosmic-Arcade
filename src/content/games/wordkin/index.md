@@ -6,7 +6,7 @@ kind: video
 build: "word-game"
 platforms: [desktop, mobile]
 inputs: [mouse, keyboard, touch]
-tags: [words, puzzle, daily]
+tags: [words, puzzle, daily, pwa]
 ---
 
 Three small word puzzles. Each has a new daily puzzle and an endless practice mode.
@@ -26,6 +26,15 @@ Three small word puzzles. Each has a new daily puzzle and an endless practice mo
 - Keyboard: type letters, **Enter** to submit, **Backspace** to delete, **Esc** to go back.
 
 Hearts are your mistakes. Keep them all for three stars.
+
+## Extras
+
+- **Easy, Medium, Hard** on the title screen.
+- **Ask Kip:** tap Kip for a hint. It costs a few points.
+- **Kin Book:** every group you solve is a sticker. Fill a set and Kip wins a hat.
+- **Daily chain:** each daily you win shows 2 letters of a bonus word. Play all three, then solve it.
+
+Works offline after the first load. Tap **Install** on the title screen (or Add to Home Screen on iPhone) to keep it as an app.
 
 ## Credits
 

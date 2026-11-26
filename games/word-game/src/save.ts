@@ -34,6 +34,14 @@ interface SaveData {
 	seenHelp: Partial<Record<ModeId, boolean>>;
 	daily: Record<string, DailyResult>;
 	stats: Record<ModeId, ModeStats>;
+	/** Kin Book: group id → times solved and the first date. */
+	book: Record<string, { n: number; first: string }>;
+	/** The set id whose hat Kip wears, or null. */
+	hat: string | null;
+	/** Daily chain results: `diff|date` → guesses and whether it was solved. */
+	chain: Record<string, { guesses: string[]; won: boolean; done: boolean }>;
+	/** Wins of the daily chain in a row, per difficulty does not matter. */
+	chainStreak: { streak: number; best: number; last: string | null };
 }
 
 const freshStats = (): ModeStats => ({ played: 0, won: 0, bestScore: 0, streak: 0, bestStreak: 0, lastDaily: null });
@@ -46,6 +54,10 @@ function fresh(): SaveData {
 		seenHelp: {},
 		daily: {},
 		stats: { crack: freshStats(), secret: freshStats(), link: freshStats() },
+		book: {},
+		hat: null,
+		chain: {},
+		chainStreak: { streak: 0, best: 0, last: null },
 	};
 }
 
@@ -55,7 +67,12 @@ function load(): SaveData {
 		if (raw) {
 			const data = JSON.parse(raw) as SaveData;
 			if (data.version === VERSION) {
+				const base = fresh();
 				data.settings.difficulty ??= 'medium';
+				data.book ??= base.book;
+				data.hat ??= null;
+				data.chain ??= base.chain;
+				data.chainStreak ??= base.chainStreak;
 				return data;
 			}
 		}
@@ -104,8 +121,26 @@ export function recordGame(mode: ModeId, diff: Difficulty, date: string | null, 
 	return best;
 }
 
+export function chainState(diff: Difficulty, date: string) {
+	return save.chain[`${diff}|${date}`] ?? { guesses: [], won: false, done: false };
+}
+
+/** Saves the chain after each guess. A win on a new day grows the chain streak. */
+export function recordChain(diff: Difficulty, date: string, guesses: string[], won: boolean, done: boolean): void {
+	save.chain[`${diff}|${date}`] = { guesses, won, done };
+	const s = save.chainStreak;
+	if (won && s.last !== date) {
+		s.streak = s.last === dayBefore(date) ? s.streak + 1 : 1;
+		s.best = Math.max(s.best, s.streak);
+		s.last = date;
+	}
+	persist();
+}
+
 export function resetAll(): void {
 	const settings = save.settings;
-	Object.assign(save, fresh(), { settings });
+	const { book, hat } = save;
+	// The Kin Book is a collection, not a stat: it stays.
+	Object.assign(save, fresh(), { settings, book, hat });
 	persist();
 }

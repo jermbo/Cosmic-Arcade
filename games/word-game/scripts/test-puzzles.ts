@@ -7,6 +7,8 @@ import { buildCrack, buildLink, buildSecret } from '../src/core/builder.ts';
 import { DIFFICULTIES, DIFFICULTY, TUNING } from '../src/core/tuning.ts';
 import { isWord, scoreGuess, setDictionary } from '../src/core/words.ts';
 import type { Board } from '../src/core/types.ts';
+import { buildChain, CHAIN_MODES } from '../src/core/chain.ts';
+import setsData from '../src/data/sets.json' with { type: 'json' };
 
 // The bank.
 const ids = new Set<string>();
@@ -73,6 +75,28 @@ for (const diff of DIFFICULTIES) {
 			assert.equal(new Set(r.options).size, r.options.length, 'two options are the same');
 			for (const w of r.group.words) assert(w.length <= TUNING.link.maxLength);
 		}
+	}
+}
+
+// Kin Book sets: every bank group is in exactly one set.
+const inSet = new Map<string, string>();
+for (const s of setsData) for (const g of s.groups) {
+	assert(ids.has(g), `set ${s.id}: no group ${g}`);
+	assert(!inSet.has(g), `group ${g} is in ${inSet.get(g)} and ${s.id}`);
+	inSet.set(g, s.id);
+}
+for (const id of ids) assert(inSet.has(id), `group ${id} is in no Kin Book set`);
+
+// Daily chain: a 6 letter word, 2 different spots per mode.
+for (const diff of DIFFICULTIES) {
+	for (let d = 1; d <= 28; d++) {
+		const date = `2026-12-${String(d).padStart(2, '0')}`;
+		const chain = buildChain(diff, date);
+		assert.equal(chain.word.length, TUNING.chain.length);
+		const spots = CHAIN_MODES.flatMap((m) => chain.spots[m]);
+		assert.equal(new Set(spots).size, TUNING.chain.length, 'chain spots must cover each letter once');
+		assert.notEqual(chain.word, buildSecret(`secret|${diff}|${date}`, diff, date).word, 'chain word equals the secret word');
+		assert.deepEqual(buildChain(diff, date), chain, 'chain must be the same each time');
 	}
 }
 

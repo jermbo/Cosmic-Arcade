@@ -15,6 +15,8 @@ export interface GameCtx {
 
 export interface ModeGame {
 	el: HTMLElement;
+	/** Hints Kip gave this game. */
+	hints: () => number;
 	destroy: () => void;
 }
 

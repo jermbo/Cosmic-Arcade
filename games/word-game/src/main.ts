@@ -6,6 +6,7 @@ import { boot } from './app.ts';
 import { unlockAudio } from './audio.ts';
 import { loadDictionary } from './core/dictionary.ts';
 import { save } from './save.ts';
+import { setupPwa } from './ui/pwa.ts';
 
 document.documentElement.classList.toggle('calm', save.settings.lessMotion);
 
@@ -14,6 +15,9 @@ addEventListener('pointerdown', unlockAudio, { capture: true });
 addEventListener('keydown', unlockAudio, { capture: true });
 
 boot(document.getElementById('app')!);
+
+// Offline play and the install button. The title screen listens for `pwa-change`.
+setupPwa(() => dispatchEvent(new Event('pwa-change')));
 
 // The word list is big: load it once the title is on screen.
 setTimeout(() => void loadDictionary(), 300);

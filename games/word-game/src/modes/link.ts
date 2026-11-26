@@ -9,6 +9,7 @@ import { calm, confetti, pulse, toast } from '../ui/fx.ts';
 import { Keyboard } from '../ui/keyboard.ts';
 import { openModal, type ModalHandle } from '../ui/modal.ts';
 import { Shell } from '../ui/shell.ts';
+import { noteSticker } from '../ui/stickers.ts';
 import { WordRows } from '../ui/wordrows.ts';
 import type { GameCtx, ModeGame } from './ctx.ts';
 
@@ -17,13 +18,15 @@ interface Slot {
 	found: boolean;
 	guesses: string[];
 	marks: Mark[][];
+	/** Letter spots Kip showed. */
+	extra: Set<number>;
 	el: HTMLButtonElement;
 }
 
 export function startLink(ctx: GameCtx): ModeGame {
 	const T = { ...TUNING.link, ...DIFFICULTY[ctx.difficulty].link };
 	const puzzle = buildLink(ctx.seed, ctx.difficulty, ctx.date ?? undefined);
-	const shell = new Shell({ title: 'Link', tag: `${ctx.date ? 'Daily' : 'Practice'} · ${DIFFICULTY[ctx.difficulty].name}`, hearts: T.hearts, scale: TUNING.scoreScale[ctx.difficulty], onBack: ctx.exit, onHelp: ctx.help });
+	const shell = new Shell({ title: 'Link', tag: `${ctx.date ? 'Daily' : 'Practice'} · ${DIFFICULTY[ctx.difficulty].name}`, hearts: T.hearts, scale: TUNING.scoreScale[ctx.difficulty], hints: DIFFICULTY[ctx.difficulty].hints, onHint: () => hint(), onBack: ctx.exit, onHelp: ctx.help });
 	let over = false;
 	let roundIndex = 0;
 	let round: LinkRound;
@@ -67,7 +70,7 @@ export function startLink(ctx: GameCtx): ModeGame {
 		themeBanner.hidden = true;
 		slots = round.group.words.map((word) => {
 			const el = h('button', { class: `slot-word ${lengthClass(word)}`, type: 'button', on: { click: () => choose(slots.indexOf(slot)) } });
-			const slot: Slot = { word, found: false, guesses: [], marks: [], el };
+			const slot: Slot = { word, found: false, guesses: [], marks: [], extra: new Set(), el };
 			return slot;
 		});
 		slotGrid.replaceChildren(...slots.map((s) => s.el));
@@ -93,9 +96,24 @@ export function startLink(ctx: GameCtx): ModeGame {
 	/** First letter, plus any letter a past guess put in the right spot. */
 	function ghostFor(s: Slot): (string | null)[] {
 		const last = s.word.length - 1;
-		const g: (string | null)[] = [...s.word].map((ch, i) => (i === 0 || (T.showLast && i === last) ? ch : null));
+		const g: (string | null)[] = [...s.word].map((ch, i) => (i === 0 || (T.showLast && i === last) || s.extra.has(i) ? ch : null));
 		s.marks.forEach((m) => m.forEach((mark, i) => mark === 'hit' && (g[i] = s.word[i])));
 		return g;
+	}
+
+	/** Ask Kip: one more letter of the word you are on. */
+	function hint(): string | null {
+		if (over || busy || sheet) return null;
+		const s = slots[active];
+		if (!s || s.found) return null;
+		const free = ghostFor(s).map((g, i) => (g ? -1 : i)).filter((i) => i >= 0);
+		if (!free.length) return "You know every letter. Type it in!";
+		const pos = free[Math.floor(Math.random() * free.length)];
+		s.extra.add(pos);
+		paintSlot(s);
+		pulse(s.el, 'tile--nudge');
+		rows?.setGhost(ghostFor(s));
+		return `Letter ${pos + 1} is ${s.word[pos]}!`;
 	}
 
 	function choose(i: number, quiet = false) {
@@ -250,6 +268,7 @@ export function startLink(ctx: GameCtx): ModeGame {
 		themeBanner.textContent = round.group.theme;
 		pulse(themeBanner, 'round__banner--stamp');
 		pips[roundIndex].classList.add('pip--done');
+		noteSticker(round.group.id, shell.kip);
 		sfx.solve(combo);
 		shell.kip.react('happy');
 		shell.addScore(points);
@@ -299,6 +318,7 @@ export function startLink(ctx: GameCtx): ModeGame {
 
 	return {
 		el: shell.el,
+		hints: () => shell.hintsUsed,
 		destroy: () => {
 			over = true;
 			kb.detach();

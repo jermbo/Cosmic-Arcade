@@ -1,5 +1,7 @@
 // Kip, the tile buddy. A square letter tile with a face that reacts to play.
+import { wornHat } from '../book.ts';
 import { h } from './dom.ts';
+import { hatSvg } from './hats.ts';
 
 export type Mood = 'happy' | 'sad' | 'wow' | 'think' | 'oops';
 
@@ -21,9 +23,18 @@ export class Kip {
 	el: HTMLElement;
 	private timer = 0;
 	private blinkTimer = 0;
+	private hatEl: HTMLElement;
+
+	/** Puts a hat on (or off, with null). */
+	setHat(hat: string | null): void {
+		this.hatEl.innerHTML = hat ? hatSvg(hat) : '';
+		this.el.classList.toggle('kip--hatted', !!hat);
+	}
 
 	constructor(size: 'big' | 'small' = 'small') {
 		this.el = h('div', { class: `kip kip--${size}`, 'aria-hidden': 'true', html: FACE });
+		this.hatEl = this.el.appendChild(h('span', { class: 'kip__hat' }));
+		this.setHat(wornHat()?.hat ?? null);
 		this.blinkLoop();
 	}
 

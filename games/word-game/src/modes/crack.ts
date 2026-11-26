@@ -10,6 +10,7 @@ import { toast } from '../ui/fx.ts';
 import { GuessPanel } from '../ui/guesspanel.ts';
 import { pushKeys } from '../ui/nav.ts';
 import { Shell } from '../ui/shell.ts';
+import { noteSticker } from '../ui/stickers.ts';
 import { WordRows } from '../ui/wordrows.ts';
 import type { GameCtx, ModeGame } from './ctx.ts';
 
@@ -23,7 +24,7 @@ interface LockState {
 export function startCrack(ctx: GameCtx): ModeGame {
 	const T = { ...TUNING.crack, ...DIFFICULTY[ctx.difficulty].crack };
 	const puzzle = buildCrack(ctx.seed, ctx.difficulty, ctx.date ?? undefined);
-	const shell = new Shell({ title: 'Crack', tag: `${ctx.date ? 'Daily' : 'Practice'} · ${DIFFICULTY[ctx.difficulty].name}`, hearts: T.hearts, scale: TUNING.scoreScale[ctx.difficulty], onBack: ctx.exit, onHelp: ctx.help });
+	const shell = new Shell({ title: 'Crack', tag: `${ctx.date ? 'Daily' : 'Practice'} · ${DIFFICULTY[ctx.difficulty].name}`, hearts: T.hearts, scale: TUNING.scoreScale[ctx.difficulty], hints: DIFFICULTY[ctx.difficulty].hints, onHint: () => askKip(), onBack: ctx.exit, onHelp: ctx.help });
 	const hints = new Map(puzzle.locked.map((w, i) => [w, puzzle.hints[i]]));
 	const locks = new Map<string, LockState>(puzzle.locked.map((w) => [w, { guesses: [], marks: [], done: false, cracked: false }]));
 	let panel: GuessPanel | null = null;
@@ -38,8 +39,9 @@ export function startCrack(ctx: GameCtx): ModeGame {
 		{
 			canPlay: () => !over && !panel,
 			onLockedTap: (w) => openLock(w),
-			onSolve: (_g, _bar, given) => {
+			onSolve: (g, _bar, given) => {
 				if (given) return;
+				noteSticker(g.id, shell.kip);
 				combo++;
 				shell.addScore(Math.round(T.points.group * (1 + (combo - 1) * TUNING.comboBonus)));
 				sfx.solve(combo);
@@ -67,6 +69,8 @@ export function startCrack(ctx: GameCtx): ModeGame {
 		const st = locks.get(word)!;
 		if (st.done || panel) return;
 		const rows = new WordRows({ length: word.length, rows: T.guesses, ghost: hints.get(word) });
+		openWord = word;
+		openRows = rows;
 		const keyMarks = new Map<string, Mark>();
 		st.guesses.forEach((g, i) => {
 			rows.fill(g, st.marks[i]);
@@ -87,6 +91,8 @@ export function startCrack(ctx: GameCtx): ModeGame {
 			parent: shell.main,
 			onClose: () => {
 				panel = null;
+				openWord = null;
+				openRows = null;
 				board.setCompact(false);
 				hint.hidden = false;
 			},
@@ -122,6 +128,28 @@ export function startCrack(ctx: GameCtx): ModeGame {
 				}
 			},
 		});
+	}
+
+	let openWord: string | null = null;
+	let openRows: WordRows | null = null;
+
+	/** Ask Kip: a letter of the open lock, or two words that are kin. */
+	function askKip(): string | null {
+		if (over) return null;
+		if (openWord) {
+			const word = openWord;
+			const shown = hints.get(word)!;
+			const hit = new Set<number>();
+			locks.get(word)!.marks.forEach((m) => m.forEach((k, i) => k === 'hit' && hit.add(i)));
+			const free = [...word].map((_, i) => i).filter((i) => !shown[i] && !hit.has(i));
+			if (!free.length) return null;
+			const pos = free[Math.floor(Math.random() * free.length)];
+			shown[pos] = word[pos];
+			openRows?.setGhost(shown);
+			board.refreshLock(word);
+			return `Letter ${pos + 1} is ${word[pos]}!`;
+		}
+		return board.hintKin() ? 'Psst… tiles with the same number are kin.' : null;
 	}
 
 	function grid(): string {
@@ -163,6 +191,7 @@ export function startCrack(ctx: GameCtx): ModeGame {
 
 	return {
 		el: shell.el,
+		hints: () => shell.hintsUsed,
 		destroy: () => {
 			over = true;
 			releaseKeys();

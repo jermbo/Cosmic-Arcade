@@ -8,7 +8,11 @@ import { dailyResult, persist, save } from '../save.ts';
 import { h, icon } from './dom.ts';
 import { calm, pulse, toast } from './fx.ts';
 import { Kip } from './kip.ts';
+import { openBook } from './bookview.ts';
+import { chainCard } from './chainview.ts';
 import { openSettings, openStats } from './menus.ts';
+import { wornHat } from '../book.ts';
+import { canInstall, isStandalone, promptInstall } from './pwa.ts';
 
 const LOGO_COLORS = ['l1', 'l2', 'l3', 'l4', 'l3', 'l2', 'l1'];
 
@@ -74,6 +78,16 @@ export function titleScreen(onPlay: (mode: ModeId, daily: boolean) => void): { e
 	});
 
 	const modes = h('div', { class: 'modes' }, ...makeCards());
+	let chainEl = chainCard(save.settings.difficulty, today, () => redrawChain());
+	const redrawChain = () => {
+		const next = chainCard(save.settings.difficulty, today, () => redrawChain());
+		chainEl.replaceWith(next);
+		chainEl = next;
+	};
+	const installBtn = h('button', { class: 'btn btn--small btn--ghost', type: 'button', hidden: true, on: { click: () => void promptInstall() } }, 'Install');
+	const syncInstall = () => (installBtn.hidden = isStandalone() || !canInstall());
+	syncInstall();
+	addEventListener('pwa-change', syncInstall);
 	const blurb = h('p', { class: 'diff__blurb' }, DIFFICULTY[save.settings.difficulty].blurb);
 
 	function diffPicker(): HTMLElement {
@@ -88,6 +102,7 @@ export function titleScreen(onPlay: (mode: ModeId, daily: boolean) => void): { e
 				pulse(b, 'diff__btn--pop');
 				blurb.textContent = DIFFICULTY[d].blurb;
 				modes.replaceChildren(...makeCards());
+				redrawChain();
 				kip.react(d === 'hard' ? 'think' : 'happy', 800);
 			});
 			return b;
@@ -101,6 +116,9 @@ export function titleScreen(onPlay: (mode: ModeId, daily: boolean) => void): { e
 		h(
 			'div',
 			{ class: 'title__bar' },
+			installBtn,
+			h('span', { class: 'title__spacer' }),
+			h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Kin Book', on: { click: () => { sfx.ui(); openBook(() => kip.setHat(wornHat()?.hat ?? null)); } } }, icon('book')),
 			h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Stats', on: { click: () => { sfx.ui(); openStats(); } } }, icon('chart')),
 			h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Settings', on: { click: () => { sfx.ui(); openSettings(); } } }, icon('gear')),
 		),
@@ -108,6 +126,7 @@ export function titleScreen(onPlay: (mode: ModeId, daily: boolean) => void): { e
 		h('p', { class: 'title__tag' }, 'Find the kin. Crack the words.'),
 		diffPicker(),
 		modes,
+		chainEl,
 		h('p', { class: 'title__foot' }, `New daily puzzles every day · ${today}`),
 	);
 
@@ -119,6 +138,7 @@ export function titleScreen(onPlay: (mode: ModeId, daily: boolean) => void): { e
 		el,
 		destroy: () => {
 			removeEventListener('pointermove', onMove);
+			removeEventListener('pwa-change', syncInstall);
 			kip.destroy();
 		},
 	};

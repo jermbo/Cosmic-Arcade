@@ -10,6 +10,7 @@ import { confetti, fly, pulse, toast } from '../ui/fx.ts';
 import { GuessPanel } from '../ui/guesspanel.ts';
 import { pushKeys } from '../ui/nav.ts';
 import { Shell } from '../ui/shell.ts';
+import { noteSticker } from '../ui/stickers.ts';
 import { WordRows } from '../ui/wordrows.ts';
 import { MARK_EMOJI, type GameCtx, type ModeGame } from './ctx.ts';
 
@@ -17,7 +18,7 @@ export function startSecret(ctx: GameCtx): ModeGame {
 	const T = { ...TUNING.secret, ...DIFFICULTY[ctx.difficulty].secret };
 	const puzzle = buildSecret(ctx.seed, ctx.difficulty, ctx.date ?? undefined);
 	const word = puzzle.word;
-	const shell = new Shell({ title: 'Secret', tag: `${ctx.date ? 'Daily' : 'Practice'} · ${DIFFICULTY[ctx.difficulty].name}`, hearts: T.hearts, scale: TUNING.scoreScale[ctx.difficulty], onBack: ctx.exit, onHelp: ctx.help });
+	const shell = new Shell({ title: 'Secret', tag: `${ctx.date ? 'Daily' : 'Practice'} · ${DIFFICULTY[ctx.difficulty].name}`, hearts: T.hearts, scale: TUNING.scoreScale[ctx.difficulty], hints: DIFFICULTY[ctx.difficulty].hints, onHint: () => hint(), onBack: ctx.exit, onHelp: ctx.help });
 	const known: (string | null)[] = Array(word.length).fill(null);
 	const guesses: string[] = [];
 	const marks: Mark[][] = [];
@@ -53,8 +54,9 @@ export function startSecret(ctx: GameCtx): ModeGame {
 
 	const board = new SortBoard(puzzle.board, {
 		canPlay: () => !over && !panel && !sortingDone,
-		onSolve: (_g, bar, given) => {
+		onSolve: (g, bar, given) => {
 			if (given) return;
+			noteSticker(g.id, shell.kip);
 			combo++;
 			shell.addScore(Math.round(T.points.group * (1 + (combo - 1) * TUNING.comboBonus)));
 			sfx.solve(combo);
@@ -172,6 +174,19 @@ export function startSecret(ctx: GameCtx): ModeGame {
 		});
 	}
 
+	/** Ask Kip: a letter of the secret while guessing, or two words that are kin. */
+	function hint(): string | null {
+		if (over) return null;
+		if (panel || sortingDone) {
+			const free = known.map((k, i) => (k ? -1 : i)).filter((i) => i >= 0);
+			if (!free.length) return null;
+			const pos = free[Math.floor(Math.random() * free.length)];
+			setKnown(pos);
+			return `Letter ${pos + 1} is ${word[pos]}!`;
+		}
+		return board.hintKin() ? 'Psst… tiles with the same number are kin.' : null;
+	}
+
 	function grid(): string {
 		return [...board.history.map((r) => r.map((l) => LEVEL_EMOJI[l]).join('')), ...marks.map((m) => m.map((k) => MARK_EMOJI[k]).join(''))].join('\n');
 	}
@@ -233,6 +248,7 @@ export function startSecret(ctx: GameCtx): ModeGame {
 
 	return {
 		el: shell.el,
+		hints: () => shell.hintsUsed,
 		destroy: () => {
 			over = true;
 			releaseKeys();

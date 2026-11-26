@@ -8,6 +8,8 @@ export interface DiffTuning {
 	levels: Level[];
 	/** False: any letters count as a guess, real word or not. */
 	checkWords: boolean;
+	/** Times you can ask Kip for a hint in one game. */
+	hints: number;
 	crack: {
 		hearts: number;
 		/** Guesses to crack one locked word. */
@@ -45,6 +47,7 @@ export const DIFFICULTY: Record<Difficulty, DiffTuning> = {
 		blurb: 'Plain groups, letters given, more guesses.',
 		levels: [1, 1, 2, 3],
 		checkWords: false,
+		hints: 3,
 		crack: { hearts: 5, guesses: 8, minLength: 4, maxLength: 5, showFirst: true, showExtra: 1 },
 		secret: { hearts: 5, tries: 6, minLength: 6, maxLength: 7, clue: 'free' },
 		link: { hearts: 4, guesses: 10, options: 3, showLast: true },
@@ -54,6 +57,7 @@ export const DIFFICULTY: Record<Difficulty, DiffTuning> = {
 		blurb: 'One group of each kind. First letters given.',
 		levels: [1, 2, 3, 4],
 		checkWords: true,
+		hints: 2,
 		crack: { hearts: 4, guesses: 7, minLength: 4, maxLength: 6, showFirst: true, showExtra: 0 },
 		secret: { hearts: 4, tries: 4, minLength: 6, maxLength: 8, clue: 'paid' },
 		link: { hearts: 3, guesses: 8, options: 4, showLast: false },
@@ -63,6 +67,7 @@ export const DIFFICULTY: Record<Difficulty, DiffTuning> = {
 		blurb: 'Sneaky groups, no letters given, fewer guesses.',
 		levels: [2, 3, 4, 4],
 		checkWords: true,
+		hints: 1,
 		crack: { hearts: 4, guesses: 6, minLength: 4, maxLength: 6, showFirst: false, showExtra: 0 },
 		secret: { hearts: 4, tries: 3, minLength: 6, maxLength: 8, clue: 'none' },
 		link: { hearts: 3, guesses: 6, options: 5, showLast: false },
@@ -75,6 +80,10 @@ export const TUNING = {
 	crack: { points: { group: 100, crack: 100, perGuessLeft: 30, perHeart: 150 } },
 	secret: { cluePrice: 1, points: { group: 100, win: 300, perTryLeft: 80, perGroupLeft: 150, perHeart: 150 } },
 	link: { maxLength: 7, points: { round: 150, perGuessLeft: 40, perHiddenWord: 60, perWord: 25, perHeart: 150 } },
+	/** The daily chain: a bonus word filled by the 3 dailies of one difficulty. */
+	chain: { length: 6, tries: 4, lettersPerMode: 2 },
+	/** Points a hint from Kip costs (before the difficulty scale). */
+	hintCost: 40,
 	/** Combo: each solve in a row without a mistake adds this much to the next solve. */
 	comboBonus: 0.25,
 	/** Score is multiplied by this, so harder games score more. */

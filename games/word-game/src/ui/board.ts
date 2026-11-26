@@ -211,6 +211,51 @@ export class SortBoard {
 		this.events.onSolve(group, bar, given);
 	}
 
+	private kin = new Map<string, number>();
+	private kinCount = 0;
+
+	private markKin(word: string, n: number) {
+		const t = this.tiles.get(word);
+		if (!t) return;
+		this.kin.set(word, n);
+		t.dataset.kin = String(n);
+		t.classList.add('tile--kin');
+		pulse(t, 'tile--nudge');
+	}
+
+	/**
+	 * Kip's board hint: marks 2 words of one group with the same number,
+	 * or adds one more word to a group Kip already marked.
+	 */
+	hintKin(): boolean {
+		const open = this.board.groups.filter((g) => !this.solved.includes(g));
+		const free = (g: BoardGroup) => g.words.filter((w) => !this.kin.has(w) && !this.locked.has(w));
+		for (const g of open) {
+			const marked = g.words.filter((w) => this.kin.has(w));
+			const more = free(g);
+			if (marked.length >= 2 && more.length) {
+				this.markKin(more[0], this.kin.get(marked[0])!);
+				return true;
+			}
+		}
+		for (const g of open) {
+			const more = free(g);
+			if (more.length >= 2 && !g.words.some((w) => this.kin.has(w))) {
+				const n = ++this.kinCount;
+				this.markKin(more[0], n);
+				this.markKin(more[1], n);
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Redraws a locked tile, after Kip shows one more of its letters. */
+	refreshLock(word: string): void {
+		const tile = this.tiles.get(word);
+		if (tile && this.locked.has(word)) tile.replaceChildren(this.lockFace(word));
+	}
+
 	/** Opens a locked tile: the lock pops off, the word flips in. */
 	async unlock(word: string, given = false): Promise<void> {
 		const tile = this.tiles.get(word);

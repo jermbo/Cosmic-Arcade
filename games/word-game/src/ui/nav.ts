@@ -50,7 +50,7 @@ addEventListener('keydown', (e) => {
 		return;
 	}
 	// An open card (help, results, choices) takes the keys for its own buttons.
-	if (document.querySelector('.modal:not(.modal--out)')) return;
+	if (document.querySelector('.modal:not(.modal--out):not(.modal--keys)')) return;
 	const top = keyHandlers.at(-1);
 	if (!top) return;
 	if ((e.target as HTMLElement | null)?.closest?.('input, textarea')) return;

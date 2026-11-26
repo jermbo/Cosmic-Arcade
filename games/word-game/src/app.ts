@@ -6,6 +6,8 @@ import type { GameCtx, ModeGame } from './modes/ctx.ts';
 import { startCrack } from './modes/crack.ts';
 import { startLink } from './modes/link.ts';
 import { startSecret } from './modes/secret.ts';
+import { newThisGame, resetGameStickers } from './book.ts';
+import { TUNING } from './core/tuning.ts';
 import { recordGame, save } from './save.ts';
 import { openHelp } from './ui/menus.ts';
 import { closeLayer, pushLayer } from './ui/nav.ts';
@@ -47,6 +49,10 @@ function play(mode: ModeId, daily: boolean) {
 			help: () => game && openHelp(mode, game.el),
 			finish: (outcome) => {
 				if (!game) return;
+				if (date && outcome.won) outcome.lines.push(`🔗 +${TUNING.chain.lettersPerMode} letters for the daily chain`);
+				const asked = game.hints();
+				if (asked) outcome.lines.push(`Asked Kip ${asked} ${asked === 1 ? 'time' : 'times'}`);
+				if (newThisGame) outcome.lines.push(`📖 ${newThisGame} new ${newThisGame === 1 ? 'sticker' : 'stickers'} for the Kin Book`);
 				const newBest = recordGame(mode, difficulty, date, { won: outcome.won, stars: outcome.stars, score: outcome.score, share: shareText(mode, difficulty, date, outcome) });
 				showResults({
 					mode,
@@ -61,6 +67,7 @@ function play(mode: ModeId, daily: boolean) {
 				});
 			},
 		};
+		resetGameStickers();
 		game = START[mode](ctx);
 		show(game);
 		if (!save.seenHelp[mode]) openHelp(mode, game.el);

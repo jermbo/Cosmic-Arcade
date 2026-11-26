@@ -38,6 +38,7 @@ export const ICONS = {
 	back: svg('<path d="M15 5l-7 7 7 7"/>'),
 	help: svg('<path d="M9.2 9a3 3 0 1 1 4.3 2.7c-.9.5-1.5 1.2-1.5 2.3"/><circle cx="12" cy="18" r=".6" fill="currentColor"/>'),
 	gear: svg('<circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>'),
+	book: svg('<path d="M4 5.5C6.5 4 9.5 4 12 6c2.5-2 5.5-2 8-.5V19c-2.5-1.5-5.5-1.5-8 .5-2.5-2-5.5-2-8-.5z"/><path d="M12 6v13.5"/>'),
 	chart: svg('<path d="M5 20V11M12 20V5M19 20v-6"/>'),
 	shuffle: svg('<path d="M3 7h4c5 0 5 10 10 10h4M3 17h4c2 0 3-1.5 4-3M17 7h4M13 10c1-1.7 2-3 4-3"/><path d="M19 4l2 3-2 3M19 14l2 3-2 3"/>'),
 	lock: `<svg viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10.5" rx="2.5" fill="currentColor"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="currentColor" stroke-width="2.8"/></svg>`,

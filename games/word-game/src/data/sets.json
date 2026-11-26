@@ -1,0 +1,10 @@
+[
+	{ "id": "pantry", "name": "Pantry", "hat": "chef", "hatName": "Chef hat", "groups": ["fruits", "veg", "desserts", "breakfast", "pasta", "cafe", "herbs", "cheese", "breads", "cook"] },
+	{ "id": "wild", "name": "The wild", "hat": "sprout", "hatName": "Sprout", "groups": ["farm", "weather", "planets", "trees", "birds", "flowers", "sea", "insects", "bigcats", "water", "sky", "dogs"] },
+	{ "id": "home", "name": "Home", "hat": "beanie", "hatName": "Beanie", "groups": ["kitchen", "furniture", "bathroom", "office", "toolbox", "camping", "clothes", "shoes", "hats", "beach", "time"] },
+	{ "id": "play", "name": "Play time", "hat": "party", "hatName": "Party hat", "groups": ["instruments", "sports", "cardgames", "dances", "chess", "myth", "shapes", "gems", "countries", "vehicles", "face"] },
+	{ "id": "wordy", "name": "Wordy", "hat": "grad", "hatName": "Grad cap", "groups": ["rhymecat", "rhymemoon", "blues", "reds", "big", "fast", "happy", "palindromes", "letters", "knots"] },
+	{ "id": "things", "name": "Things with…", "hat": "tophat", "hatName": "Top hat", "groups": ["keys", "shells", "buzz", "wings", "teeth", "trunks", "rings", "run", "scales", "draw", "needles", "pages", "pitch", "tails", "eyes", "caps", "broken"] },
+	{ "id": "blanks", "name": "Fill the blank", "hat": "crown", "hatName": "Crown", "groups": ["ball", "fire", "cake", "sun", "board", "stone", "house", "bear"] },
+	{ "id": "sneaky", "name": "Sneaky", "hat": "sleuth", "hatName": "Sleuth cap", "groups": ["hidanimal", "hidbody", "hidmetal", "hidnumber", "splus", "hidcolor", "backwards", "hidvehicle", "hidtree", "hidweather"] }
+]
