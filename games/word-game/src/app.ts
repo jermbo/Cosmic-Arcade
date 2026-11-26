@@ -1,0 +1,71 @@
+// The flow: title, game, results, back to title.
+import { seedFor } from './core/builder.ts';
+import { todayKey } from './core/rng.ts';
+import type { ModeId } from './core/types.ts';
+import type { GameCtx, ModeGame } from './modes/ctx.ts';
+import { startCrack } from './modes/crack.ts';
+import { startLink } from './modes/link.ts';
+import { startSecret } from './modes/secret.ts';
+import { recordGame, save } from './save.ts';
+import { openHelp } from './ui/menus.ts';
+import { closeLayer, pushLayer } from './ui/nav.ts';
+import { shareText, showResults } from './ui/results.ts';
+import { titleScreen } from './ui/title.ts';
+
+const START: Record<ModeId, (ctx: GameCtx) => ModeGame> = { crack: startCrack, secret: startSecret, link: startLink };
+
+let root: HTMLElement;
+let current: { el: HTMLElement; destroy: () => void } | null = null;
+
+function show(screen: { el: HTMLElement; destroy: () => void }) {
+	current?.destroy();
+	current = screen;
+	root.replaceChildren(screen.el);
+	screen.el.classList.add('screen--in');
+	scrollTo(0, 0);
+}
+
+function home() {
+	show(titleScreen(play));
+}
+
+function play(mode: ModeId, daily: boolean) {
+	let game: ModeGame | null = null;
+	const depth = pushLayer(() => {
+		game = null;
+		home();
+	});
+
+	const run = (date: string | null) => {
+		const ctx: GameCtx = {
+			mode,
+			date,
+			seed: seedFor(mode, date),
+			exit: () => closeLayer(depth),
+			help: () => game && openHelp(mode, game.el),
+			finish: (outcome) => {
+				if (!game) return;
+				const newBest = recordGame(mode, date, { won: outcome.won, stars: outcome.stars, score: outcome.score, share: shareText(mode, date, outcome) });
+				showResults({
+					mode,
+					date,
+					outcome,
+					newBest,
+					streak: save.stats[mode].streak,
+					parent: game.el,
+					onNext: () => run(null),
+					onHome: () => closeLayer(depth),
+				});
+			},
+		};
+		game = START[mode](ctx);
+		show(game);
+		if (!save.seenHelp[mode]) openHelp(mode, game.el);
+	};
+	run(daily ? todayKey() : null);
+}
+
+export function boot(el: HTMLElement): void {
+	root = el;
+	home();
+}
