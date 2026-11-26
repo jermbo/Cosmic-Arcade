@@ -1,0 +1,27 @@
+// What a mode gets from the app, and what it gives back.
+import type { Difficulty, Mark, ModeId } from '../core/types.ts';
+import type { Outcome } from '../ui/results.ts';
+
+export interface GameCtx {
+	mode: ModeId;
+	/** The daily date, or null for practice. */
+	date: string | null;
+	difficulty: Difficulty;
+	seed: string;
+	/** Endless Run: hearts carried in from the last puzzle. */
+	hearts?: { left: number; max: number };
+	/** Text under the mode name in the header. */
+	tag?: string;
+	exit: () => void;
+	help: () => void;
+	finish: (outcome: Outcome) => void;
+}
+
+export interface ModeGame {
+	el: HTMLElement;
+	/** Hints Kip gave this game. */
+	hints: () => number;
+	destroy: () => void;
+}
+
+export const MARK_EMOJI: Record<Mark, string> = { hit: '🟩', near: '🟨', miss: '⬜' };
