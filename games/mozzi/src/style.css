@@ -2830,3 +2830,44 @@ button.mozzi {
 	background: var(--bg);
 	line-height: 1.4;
 }
+
+/* ============================================================ app (PWA) */
+
+.install {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 38px;
+	padding: 0 12px;
+	border-radius: 999px;
+	font-weight: 800;
+	font-size: 14px;
+	color: var(--ink);
+}
+
+/* "Update ready" note, added by src/app/pwa.ts. */
+.update-note {
+	position: fixed;
+	left: 50%;
+	bottom: max(16px, env(safe-area-inset-bottom));
+	z-index: 60;
+	transform: translateX(-50%);
+	padding: 12px 18px;
+	border-radius: 999px;
+	background: var(--ink);
+	color: var(--bg);
+	font: 700 15px system-ui, sans-serif;
+	box-shadow: 0 8px 24px var(--drop);
+	animation: pop 0.3s ease-out;
+}
+
+.update-note[hidden] {
+	display: none;
+}
+
+/* Installed as an app: no browser bar, so leave room for the status bar. */
+@media (display-mode: standalone) {
+	.play {
+		padding-top: max(14px, env(safe-area-inset-top));
+	}
+}

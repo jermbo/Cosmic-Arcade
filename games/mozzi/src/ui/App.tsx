@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { audio } from '../app/audio.ts';
 import { moveFocus, useGamepad, useKeys } from '../app/input.ts';
+import { canInstall, isStandalone, promptInstall, setupPwa } from '../app/pwa.ts';
 import type { GameSave, SaveData, Settings } from '../app/save.ts';
 import { buy, finish, freshSave, liveStreak, load, store } from '../app/save.ts';
 import type { Item } from '../app/shop.ts';
@@ -30,6 +31,10 @@ export function App() {
 	const [today, setToday] = useState(() => dateKey(new Date()));
 	const dataRef = useRef(data);
 	dataRef.current = data;
+
+	// Offline play and the Install button (shown only when the browser offers it).
+	const [installable, setInstallable] = useState(false);
+	useEffect(() => setupPwa(() => setInstallable(canInstall() && !isStandalone())), []);
 
 	const reduceOS = useMemo(() => matchMedia('(prefers-reduced-motion: reduce)'), []);
 	const [osCalm, setOsCalm] = useState(reduceOS.matches);
@@ -202,6 +207,13 @@ export function App() {
 					onRules={() => setScreen({ name: 'rules', from: screen })}
 					onShop={() => setScreen({ name: 'shop', from: screen })}
 					onSettings={() => setSettingsOpen(true)}
+					onInstall={
+						installable
+							? () => {
+									void promptInstall().then(() => setInstallable(canInstall() && !isStandalone()));
+								}
+							: undefined
+					}
 				/>
 			);
 			break;

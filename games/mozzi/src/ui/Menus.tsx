@@ -66,6 +66,8 @@ interface TitleProps {
 	onRules: () => void;
 	onShop: () => void;
 	onSettings: () => void;
+	/** Set when the browser offers to install the game as an app. */
+	onInstall?: () => void;
 }
 
 /** The big Mozzi on the title: its eyes follow your pointer, and it likes a tap. */
@@ -118,6 +120,11 @@ export function Title(p: TitleProps) {
 	return (
 		<main className="screen title-screen" data-layer>
 			<div className="title-corner">
+				{p.onInstall && (
+					<button className="puff install" onClick={p.onInstall}>
+						<Icon name="download" size={18} /> Install
+					</button>
+				)}
 				<CoinChip coins={p.data.coins} />
 				<button className="puff tool" onClick={p.onSettings} aria-label="Settings">
 					<Icon name="gear" />
@@ -315,6 +322,13 @@ export function Rules({ onBack }: { onBack: () => void }) {
 					<li>There are no boxes, unlike Sudoku. Just rows, columns and pairs.</li>
 				</ol>
 				<p>Clues are bold, and clue colors have a small bar in the corner. They can’t change.</p>
+			</section>
+			<section className="card">
+				<h3>Play offline</h3>
+				<p>
+					Mozzi works without a connection after the first visit. To keep it as an app, tap <b>Install</b> on the title screen when your browser offers it. On an
+					iPhone or iPad, tap Share, then <b>Add to Home Screen</b>.
+				</p>
 			</section>
 			<section className="card">
 				<h3>Controls</h3>

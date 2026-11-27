@@ -14,6 +14,7 @@ TypeScript, React and Vite. The puzzle logic has no UI code and runs in Node for
 | `npm test -w mozzi` | Builds and checks 590 puzzles (about 15 s). |
 | `npm run compare-controls -w mozzi` | Counts the inputs of the two control styles. |
 | `npm run build -w mozzi` | Tests, type check, then a static build in `dist/`. |
+| `npm run icons -w mozzi` | Redraws the app icons from one SVG (uses `sharp`, already in the repo). |
 
 The arcade serves the build from `/games/mozzi/play/`. The title screen links back with `../`.
 
@@ -248,6 +249,16 @@ All sound is made in code with Web Audio (`src/app/audio.ts`). Each sound pack i
 - **Big numbers** setting; buttons are at least 38px (most are 42–68px).
 - Two free themes, one light and one dark.
 - Reduced motion follows the device, or can be set by hand.
+
+## Offline app (PWA)
+
+Mozzi installs as an app and plays offline, the same way as Wordkin:
+
+- `vite.config.ts` writes `sw.js` at build time with the exact list of files to keep: the game, the styles, the icons, the manifest, and only the Latin font files (18 files). A new build gets a new cache name, and old caches are removed.
+- `public/manifest.webmanifest` gives the name, colors and icons; `public/icons/` holds the icons, drawn by `scripts/make-icons.ts` (Mozzi on a soft tile, plus maskable and Apple touch versions).
+- `src/app/pwa.ts` registers the service worker, shows **Install** on the title screen when the browser offers it, and shows "Update ready. Tap to reload." when a new build is waiting. Once installed, it asks the browser to keep the save even when storage runs low.
+- The dev server has no service worker. Add `?dev` to a build URL to turn it off there too.
+- On an iPhone or iPad there is no install prompt: use Share, then Add to Home Screen. How to play says so.
 
 ## Save data
 

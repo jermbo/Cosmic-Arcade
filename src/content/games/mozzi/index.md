@@ -6,7 +6,7 @@ kind: video
 build: "mozzi"
 platforms: [desktop, mobile]
 inputs: [mouse, keyboard, touch, gamepad]
-tags: [logic, puzzle, daily]
+tags: [logic, puzzle, daily, pwa]
 ---
 
 A small logic puzzle with a new mosaic window every day. Each window is a 4×4 grid of tiles. Give every tile a number and a color. Mozzi, a creature made of four tiles, watches you play and gives the hints.
@@ -30,6 +30,10 @@ Some parts are set in lead from the start: they are the clues.
 ## Shop
 
 Each window you mend earns coins: more for harder levels, no hints, a new best time and your daily streak. Spend them on themes (light and dark), tile styles and sound packs.
+
+## Play offline
+
+Mozzi works offline after the first visit. Tap **Install** on the title screen to keep it as an app, or on an iPhone use Share, then Add to Home Screen.
 
 ## Controls
 
