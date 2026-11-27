@@ -15,6 +15,11 @@
       "name": "exit-zero",
       "url": "http://localhost:4012",
       "port": 4012
+    },
+    {
+      "name": "mozzi",
+      "url": "http://localhost:4015",
+      "port": 4015
     }
   ]
 }

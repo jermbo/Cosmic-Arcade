@@ -1,0 +1,29 @@
+{
+	"name": "mozzi",
+	"private": true,
+	"version": "2.0.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vite --open --host --port 4015",
+		"build": "npm test && tsc && vite build",
+		"preview": "vite preview",
+		"test": "node scripts/test-puzzles.ts && node scripts/check-colors.ts",
+		"compare-controls": "node scripts/compare-controls.ts",
+		"icons": "node scripts/make-icons.ts"
+	},
+	"arcade": {
+		"engine": "react",
+		"outDir": "dist"
+	},
+	"dependencies": {
+		"@fontsource/bricolage-grotesque": "5.3.0",
+		"react": "19.3.1",
+		"react-dom": "19.3.1"
+	},
+	"devDependencies": {
+		"@types/react": "19.3.0",
+		"@types/react-dom": "19.3.0",
+		"typescript": "7.0.2",
+		"vite": "8.3.6"
+	}
+}
