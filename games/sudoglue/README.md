@@ -32,13 +32,14 @@ flowchart LR
   end
   subgraph app["src/app — game state"]
     game[game.ts<br/>moves, undo, notes]
-    save[save.ts<br/>localStorage]
-    audio[audio.ts<br/>Web Audio]
+    save[save.ts<br/>localStorage, coins]
+    shop[shop.ts<br/>items, prices, rewards]
+    audio[audio.ts<br/>Web Audio packs]
     input[input.ts<br/>keys + gamepad]
   end
   subgraph ui["src/ui — React"]
-    App --> Play --> Window & Tray & HintPanel
-    App --> Menus
+    App --> Play --> Board & HintPanel
+    App --> Menus & Shop
   end
   gen --> solve & logic
   hints --> logic --> explain
@@ -50,9 +51,11 @@ flowchart LR
 | Path | Holds |
 | ---- | ----- |
 | `src/core/` | Pure logic. Tiles are numbered 0–15 (row × 4 + column). Numbers and colors are 0–3. A pair is `number × 4 + color`. |
-| `src/app/game.ts` | One window being played: every move is `step(state, action)`, which returns a new state plus events (for sound and effects). |
-| `src/ui/` | The window (one SVG), the controls, hints, menus, the particle canvas, and Gloop the glue bottle. |
-| `src/ui/art.ts` | Glass colors, patterns, hand-drawn numerals, the window shape. All art is drawn in code. |
+| `src/app/game.ts` | One window being played: every move is `step(state, action)`, which returns a new state plus events (for sound, effects and screen-reader messages). |
+| `src/app/shop.ts` | Every shop item, price and coin reward, as data. |
+| `src/ui/Board.tsx` | The window: a 4×4 grid of HTML buttons. All its looks come from CSS tokens. |
+| `src/ui/Play.tsx` | The play screen (layout C), hint and pairs sheets, results and the tutorial. |
+| `src/style.css` | Themes (`[data-theme]`), tile styles (`[data-tiles]`), layout and motion. |
 | `scripts/` | Tests and the control-style comparison. |
 
 ## The exact solver
@@ -170,32 +173,68 @@ What 4×4 can and can't do:
 
 Daily levels by weekday live in `WEEKDAY_LEVEL` (`src/core/daily.ts`): Mon Easy, Tue–Wed Medium, Thu–Fri Hard, Sat–Sun Expert.
 
-## Controls: what we tried
+## Controls and layout
 
-| Style | How it works | Taps per puzzle* |
-| ----- | ------------ | ---------------- |
+Version 1 tried two control styles, counting the inputs to fill real puzzles in the order the hint solver fills them (`npm run compare-controls`):
+
+| Style | How it works | Taps per puzzle |
+| ----- | ------------ | --------------- |
 | **A. Tile first (kept)** | Pick a tile, then tap a number and a color. | 47.9 (keyboard: 65.8 presses) |
 | B. Pane first ("brush") | Arm a number or a color, then tap tiles to paint it. | 51.2 (33.3 if you paint each value in one go) |
 
-\* Inputs to place every part, in the order the hint solver places them. From `npm run compare-controls`.
+Tile first won: fewer taps in a natural order, and it works the same with a keyboard and a gamepad.
 
-Tile first won: fewer taps in a natural order, it works the same on keyboard and gamepad (the cursor is a tile), and you always look at one tile and its options. The brush only wins if you already know where every copy of a value goes. It is kept as a dev-only prototype: open the dev server with `?controls=brush`.
+Version 2 kept tile first and picked the layout with two prototypes (see the [decision log](../../docs/initiatives/sudoglue/v2/decision-log.md)). The winner is **layout C, the thumb zone**:
 
-## Feel
+- **Top bar:** pause, the clock, then undo, redo, notes, erase and hint. On phones narrower than 380px redo hides (Y still redoes).
+- **Board:** takes all the space that is left, as a square.
+- **Status line:** notes on or off, and a **Pairs** chip that opens a sheet with all 16 pairs.
+- **Numbers row and colors row** at the bottom, in reach of the thumb. They show used pairs in context: when the picked tile is a 2, every color already used with 2 elsewhere is faded and checked. The same works the other way for numbers.
+- **Hint:** opens as a sheet in place of the two rows. The board shrinks but stays in view, so the highlights are always visible.
+- **Sideways and desktop:** the board on the left, the rows (or the hint) on the right.
 
-- **Placing** a pane: it drops in with a squish, glue squeezes out (particles), then a click. Clues are "set in lead" (dark number badge, corner rivets). Your panes show a glue bead and a drip.
-- **A full, clean row or column** catches the light: a sweep of light across it, glints, a shimmer.
-- **Rose window**: each petal lights when all four panes of its color are in.
-- **Solved**: the window glows with moving color, glass confetti, a chord.
-- **Clashes** crack the panes involved and Gloop, the glue bottle, winces.
-- **Patterns**: ruby has stripes, cobalt waves, amber dots, jade checks.
-- **Reduced motion** (setting, or the device setting): no squish, shake, sweep or bobbing; fades stay; the solved glow holds still.
+## Look and feel
 
-All sound is made in code with Web Audio (`src/app/audio.ts`): soft glass bells and wooden tocks on a G-major pentatonic scale, a little filtered noise for glue, and a slow music box over pad chords.
+Soft clay: puffy tiles that press down, calm flat colors, no hard outlines. The colors are tuned to stay apart for color-blind players (see Accessibility), and the **Color shapes** setting adds a symbol to each: ● ruby, ▲ cobalt, ■ amber, ◆ jade.
+
+- **Placing:** a new number pops in, a new color flows out from the middle of the tile, and a tile with both squishes as glue drops squeeze out.
+- **No early praise:** a full row or column gets no effect. It only means no rule is broken yet, not that it is right, so the only celebration is the solved window.
+- **Solved:** the tiles ripple and colored light turns slowly behind the window, with confetti.
+- **Clashes:** a red ring and a small shake.
+- **Clues:** bold numbers; clue colors carry a small bar in the corner.
+- **Smooth motion:** effects on a tile (squish, shake, hint flash, the solved ripple) run on its inner face, so they never fight the tile's lift and press.
+- **Reduced motion** (setting, or the device setting): animations stop; the solved glow holds still.
+
+## Shop, coins, themes, tiles and sounds
+
+Coins come from mended windows (each window pays once): 10/15/20/30 by level, +10 with no hints, +5 for a new best time, +5 for today's window, and +2 per streak day (up to +10). Hints are always free.
+
+| Kind | Items (price) |
+| ---- | ------------- |
+| Themes | Linen (free), Dusk (free, dark), Meadow 60, Blossom 60, Deep Sea 90 (dark), Ember 90 (dark) |
+| Tile styles | Clay (free), Paper 80, Glass 120, Gem 150 |
+| Sound packs | Glass Bells (free), Kalimba 100, Felt Piano 100 |
+
+A theme is a block of color tokens in `style.css`; a tile style is a block of shape tokens (radius, shadow, sheen). Because they are tokens, the shop can draw a preview of any theme or tile style inside the page.
+
+### Sound
+
+All sound is made in code with Web Audio (`src/app/audio.ts`). Each sound pack is one instrument: soft glass bells, a wooden kalimba, or a felt piano. Every effect and the music play on that instrument, on one G-major pentatonic scale. To keep it soft: no raw noise bursts, no sharp attacks, a low-pass filter on every voice, a small room reverb, and quiet levels. The music is a slow, sparse melody over warm pad chords (Gmaj7, Em7, Cmaj7, Dsus).
+
+## Accessibility
+
+- The board is a grid for screen readers; each tile reads its name and contents ("B2, 3, ruby, clue").
+- A polite live region says what happened: placements, clashes, finished lines, hints (the full why), and the end.
+- Full keyboard and gamepad play; focus rings follow the theme's accent.
+- **Colors that stay apart.** Each theme's four colors, and its empty tile, are tuned to differ mostly in lightness, so they stay apart under normal vision and the three common kinds of color blindness (protanopia, deuteranopia, tritanopia). `scripts/check-colors.ts` checks this on every `npm test`: it simulates each kind (Machado et al. 2009), measures the smallest color distance (CIELAB ΔE), and fails below 18. It also checks the number ink has a contrast of at least 3.5:1 on every color. Before tuning, ruby and jade were almost the same for deuteranopia (ΔE about 5); now the smallest distance is 21 or more.
+- **Color shapes** setting (off by default, and on by itself when the device asks for more contrast): ● ruby, ▲ cobalt, ■ amber, ◆ jade, on the tiles, the color keys, notes, the pairs sheet and hint text. Color names also show on the color keys.
+- **Big numbers** setting; buttons are at least 38px (most are 42–68px).
+- Two free themes, one light and one dark.
+- Reduced motion follows the device, or can be set by hand.
 
 ## Save data
 
-One localStorage entry, `sudoglue:v1`: settings, windows in progress, finished windows, best 5 times per level (with hints used), the next practice number per level, the daily streak, and whether the tutorial was seen. A daily counts for the streak when it is finished on its own day.
+One localStorage entry, `sudoglue:v1`: settings, windows in progress, finished windows, best 5 times per level (with hints used), the next practice number per level, the daily streak, coins, owned items, the theme, tile style and sound pack in use, and whether the tutorial was seen. A daily counts for the streak when it is finished on its own day.
 
 ## Tuning knobs
 
@@ -205,12 +244,13 @@ One localStorage entry, `sudoglue:v1`: settings, windows in progress, finished w
 | Tries per puzzle (tougher Hard/Expert) | `TRIES` in `src/core/generate.ts` |
 | Score weight per tier | `STEP_WEIGHT` in `src/core/generate.ts` |
 | Level per weekday | `WEEKDAY_LEVEL` in `src/core/daily.ts` |
-| Glass colors and patterns | `GLASS` in `src/ui/art.ts` and `GlassDefs` in `src/ui/bits.tsx` |
-| Sounds and music | `SOUNDS` and `Engine` in `src/app/audio.ts` |
+| Shop items, prices, coin rewards | `CATALOG` and `EARN` in `src/app/shop.ts` |
+| Theme colors, tile shapes | `[data-theme]` and `[data-tiles]` blocks in `src/style.css` |
+| Sound packs and music | `PACKS`, `SOUNDS` and `Engine` in `src/app/audio.ts` |
 
 ## Tests
 
-`npm test` (`scripts/test-puzzles.ts`) checks 130 practice puzzles per level and 70 daily puzzles (590 in all). For each:
+`npm test` runs `scripts/test-puzzles.ts` and `scripts/check-colors.ts` (see Accessibility). The puzzle test checks 130 practice puzzles per level and 70 daily puzzles (590 in all). For each:
 
 - exactly one solution, and it matches the stored answer;
 - the human solver finishes it, and every part it places is right;

@@ -2,7 +2,7 @@
  * The state of one window being played, and every change the player can make.
  * Pure functions: the React side calls `step(state, action)` and gets a new state.
  */
-import { CELLS, LINES, PEERS } from '../core/grid.ts';
+import { CELLS, PEERS } from '../core/grid.ts';
 import type { Hint } from '../core/hints.ts';
 import { getHint } from '../core/hints.ts';
 import { isFull } from '../core/logic.ts';
@@ -29,7 +29,6 @@ export type Event =
 	| { kind: 'locked'; cell: number }
 	| { kind: 'undo' }
 	| { kind: 'clash'; cells: number[] }
-	| { kind: 'lines'; lines: number[] }
 	| { kind: 'solved' }
 	| { kind: 'select'; cell: number }
 	| { kind: 'hint' }
@@ -54,8 +53,6 @@ export interface Game {
 	shown: number;
 	hint: HintView | null;
 	solved: boolean;
-	/** Lines (index in LINES) that are full and correct. */
-	litLines: number[];
 	events: Event[];
 	/** Bumps on every change, so effects can tell events apart. */
 	tick: number;
@@ -85,11 +82,9 @@ export function newGame(puzzle: Puzzle, saved?: GameSave): Game {
 		shown: saved?.shown ?? 0,
 		hint: null,
 		solved: false,
-		litLines: [],
 		events: [],
 		tick: 0,
 	};
-	g.litLines = goodLines(g);
 	g.solved = isSolved(g);
 	return g;
 }
@@ -108,13 +103,6 @@ export const isLocked = (g: Game, cell: number, axis: Axis) => (axis === 'num' ?
 
 const isSolved = (g: Game) =>
 	isFull(g.board) && g.board.num.every((v, i) => v === g.puzzle.solution.num[i]) && g.board.color.every((v, i) => v === g.puzzle.solution.color[i]);
-
-/** Lines whose 4 tiles are full and break no rule. */
-function goodLines(g: Game): number[] {
-	const clashes = findClashes(g.board);
-	const bad = new Set(clashes.flatMap((c) => c.cells));
-	return LINES.flatMap((line, i) => (line.cells.every((c) => g.board.num[c] >= 0 && g.board.color[c] >= 0 && !bad.has(c)) ? [i] : []));
-}
 
 export type Action =
 	| { type: 'select'; cell: number }
@@ -135,10 +123,11 @@ function remember(g: Game): Game {
 	return { ...g, past: [...g.past.slice(-199), snap], future: [] };
 }
 
-/** After a change: check lines, clashes and the end. */
+/**
+ * After a change: check clashes and the end. A full row or column is not
+ * celebrated: only the whole window can be known to be right.
+ */
 function settle(before: Game, g: Game, events: Event[]): Game {
-	const lit = goodLines(g);
-	const newLines = lit.filter((l) => !before.litLines.includes(l));
 	const solved = isSolved(g);
 	const out: Event[] = [...events];
 	const changed = events.find((e) => e.kind === 'place');
@@ -146,9 +135,8 @@ function settle(before: Game, g: Game, events: Event[]): Game {
 		const clashes = findClashes(g.board).filter((c) => c.cells.includes(changed.cell));
 		if (clashes.length) out.push({ kind: 'clash', cells: [...new Set(clashes.flatMap((c) => c.cells))] });
 	}
-	if (newLines.length && !solved) out.push({ kind: 'lines', lines: newLines });
 	if (solved && !before.solved) out.push({ kind: 'solved' });
-	return { ...g, litLines: lit, solved, events: out, tick: g.tick + 1 };
+	return { ...g, solved, events: out, tick: g.tick + 1 };
 }
 
 /** Placing a value clears it from the notes of the tile and of its row and column. */

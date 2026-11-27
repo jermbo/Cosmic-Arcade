@@ -2,7 +2,8 @@
  * Gloop, the workshop's glue bottle. It squeezes when you glue a pane, winces at
  * a clash, and hops when the window is mended.
  */
-import { CREAM, INK } from './art.ts';
+const INK = '#3a3340';
+const CREAM = '#fffaf2';
 
 export type Mood = 'idle' | 'squeeze' | 'worry' | 'wink' | 'cheer' | 'think';
 

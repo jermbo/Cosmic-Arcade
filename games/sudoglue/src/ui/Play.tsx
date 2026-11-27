@@ -1,4 +1,8 @@
-/** The play screen: the window, the controls, hints, pause, results and the first-play tutorial. */
+/**
+ * The play screen, layout C ("thumb zone"): tools in the top bar, the board, then
+ * a numbers row and a colors row at the bottom, in reach of the thumb.
+ * A hint opens as a sheet in place of the two rows; the board shrinks but stays in view.
+ */
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { audio } from '../app/audio.ts';
 import type { Event, Game } from '../app/game.ts';
@@ -7,23 +11,25 @@ import type { Pad } from '../app/input.ts';
 import { moveFocus, useGamepad, useKeys } from '../app/input.ts';
 import type { GameSave, Settings } from '../app/save.ts';
 import { formatTime } from '../app/save.ts';
-import { LINES } from '../core/grid.ts';
+import type { Earning } from '../app/shop.ts';
+import { cellName } from '../core/grid.ts';
 import type { Puzzle } from '../core/types.ts';
-import { GLASS, cellBox } from './art.ts';
-import { Icon, MiniPane, NumeralIcon } from './bits.tsx';
+import { COLOR_NAMES, sentenceText } from '../core/words.ts';
+import { colorLabel, colorName, Icon, Mini, Shape } from './bits.tsx';
+import type { Face, FaceAnim } from './Board.tsx';
+import { Board } from './Board.tsx';
 import type { FxApi } from './Fx.tsx';
-import { Fx } from './Fx.tsx';
-import type { Mood } from './Gloop.tsx';
+import { Fx, tileCenter } from './Fx.tsx';
 import { Gloop } from './Gloop.tsx';
 import { HintPanel, marksFor } from './HintPanel.tsx';
-import { PairRack, Tray } from './Tray.tsx';
-import { Window } from './Window.tsx';
 
 export interface FinishInfo {
 	isBest: boolean;
 	best: number | null;
 	streak: number;
 	dailyToday: boolean;
+	earned: Earning[];
+	coins: number;
 }
 
 interface Props {
@@ -35,7 +41,6 @@ interface Props {
 	calm: boolean;
 	keysShown: boolean;
 	tutorial: boolean;
-	brushMode: boolean;
 	onTutorialDone: () => void;
 	onSave: (g: GameSave) => void;
 	onFinish: (g: { time: number; hints: number; shown: number }) => FinishInfo;
@@ -50,141 +55,143 @@ interface Props {
 	covered: boolean;
 }
 
-const MOODS_MS = 900;
+const NUM_KEYS = ['1', '2', '3', '4'];
+const COLOR_KEYS = ['Q', 'W', 'E', 'R'];
 
 export function Play(props: Props) {
 	const { puzzle, settings, calm } = props;
 	const [game, dispatch] = useReducer(step, undefined, () => newGame(puzzle, props.saved));
 	const [paused, setPaused] = useState(false);
 	const [confirmReset, setConfirmReset] = useState(false);
+	const [pairsOpen, setPairsOpen] = useState(false);
 	const [result, setResult] = useState<(FinishInfo & { time: number; hints: number; shown: number }) | null>(null);
-	const [bumps, setBumps] = useState<number[]>(() => Array(16).fill(0));
-	const [sweeps, setSweeps] = useState<[number, number][]>([]);
+	const [faces, setFaces] = useState<Face[]>(() => Array.from({ length: 16 }, () => ({ bump: 0, anim: '' as FaceAnim })));
 	const [shake, setShake] = useState<number[]>([]);
 	const [flash, setFlash] = useState<number[]>([]);
-	const [mood, setMood] = useState<Mood>('idle');
 	const [toast, setToast] = useState('');
+	const [live, setLive] = useState('');
 	const [tut, setTut] = useState(props.tutorial ? 0 : -1);
-	const [brush, setBrush] = useState<{ num: number; color: number }>({ num: -1, color: -1 });
 	const fx = useRef<FxApi>(null);
-	// The window fills the space the controls leave, at its own shape (400 × 456).
+	const gameRef = useRef(game);
+	gameRef.current = game;
+
+	// The board fills the space the bars leave, as a square.
 	const wrap = useRef<HTMLDivElement>(null);
-	const [boxW, setBoxW] = useState(300);
+	const [size, setSize] = useState(300);
 	useEffect(() => {
 		const el = wrap.current;
 		if (!el) return;
-		const fit = () => setBoxW(Math.floor(Math.max(160, Math.min(el.clientWidth - 8, (el.clientHeight - 36) * (400 / 456), 660))));
+		const fit = () => setSize(Math.floor(Math.max(180, Math.min(el.clientWidth - 30, el.clientHeight - 30, 620))));
 		const ro = new ResizeObserver(fit);
 		ro.observe(el);
 		fit();
 		return () => ro.disconnect();
 	}, []);
-	const sweepId = useRef(1);
-	const gameRef = useRef(game);
-	gameRef.current = game;
 
 	const clashes = useMemo(() => (settings.showClashes ? clashCells(game.board) : new Set<number>()), [game.board, settings.showClashes]);
 	const counts = useMemo(() => pairCounts(game.board), [game.board]);
 	const marks = marksFor(game.hint, flash);
-	const blocked = paused || !!result || confirmReset;
+	const blocked = paused || !!result || confirmReset || pairsOpen;
 
 	const say = useCallback((text: string) => {
 		setToast(text);
-		window.setTimeout(() => setToast((t) => (t === text ? '' : t)), 1800);
+		window.setTimeout(() => setToast((t) => (t === text ? '' : t)), 2000);
 	}, []);
-	const moodFor = useCallback((m: Mood, ms = MOODS_MS) => {
-		setMood(m);
-		window.setTimeout(() => setMood((now) => (now === m ? 'idle' : now)), ms);
-	}, []);
+	/** Words for screen readers (a polite live region). */
+	const tell = useCallback((text: string) => setLive((t) => (t === text ? `${text} ` : text)), []);
 	const buzz = useCallback((ms: number) => settings.haptics && navigator.vibrate?.(ms), [settings.haptics]);
+	const bump = (cell: number, anim: FaceAnim) => setFaces((f) => f.map((x, i) => (i === cell ? { bump: x.bump + 1, anim } : x)));
 
-	// ---------------------------------------------------------------- feel: sound, particles, motion
+	// ---------------------------------------------------------------- feel: sound, particles, motion, and spoken updates
 	useEffect(() => {
 		for (const e of game.events) react(e);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [game.tick]);
 
 	function react(e: Event) {
+		const g = gameRef.current;
 		switch (e.kind) {
 			case 'select':
 				audio.play('select');
 				break;
 			case 'place': {
-				const { cx, cy } = cellBox(e.cell);
-				setBumps((b) => b.map((v, i) => (i === e.cell ? v + 1 : v)));
+				const { cx, cy } = tileCenter(e.cell);
+				bump(e.cell, e.full ? 'full' : e.axis === 'num' ? 'num' : 'color');
 				audio.play(e.axis === 'num' ? (`num${e.value}` as 'num0') : (`color${e.value}` as 'color0'));
+				const n = g.board.num[e.cell];
+				const c = g.board.color[e.cell];
+				tell(`${cellName(e.cell)}: ${[n >= 0 ? n + 1 : '', c >= 0 ? COLOR_NAMES[c] : ''].filter(Boolean).join(', ')}${e.full ? '. Glued in.' : ''}`);
 				if (e.full) {
-					audio.play('squish', { delay: 0.03 });
-					audio.play('click', { delay: 0.16 });
-					fx.current?.burst('glue', cx, cy, 12);
+					audio.play('glue', { delay: 0.05 });
+					fx.current?.burst('glue', cx, cy, 10);
 					buzz(12);
-					moodFor('squeeze', 420);
 				} else buzz(6);
 				if (tut === 1 && e.axis === 'num') setTut(2);
 				if (tut === 2 && e.axis === 'color') setTut(3);
 				break;
 			}
 			case 'erase':
+				bump(e.cell, 'erase');
 				audio.play('erase');
+				tell(`${cellName(e.cell)} cleared`);
 				break;
 			case 'note':
 				audio.play('note');
 				break;
 			case 'undo':
 				audio.play('undo');
+				tell('Undone');
 				break;
 			case 'locked':
 				audio.play('locked');
 				setShake([e.cell]);
 				window.setTimeout(() => setShake([]), 380);
-				say('That part is set in lead. It can’t change.');
+				say('That part is a clue. It can’t change.');
+				tell('That part is a clue.');
 				break;
 			case 'clash':
-				audio.play('clash', { delay: 0.12 });
+				audio.play('clash', { delay: 0.15 });
 				setShake(e.cells);
 				window.setTimeout(() => setShake([]), 420);
-				moodFor('worry', 1300);
 				buzz(30);
-				break;
-			case 'lines':
-				audio.play('shimmer', { delay: 0.2 });
-				moodFor('wink');
-				for (const li of e.lines) {
-					const id = sweepId.current++;
-					setSweeps((s) => [...s, [id, li]]);
-					window.setTimeout(() => setSweeps((s) => s.filter(([k]) => k !== id)), 1100);
-					for (const c of LINES[li].cells) {
-						const { cx, cy } = cellBox(c);
-						window.setTimeout(() => fx.current?.burst('glint', cx, cy - 20, 2), 200 + Math.random() * 400);
-					}
-				}
+				tell(`Clash: ${e.cells.map(cellName).join(' and ')} break a rule.`);
 				break;
 			case 'solved': {
 				audio.duck(5);
-				audio.play('click');
-				audio.play('solve', { delay: 0.25 });
-				moodFor('cheer', 4000);
+				audio.play('solve', { delay: 0.2 });
 				buzz(40);
+				tell('Window mended!');
 				window.setTimeout(() => {
 					for (let i = 0; i < 16; i++) {
-						const { cx, cy } = cellBox(i);
+						const { cx, cy } = tileCenter(i);
 						window.setTimeout(() => fx.current?.burst('shard', cx, cy, 3), i * 45);
 						window.setTimeout(() => fx.current?.burst('mote', cx, cy, 2), 600 + i * 30);
 					}
-				}, 200);
-				const info = props.onFinish({ time: game.elapsed, hints: game.hints, shown: game.shown });
-				window.setTimeout(() => setResult({ ...info, time: game.elapsed, hints: game.hints, shown: game.shown }), calm ? 900 : 2300);
+				}, 300);
+				const info = props.onFinish({ time: g.elapsed, hints: g.hints, shown: g.shown });
+				window.setTimeout(() => setResult({ ...info, time: g.elapsed, hints: g.hints, shown: g.shown }), calm ? 900 : 2400);
 				break;
 			}
 			case 'hint':
 				audio.play('hint');
-				moodFor('think', 1200);
 				break;
 			case 'reset':
 				audio.play('page');
+				setFaces((f) => f.map((x) => ({ bump: x.bump + 1, anim: 'erase' })));
 				break;
 		}
 	}
+
+	// Read hints aloud as they open.
+	useEffect(() => {
+		const h = game.hint;
+		if (!h) return;
+		if (h.hint.kind === 'wrong') tell([h.hint.where, ...(h.level >= 2 ? h.hint.why : [])].map(sentenceText).join(' '));
+		else if (h.hint.kind === 'step') {
+			const ex = h.hint.ex;
+			tell(h.level === 1 ? sentenceText(ex.where) : [ex.question, ...ex.reasons.map((r) => r.says), ex.answer].map(sentenceText).join(' '));
+		}
+	}, [game.hint, tell]);
 
 	// ---------------------------------------------------------------- time and saving
 	useEffect(() => {
@@ -204,7 +211,6 @@ export function Play(props: Props) {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [game.board, game.notes, game.hints, game.shown, Math.floor(game.elapsed / 5000)]);
 
-	// Save the clock when leaving the screen.
 	useEffect(
 		() => () => {
 			if (!gameRef.current.solved) props.onSave(toSave(gameRef.current));
@@ -219,11 +225,12 @@ export function Play(props: Props) {
 		return () => document.removeEventListener('visibilitychange', hide);
 	}, []);
 
-	// The phone's back button opens pause (or closes what is open), never leaves.
+	// The phone's back button closes what is open, else pauses. It never leaves.
 	const firstBack = useRef(props.backSignal);
 	useEffect(() => {
 		if (props.backSignal === firstBack.current) return;
 		if (confirmReset) setConfirmReset(false);
+		else if (pairsOpen) setPairsOpen(false);
 		else if (game.hint) dispatch({ type: 'closeHint' });
 		else if (result) props.onQuit();
 		else setPaused((p) => !p);
@@ -233,48 +240,37 @@ export function Play(props: Props) {
 	// ---------------------------------------------------------------- actions
 	const tapTile = (cell: number) => {
 		if (blocked) return;
-		if (props.brushMode && (brush.num >= 0 || brush.color >= 0)) {
-			if (brush.num >= 0) dispatch({ type: 'set', axis: 'num', value: brush.num, cell });
-			if (brush.color >= 0) dispatch({ type: 'set', axis: 'color', value: brush.color, cell });
-			return;
-		}
 		dispatch({ type: 'select', cell });
 		if (tut === 0) setTut(1);
 	};
-	const pressNum = (v: number) => {
-		if (props.brushMode) return setBrush((b) => ({ ...b, num: b.num === v ? -1 : v }));
-		dispatch({ type: 'set', axis: 'num', value: v });
-	};
-	const pressColor = (v: number) => {
-		if (props.brushMode) return setBrush((b) => ({ ...b, color: b.color === v ? -1 : v }));
-		dispatch({ type: 'set', axis: 'color', value: v });
-	};
+	const pressNum = (v: number) => dispatch({ type: 'set', axis: 'num', value: v });
+	const pressColor = (v: number) => dispatch({ type: 'set', axis: 'color', value: v });
 	const pickPair = (p: number) => {
-		if (props.brushMode) return setBrush({ num: p >> 2, color: p & 3 });
-		const cells = game.board.num.flatMap((n, i) => (n * 4 + game.board.color[i] === p && n >= 0 && game.board.color[i] >= 0 ? [i] : []));
+		const cells = game.board.num.flatMap((n, i) => (n >= 0 && game.board.color[i] >= 0 && n * 4 + game.board.color[i] === p ? [i] : []));
+		setPairsOpen(false);
 		setFlash(cells);
-		window.setTimeout(() => setFlash([]), 1200);
+		window.setTimeout(() => setFlash([]), 1400);
 		audio.play('ui');
-		if (!cells.length) say(`The ${GLASS[p & 3].name.toLowerCase()} ${(p >> 2) + 1} isn’t in the window yet.`);
+		if (!cells.length) say(`The ${COLOR_NAMES[p & 3]} ${(p >> 2) + 1} isn’t in the window yet.`);
 	};
 	const cycle = (axis: 'num' | 'color') => {
 		const now = (axis === 'num' ? game.board.num : game.board.color)[game.sel];
-		if (now === 3) dispatch({ type: 'set', axis, value: 3 }); // picking it again clears it
-		else dispatch({ type: 'set', axis, value: now + 1 });
+		dispatch({ type: 'set', axis, value: now === 3 ? 3 : now + 1 }); // picking 4 again clears it
 	};
-	const focusTile = (cell: number) => document.querySelector<SVGElement>(`[data-cell="${cell}"]`)?.focus();
+	const focusTile = (cell: number) => document.querySelector<HTMLElement>(`[data-cell="${cell}"]`)?.focus();
 
 	useKeys((e) => {
 		if (props.covered || e.target instanceof HTMLInputElement) return;
 		if (e.key === 'Escape') {
 			e.preventDefault();
 			if (confirmReset) setConfirmReset(false);
+			else if (pairsOpen) setPairsOpen(false);
 			else if (game.hint) dispatch({ type: 'closeHint' });
 			else if (!result) setPaused((p) => !p);
 			return;
 		}
 		if (blocked) {
-			if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+			if (e.key.startsWith('Arrow')) {
 				e.preventDefault();
 				moveFocus(e.key.slice(5).toLowerCase() as 'up');
 			}
@@ -294,19 +290,17 @@ export function Play(props: Props) {
 			dispatch({ type: e.shiftKey ? 'redo' : 'undo' });
 			return;
 		}
-		if (mod) return;
+		if (mod || e.altKey) return;
 		if ('1234'.includes(k) && k) pressNum(Number(k) - 1);
 		else if ('5678'.includes(k) && k) pressColor(Number(k) - 5);
 		else if ('qwer'.includes(k) && k) pressColor('qwer'.indexOf(k));
 		else if (k === 'backspace' || k === 'delete' || k === '0' || k === 'x') dispatch({ type: 'erase' });
-		else if (k === 'n' || k === ' ') {
-			e.preventDefault();
-			dispatch({ type: 'toggleNotes' });
-		} else if (k === 'z') dispatch({ type: e.shiftKey ? 'redo' : 'undo' });
+		else if (k === 'n' || k === ' ') dispatch({ type: 'toggleNotes' });
+		else if (k === 'z') dispatch({ type: e.shiftKey ? 'redo' : 'undo' });
 		else if (k === 'y') dispatch({ type: 'redo' });
 		else if (k === 'h') dispatch({ type: 'hint' });
+		else if (k === 'p') setPairsOpen(true);
 		else if (k === 'enter' && game.hint) dispatch({ type: 'hintLevel', level: game.hint.level === 1 ? 2 : 3 });
-		else if (k === 'p') setPaused(true);
 		else return;
 		e.preventDefault();
 	});
@@ -324,6 +318,7 @@ export function Play(props: Props) {
 			else if (cmd === 'a') active?.click();
 			else if (cmd === 'b') {
 				if (confirmReset) setConfirmReset(false);
+				else if (pairsOpen) setPairsOpen(false);
 				else if (paused) setPaused(false);
 				else focusTile(game.sel);
 			}
@@ -358,30 +353,57 @@ export function Play(props: Props) {
 	}, [game.sel]);
 
 	const g: Game = game;
+	const selN = g.board.num[g.sel];
+	const selC = g.board.color[g.sel];
+	const lockN = puzzle.givens.num[g.sel] >= 0;
+	const lockC = puzzle.givens.color[g.sel] >= 0;
+	const used = counts.filter((c) => c > 0).length;
+	/** Is the pair (n, c) already finished on another tile? */
+	const pairElsewhere = (n: number, c: number) => g.board.num.some((v, i) => i !== g.sel && v === n && g.board.color[i] === c);
+
 	return (
-		<div className={`play${paused ? ' is-paused' : ''}${g.solved ? ' is-solved' : ''}${g.hint ? ' hint-open' : ''}`} data-layer>
+		<div
+			className={`play${paused ? ' is-paused' : ''}${g.solved ? ' is-solved' : ''}${g.hint ? ' hint-open' : ''}${g.notesMode ? ' notes-on' : ''}`}
+			data-layer
+		>
 			<header className="bar">
-				<button className="icon-btn" onClick={() => setPaused(true)} aria-label="Pause">
+				<button className="puff tool" onClick={() => setPaused(true)} aria-label="Pause">
 					<Icon name="pause" />
 				</button>
 				<div className="bar-title">
-					<b>{props.label}</b>
-					<span>{props.sub}</span>
+					<b className="timer" aria-label={`Time ${formatTime(g.elapsed)}`}>
+						{settings.showTimer ? formatTime(g.elapsed) : props.label}
+					</b>
+					<small>{props.sub}</small>
 				</div>
-				{settings.showTimer ? (
-					<div className="timer" aria-label="Time">
-						{formatTime(g.elapsed)}
-					</div>
-				) : (
-					<div className="timer" />
-				)}
+				<div className="bar-tools">
+					<button className="puff tool" onClick={() => dispatch({ type: 'undo' })} disabled={!g.past.length} aria-label="Undo">
+						<Icon name="undo" />
+						{props.keysShown && <kbd>Z</kbd>}
+					</button>
+					<button className="puff tool redo" onClick={() => dispatch({ type: 'redo' })} disabled={!g.future.length} aria-label="Redo">
+						<Icon name="redo" />
+						{props.keysShown && <kbd>Y</kbd>}
+					</button>
+					<button className={`puff tool${g.notesMode ? ' on' : ''}`} onClick={() => dispatch({ type: 'toggleNotes' })} aria-pressed={g.notesMode} aria-label="Pencil notes">
+						<Icon name="pencil" />
+						{props.keysShown && <kbd>N</kbd>}
+					</button>
+					<button className="puff tool" onClick={() => dispatch({ type: 'erase' })} aria-label="Erase tile">
+						<Icon name="erase" />
+						{props.keysShown && <kbd>⌫</kbd>}
+					</button>
+					<button className="puff tool tool-hint" onClick={() => dispatch({ type: 'hint' })} aria-label="Hint">
+						<Icon name="bulb" />
+						{props.keysShown && <kbd>H</kbd>}
+					</button>
+				</div>
 			</header>
 
-			<div className="stage">
-				<div className="window-wrap" ref={wrap}>
-					<div className={`light-pool${g.solved ? ' on' : ''}`} aria-hidden="true" />
-					<div className="window-box" style={{ width: boxW }}>
-						<Window
+			<main className="stage">
+				<div className="board-wrap" ref={wrap}>
+					<div className="board-box" style={{ ['--board' as string]: `${size}px` }}>
+						<Board
 							board={g.board}
 							givens={puzzle.givens}
 							noteNum={g.notes.num}
@@ -391,24 +413,19 @@ export function Play(props: Props) {
 							clashes={clashes}
 							helpers={settings.helpers && !marks}
 							marks={marks}
-							bumps={bumps}
-							sweeps={sweeps}
+							faces={faces}
 							shake={calm ? [] : shake}
 							solved={g.solved}
-							motion={!calm}
-							litLines={g.litLines}
 							onTap={tapTile}
 							onFocusCell={(cell) => dispatch({ type: 'select', cell })}
-						/>
-						<Fx ref={fx} calm={calm} />
+						>
+							<Fx ref={fx} calm={calm} />
+						</Board>
 						{paused && <div className="frost" aria-hidden="true" />}
-					</div>
-					<div className="sill" aria-hidden="true" style={{ width: boxW + 18 }}>
-						<Gloop mood={mood} size={54} />
 					</div>
 				</div>
 
-				<div className="side">
+				<div className="dock">
 					{g.hint ? (
 						<HintPanel
 							view={g.hint}
@@ -418,31 +435,72 @@ export function Play(props: Props) {
 							onClose={() => dispatch({ type: 'closeHint' })}
 							onFlash={setFlash}
 						/>
-					) : null}
-					<div className={`controls${g.hint ? ' dim' : ''}`}>
-						<Tray
-							board={g.board}
-							givens={puzzle.givens}
-							sel={g.sel}
-							notesMode={g.notesMode}
-							noteNum={g.notes.num[g.sel]}
-							noteColor={g.notes.color[g.sel]}
-							keys={props.keysShown}
-							canUndo={g.past.length > 0}
-							canRedo={g.future.length > 0}
-							hintsUsed={g.hints}
-							brush={props.brushMode ? brush : null}
-							onNum={pressNum}
-							onColor={pressColor}
-							onErase={() => dispatch({ type: 'erase' })}
-							onUndo={() => dispatch({ type: 'undo' })}
-							onRedo={() => dispatch({ type: 'redo' })}
-							onNotes={() => dispatch({ type: 'toggleNotes' })}
-							onHint={() => dispatch({ type: 'hint' })}
-						/>
-						<PairRack counts={counts} onPick={pickPair} pickedPair={props.brushMode && brush.num >= 0 && brush.color >= 0 ? brush.num * 4 + brush.color : -1} />
-					</div>
+					) : (
+						<div className="controls">
+							<div className="status">
+								<span className={`mode${g.notesMode ? ' on' : ''}`} aria-live="polite">
+									<Icon name="pencil" size={15} /> {g.notesMode ? 'Notes on' : 'Notes off'}
+								</span>
+								<button className="pairs-chip" onClick={() => setPairsOpen(true)} aria-label={`Pairs used: ${used} of 16. Show all pairs.`}>
+									<Icon name="grid" size={15} /> Pairs <b>{used}</b>/16
+								</button>
+							</div>
+							<div className="keys" role="group" aria-label="Numbers">
+								{[0, 1, 2, 3].map((v) => {
+									const count = g.board.num.filter((n) => n === v).length;
+									const on = selN === v;
+									const noted = g.notesMode && g.notes.num[g.sel] & (1 << v);
+									const taken = selC >= 0 && selN !== v && pairElsewhere(v, selC);
+									return (
+										<button
+											key={v}
+											className={`puff key key-num${on ? ' on' : ''}${noted ? ' noted' : ''}${taken ? ' taken' : ''}${count >= 4 ? ' spent' : ''}`}
+											disabled={lockN && !g.notesMode}
+											onClick={() => pressNum(v)}
+											aria-pressed={on || !!noted}
+											aria-label={`${v + 1}${g.notesMode ? ', note' : ''}${taken ? `, the ${COLOR_NAMES[selC]} ${v + 1} is used` : ''}`}
+										>
+											<span className="key-n">{v + 1}</span>
+											<span className="pips" aria-hidden="true">
+												{[0, 1, 2, 3].map((k) => (
+													<i key={k} className={k < count ? 'full' : ''} />
+												))}
+											</span>
+											{taken && <span className="taken-mark" aria-hidden="true"><Icon name="check" size={12} /></span>}
+											{props.keysShown && <kbd>{NUM_KEYS[v]}</kbd>}
+										</button>
+									);
+								})}
+							</div>
+							<div className="keys" role="group" aria-label="Glass colors">
+								{[0, 1, 2, 3].map((v) => {
+									const on = selC === v;
+									const noted = g.notesMode && g.notes.color[g.sel] & (1 << v);
+									const taken = selN >= 0 && selC !== v && pairElsewhere(selN, v);
+									return (
+										<button
+											key={v}
+											className={`puff key key-color k${v}${on ? ' on' : ''}${noted ? ' noted' : ''}${taken ? ' taken' : ''}`}
+											disabled={lockC && !g.notesMode}
+											onClick={() => pressColor(v)}
+											aria-pressed={on || !!noted}
+											aria-label={`${colorLabel(v)}${g.notesMode ? ', note' : ''}${taken ? `, the ${COLOR_NAMES[v]} ${selN + 1} is used` : ''}`}
+										>
+											<Shape c={v} />
+											<span className="key-name">{colorName(v)}</span>
+											{taken && <span className="taken-mark" aria-hidden="true"><Icon name="check" size={12} /></span>}
+											{props.keysShown && <kbd>{COLOR_KEYS[v]}</kbd>}
+										</button>
+									);
+								})}
+							</div>
+						</div>
+					)}
 				</div>
+			</main>
+
+			<div className="sr-only" aria-live="polite" role="status">
+				{live}
 			</div>
 
 			{toast && (
@@ -451,7 +509,42 @@ export function Play(props: Props) {
 				</div>
 			)}
 
-			{tut >= 0 && !paused && <Coach step={tut} keys={props.keysShown} onNext={() => setTut((t) => t + 1)} onDone={() => { setTut(-1); props.onTutorialDone(); }} />}
+			{tut >= 0 && !paused && (
+				<Coach
+					step={tut}
+					keys={props.keysShown}
+					onNext={() => setTut((t) => t + 1)}
+					onDone={() => {
+						setTut(-1);
+						props.onTutorialDone();
+					}}
+				/>
+			)}
+
+			{pairsOpen && (
+				<div className="overlay sheet-overlay" data-layer onClick={() => setPairsOpen(false)}>
+					<div className="sheet pairs-sheet" role="dialog" aria-label="Pairs" onClick={(e) => e.stopPropagation()}>
+						<header>
+							<h2>Pairs</h2>
+							<button className="puff tool" onClick={() => setPairsOpen(false)} aria-label="Close" autoFocus>
+								<Icon name="close" />
+							</button>
+						</header>
+						<p className="muted">Each number + color pair is used once. Tap one to find it.</p>
+						<div className="pair-table">
+							<span />
+							{[0, 1, 2, 3].map((c) => (
+								<span key={c} className="ph">
+									<Mini c={c} size={20} />
+								</span>
+							))}
+							{[0, 1, 2, 3].map((n) => (
+								<PairRow key={n} n={n} counts={counts} onPick={pickPair} />
+							))}
+						</div>
+					</div>
+				</div>
+			)}
 
 			{paused && !result && (
 				<div className="overlay" data-layer>
@@ -462,7 +555,7 @@ export function Play(props: Props) {
 						</p>
 						<div className="stack">
 							<button className="btn btn-main" autoFocus onClick={() => setPaused(false)}>
-								<Icon name="play" /> Back to the glass
+								<Icon name="play" /> Keep going
 							</button>
 							<button className="btn" onClick={() => setConfirmReset(true)}>
 								<Icon name="reset" /> Start this window over
@@ -485,7 +578,7 @@ export function Play(props: Props) {
 				<div className="overlay" data-layer>
 					<div className="card modal" role="alertdialog" aria-label="Start over?">
 						<h2>Start over?</h2>
-						<p>All your panes and notes come off this window. The clock keeps running. You can undo it.</p>
+						<p>All your tiles and notes come off this window. The clock keeps running. You can undo it.</p>
 						<div className="row">
 							<button className="btn" autoFocus onClick={() => setConfirmReset(false)}>
 								Keep going
@@ -505,64 +598,118 @@ export function Play(props: Props) {
 				</div>
 			)}
 
-			{result && (
-				<div className="overlay results-overlay" data-layer>
-					<div className="card modal results" role="dialog" aria-label="Window mended">
-						<div className="results-gloop">
-							<Gloop mood="cheer" size={72} />
-						</div>
-						<h2>Window mended!</h2>
-						<p className="muted">{props.label}</p>
-						<dl className="stats">
-							<div>
-								<dt>Time</dt>
-								<dd>{formatTime(result.time)}</dd>
-							</div>
-							<div>
-								<dt>Hints</dt>
-								<dd>
-									{result.hints}
-									{result.shown > 0 && <small> ({result.shown} shown)</small>}
-								</dd>
-							</div>
-							<div>
-								<dt>Best</dt>
-								<dd>{result.best !== null ? formatTime(result.best) : '–'}</dd>
-							</div>
-							{result.dailyToday && (
-								<div>
-									<dt>Streak</dt>
-									<dd>
-										{result.streak} day{result.streak === 1 ? '' : 's'}
-									</dd>
-								</div>
-							)}
-						</dl>
-						{result.isBest && <p className="best-badge">New best time! Smooth as glass.</p>}
-						{result.hints === 0 && <p className="clean-badge">No hints. Not a smudge on it.</p>}
-						<div className="stack">
-							{props.onNext && (
-								<button className="btn btn-main" autoFocus onClick={props.onNext}>
-									<Icon name="play" /> {props.nextLabel ?? 'Next window'}
-								</button>
-							)}
-							<button className="btn" autoFocus={!props.onNext} onClick={props.onQuit}>
-								<Icon name="home" /> Back to the workshop
-							</button>
-						</div>
-					</div>
-				</div>
-			)}
+			{result && <Results r={result} label={props.label} onNext={props.onNext} nextLabel={props.nextLabel} onQuit={props.onQuit} calm={calm} />}
 		</div>
 	);
 }
 
-/** The first-play tutorial: four short coach cards that move on as you do each thing. */
+function PairRow({ n, counts, onPick }: { n: number; counts: number[]; onPick: (pair: number) => void }) {
+	return (
+		<>
+			<span className="ph num">{n + 1}</span>
+			{[0, 1, 2, 3].map((c) => {
+				const k = counts[n * 4 + c];
+				return (
+					<button
+						key={c}
+						className={`pair${k === 1 ? ' used' : ''}${k > 1 ? ' twice' : ''}`}
+						onClick={() => onPick(n * 4 + c)}
+						aria-label={`${COLOR_NAMES[c]} ${n + 1}: ${k === 0 ? 'not used' : k === 1 ? 'used' : 'used twice'}`}
+					>
+						<Mini n={n} c={c} size={40} />
+						{k > 0 && <span className="pair-mark">{k > 1 ? '!' : <Icon name="check" size={12} />}</span>}
+					</button>
+				);
+			})}
+		</>
+	);
+}
+
+/** Window mended: stats, then coins counting up. */
+function Results({ r, label, onNext, nextLabel, onQuit, calm }: { r: FinishInfo & { time: number; hints: number; shown: number }; label: string; onNext?: () => void; nextLabel?: string; onQuit: () => void; calm: boolean }) {
+	const total = r.earned.reduce((s, e) => s + e.coins, 0);
+	const [shown, setShown] = useState(calm ? total : 0);
+	useEffect(() => {
+		if (calm || total === 0) return;
+		let v = 0;
+		const id = window.setInterval(() => {
+			v = Math.min(total, v + Math.max(1, Math.ceil(total / 24)));
+			setShown(v);
+			if (v % 5 === 0 || v === total) audio.play('coin', { gain: 0.6 });
+			if (v >= total) clearInterval(id);
+		}, 45);
+		return () => clearInterval(id);
+	}, [total, calm]);
+	return (
+		<div className="overlay results-overlay" data-layer>
+			<div className="card modal results" role="dialog" aria-label="Window mended">
+				<div className="results-gloop">
+					<Gloop mood="cheer" size={72} />
+				</div>
+				<h2>Window mended!</h2>
+				<p className="muted">{label}</p>
+				<dl className="stats">
+					<div>
+						<dt>Time</dt>
+						<dd>{formatTime(r.time)}</dd>
+					</div>
+					<div>
+						<dt>Hints</dt>
+						<dd>
+							{r.hints}
+							{r.shown > 0 && <small> ({r.shown} shown)</small>}
+						</dd>
+					</div>
+					<div>
+						<dt>Best</dt>
+						<dd>{r.best !== null ? formatTime(r.best) : '–'}</dd>
+					</div>
+					{r.dailyToday && (
+						<div>
+							<dt>Streak</dt>
+							<dd>{r.streak}</dd>
+						</div>
+					)}
+				</dl>
+				{r.earned.length > 0 ? (
+					<div className="earned" aria-label={`You earned ${total} coins. You have ${r.coins}.`}>
+						<ul>
+							{r.earned.map((e, i) => (
+								<li key={e.label} style={{ ['--i' as string]: i }}>
+									<span>{e.label}</span>
+									<b>+{e.coins}</b>
+								</li>
+							))}
+						</ul>
+						<p className="earned-total">
+							<Icon name="coin" size={20} /> <b>+{shown}</b> <span className="muted">· {r.coins} in total</span>
+						</p>
+					</div>
+				) : (
+					<p className="muted small">You mended this one before, so it earns no coins this time.</p>
+				)}
+				{r.isBest && <p className="badge-line">New best time!</p>}
+				<div className="stack">
+					{onNext && (
+						<button className="btn btn-main" autoFocus onClick={onNext}>
+							<Icon name="play" /> {nextLabel ?? 'Next window'}
+						</button>
+					)}
+					<button className="btn" autoFocus={!onNext} onClick={onQuit}>
+						<Icon name="home" /> Back to the workshop
+					</button>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+/** The first-play tutorial: short coach cards that move on as you do each thing. */
 function Coach({ step: s, keys, onNext, onDone }: { step: number; keys: boolean; onNext: () => void; onDone: () => void }) {
 	const cards = [
-		{ title: 'Pick a tile', body: keys ? 'Tap a pane in the window, or use the arrow keys.' : 'Tap a pane in the window.' },
+		{ title: 'Pick a tile', body: keys ? 'Tap a tile in the window, or use the arrow keys.' : 'Tap a tile in the window.' },
 		{ title: 'Give it a number', body: keys ? 'Tap a number below, or press 1–4.' : 'Tap a number below.' },
-		{ title: 'Now a glass color', body: keys ? 'Tap a color, or press Q W E R. A pane with both is glued in.' : 'Tap a color. A pane with both is glued in.' },
+		{ title: 'Now a color', body: keys ? 'Tap a color, or press Q W E R. A tile with both is glued in.' : 'Tap a color. A tile with both is glued in.' },
 	];
 	if (s >= 3) {
 		return (
@@ -571,13 +718,13 @@ function Coach({ step: s, keys, onNext, onDone }: { step: number; keys: boolean;
 					<h2>The rules</h2>
 					<ul className="rules-list">
 						<li>
-							<b>Rows and columns:</b> each has every number <NumeralIcon v={0} size={16} />–<NumeralIcon v={3} size={16} /> once and every color once.
+							<b>Rows and columns:</b> each has every number 1–4 once and every color once.
 						</li>
 						<li>
-							<b>Pairs:</b> each number + color pair, like <MiniPane n={1} c={0} size={20} /> ruby 2, is used once in the whole window.
+							<b>Pairs:</b> each number + color pair, like <Mini n={1} c={0} size={20} /> ruby 2, is used once in the whole window.
 						</li>
 						<li>
-							<b>Lead and glue:</b> parts with a dark badge or corner rivets are set in lead and stay. Yours are held with glue.
+							<b>Clues:</b> bold numbers, and colors with a small bar in the corner, are clues. They can’t change.
 						</li>
 						<li>
 							<b>Stuck?</b> <Icon name="bulb" size={16} /> Hint shows where to look, then why, then what.

@@ -3,7 +3,14 @@
  * lines, and glass confetti when the window is mended. Runs only while particles live.
  */
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import { GLASS, WIN } from './art.ts';
+/** Particles use board units: the board is 400 × 400, a tile is 100. */
+export const FX_SIZE = 400;
+export const tileCenter = (cell: number) => ({ cx: (cell % 4) * 100 + 50, cy: Math.floor(cell / 4) * 100 + 50 });
+
+/** Theme colors, read from CSS, so particles match the current theme. */
+function themeColor(name: string, fallback: string) {
+	return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
 
 type Kind = 'glue' | 'glint' | 'shard' | 'mote';
 
@@ -40,14 +47,14 @@ export const Fx = forwardRef<FxApi, { calm: boolean }>(function Fx({ calm }, ref
 				const max = kind === 'glue' ? 34 + Math.random() * 18 : kind === 'shard' ? 90 + Math.random() * 60 : 40 + Math.random() * 30;
 				parts.current.push({
 					kind,
-					x: x + (kind === 'glue' ? Math.cos(a) * 30 : 0),
-					y: y + (kind === 'glue' ? Math.sin(a) * 30 : 0),
+					x: x + (kind === 'glue' ? Math.cos(a) * 36 : 0),
+					y: y + (kind === 'glue' ? Math.sin(a) * 36 : 0),
 					vx: Math.cos(a) * sp,
 					vy: Math.sin(a) * sp - (kind === 'shard' ? 2.5 : 0),
 					life: 0,
 					max,
 					size: kind === 'glue' ? 2.5 + Math.random() * 3.5 : kind === 'shard' ? 5 + Math.random() * 6 : 2 + Math.random() * 3,
-					color: color ?? GLASS[Math.floor(Math.random() * 4)].base,
+					color: color ?? themeColor(`--k${Math.floor(Math.random() * 4)}`, '#ffb3b3'),
 					spin: (Math.random() - 0.5) * 0.3,
 					angle: Math.random() * 6,
 				});
@@ -67,10 +74,12 @@ export const Fx = forwardRef<FxApi, { calm: boolean }>(function Fx({ calm }, ref
 			cv.width = Math.round(w * dpr);
 			cv.height = Math.round(h * dpr);
 		}
-		const k = (w / WIN.w) * dpr;
+		const k = (w / FX_SIZE) * dpr;
 		ctx.setTransform(1, 0, 0, 1, 0, 0);
 		ctx.clearRect(0, 0, cv.width, cv.height);
 		ctx.setTransform(k, 0, 0, k, 0, 0);
+		const glue = themeColor('--glue', '#fffdf6');
+		const edge = themeColor('--edge-line', 'rgba(0,0,0,0.25)');
 		const alive: P[] = [];
 		for (const p of parts.current) {
 			p.life++;
@@ -89,9 +98,9 @@ export const Fx = forwardRef<FxApi, { calm: boolean }>(function Fx({ calm }, ref
 			} else p.vy -= 0.01;
 			ctx.globalAlpha = p.kind === 'glue' ? 1 - t * t : 1 - t;
 			if (p.kind === 'glue') {
-				ctx.fillStyle = '#fffdf2';
-				ctx.strokeStyle = '#241a2e';
-				ctx.lineWidth = 1.2;
+				ctx.fillStyle = glue;
+				ctx.strokeStyle = edge;
+				ctx.lineWidth = 1;
 				ctx.beginPath();
 				ctx.ellipse(p.x, p.y, p.size * (1 - t * 0.4), p.size * (1 + t * 0.3), 0, 0, Math.PI * 2);
 				ctx.fill();
@@ -101,8 +110,8 @@ export const Fx = forwardRef<FxApi, { calm: boolean }>(function Fx({ calm }, ref
 				ctx.translate(p.x, p.y);
 				ctx.rotate(p.angle);
 				ctx.fillStyle = p.color;
-				ctx.strokeStyle = '#241a2e';
-				ctx.lineWidth = 1.5;
+				ctx.strokeStyle = edge;
+				ctx.lineWidth = 1;
 				ctx.beginPath();
 				ctx.moveTo(-p.size, -p.size * 0.6);
 				ctx.lineTo(p.size, -p.size * 0.2);
@@ -114,7 +123,7 @@ export const Fx = forwardRef<FxApi, { calm: boolean }>(function Fx({ calm }, ref
 			} else {
 				// A four-point glint.
 				const s = p.size * (p.kind === 'glint' ? 1.6 - t : 1);
-				ctx.fillStyle = p.kind === 'glint' ? '#fffbe6' : p.color;
+				ctx.fillStyle = p.kind === 'glint' ? '#fffdf2' : p.color;
 				ctx.beginPath();
 				ctx.moveTo(p.x, p.y - s * 2);
 				ctx.quadraticCurveTo(p.x, p.y, p.x + s * 2, p.y);

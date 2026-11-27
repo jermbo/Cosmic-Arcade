@@ -4,7 +4,7 @@ import type { HintView } from '../app/game.ts';
 import { TIER_NAMES } from '../core/logic.ts';
 import type { Tier } from '../core/logic.ts';
 import { Icon, Words } from './bits.tsx';
-import type { Marks } from './Window.tsx';
+import type { Marks } from './Board.tsx';
 
 export const RULES: Record<Tier, string> = {
 	1: 'Each row and each column has every number once and every color once.',

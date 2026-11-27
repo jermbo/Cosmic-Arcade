@@ -3,22 +3,22 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { audio } from '../app/audio.ts';
 import { moveFocus, useGamepad, useKeys } from '../app/input.ts';
 import type { GameSave, SaveData, Settings } from '../app/save.ts';
-import { defaultSettings, finish, liveStreak, load, store } from '../app/save.ts';
+import { buy, finish, freshSave, liveStreak, load, store } from '../app/save.ts';
+import type { Item } from '../app/shop.ts';
 import { dailyPuzzle, dateKey, practicePuzzle } from '../core/daily.ts';
 import type { Level, Puzzle } from '../core/types.ts';
-import { GlassDefs } from './bits.tsx';
 import { LEVEL_INFO, Practice, Records, Rules, SettingsModal, Title, Week, dayLabel } from './Menus.tsx';
 import { Play } from './Play.tsx';
+import { Shop } from './Shop.tsx';
 
 type Screen =
 	| { name: 'title' }
 	| { name: 'week' }
 	| { name: 'practice' }
 	| { name: 'records' }
+	| { name: 'shop'; from: Screen }
 	| { name: 'rules'; from: Screen }
 	| { name: 'play'; puzzle: Puzzle; label: string; sub: string; day?: string; level?: Level; n?: number; from: 'title' | 'week' | 'practice' };
-
-const DEV_BRUSH = import.meta.env.DEV && new URLSearchParams(location.search).get('controls') === 'brush';
 
 export function App() {
 	const [data, setData] = useState<SaveData>(load);
@@ -39,6 +39,19 @@ export function App() {
 		return () => reduceOS.removeEventListener('change', fn);
 	}, [reduceOS]);
 	const calm = data.settings.motion === 'reduced' || (data.settings.motion === 'auto' && osCalm);
+
+	// Looks live on <html>, so every screen, dialog and particle follows them.
+	useEffect(() => {
+		const root = document.documentElement;
+		root.dataset.theme = data.looks.theme;
+		root.dataset.tiles = data.looks.tiles;
+		root.dataset.shapes = String(data.settings.colorShapes);
+		root.dataset.big = String(data.settings.bigText);
+		root.classList.toggle('calm', calm);
+		const bg = getComputedStyle(root).getPropertyValue('--bg').trim();
+		document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg || '#f2ede6');
+	}, [data.looks.theme, data.looks.tiles, data.settings.colorShapes, data.settings.bigText, calm]);
+	useEffect(() => audio.setPack(data.looks.sound), [data.looks.sound]);
 
 	// The date can roll over while the game is open.
 	useEffect(() => {
@@ -92,14 +105,14 @@ export function App() {
 		const s = screenRef.current;
 		if (settingsRef.current) return setSettingsOpen(false);
 		if (s.name === 'play') return setBackSignal((n) => n + 1);
-		if (s.name === 'rules') return setScreen(s.from);
+		if (s.name === 'rules' || s.name === 'shop') return setScreen(s.from);
 		if (s.name !== 'title') return setScreen({ name: 'title' });
 	}
 
 	const startDaily = (day: string, from: 'title' | 'week') => {
 		audio.play('page');
 		const puzzle = dailyPuzzle(day);
-		setScreen({ name: 'play', puzzle, label: day === today ? 'Today’s window' : dayLabel(day), sub: `${dayLabel(day)} · ${LEVEL_INFO[puzzle.level].name}`, day, from });
+		setScreen({ name: 'play', puzzle, label: day === today ? 'Today’s window' : dayLabel(day), sub: `${day === today ? "Today" : dayLabel(day)} · ${LEVEL_INFO[puzzle.level].name}`, day, from });
 		setPlayKey((k) => k + 1);
 	};
 	const startPractice = (level: Level) => {
@@ -116,7 +129,14 @@ export function App() {
 		if (s.level && s.n !== undefined) next = { ...next, practice: { ...next.practice, [s.level]: Math.max(next.practice[s.level], s.n + 1) } };
 		store(next);
 		setData(next);
-		return { isBest: res.isBest, best: next.records[s.puzzle.level][0]?.time ?? null, streak: liveStreak(next, today), dailyToday: s.day === today };
+		return {
+			isBest: res.isBest,
+			best: next.records[s.puzzle.level][0]?.time ?? null,
+			streak: liveStreak(next, today),
+			dailyToday: s.day === today,
+			earned: res.earned,
+			coins: next.coins,
+		};
 	};
 
 	// Menu screens: arrows and the gamepad move between buttons.
@@ -151,6 +171,23 @@ export function App() {
 
 	const setSettings = (s: Settings) => update((d) => ({ ...d, settings: s }));
 
+	const buyItem = (item: Item) => {
+		const next = buy(dataRef.current, item.id, item.price);
+		if (!next) {
+			audio.play('locked');
+			return false;
+		}
+		audio.play('buy');
+		const key = item.kind === 'theme' ? 'theme' : item.kind === 'tiles' ? 'tiles' : 'sound';
+		update(() => ({ ...next, looks: { ...next.looks, [key]: item.id } }));
+		return true;
+	};
+	const equipItem = (item: Item) => {
+		audio.play('ui');
+		const key = item.kind === 'theme' ? 'theme' : item.kind === 'tiles' ? 'tiles' : 'sound';
+		update((d) => ({ ...d, looks: { ...d.looks, [key]: item.id } }));
+	};
+
 	let body;
 	switch (screen.name) {
 		case 'title':
@@ -163,9 +200,13 @@ export function App() {
 					onPractice={() => setScreen({ name: 'practice' })}
 					onRecords={() => setScreen({ name: 'records' })}
 					onRules={() => setScreen({ name: 'rules', from: screen })}
+					onShop={() => setScreen({ name: 'shop', from: screen })}
 					onSettings={() => setSettingsOpen(true)}
 				/>
 			);
+			break;
+		case 'shop':
+			body = <Shop coins={data.coins} owned={data.owned} looks={data.looks} onBuy={buyItem} onUse={equipItem} onBack={() => setScreen(screen.from)} />;
 			break;
 		case 'week':
 			body = <Week data={data} today={today} onPlay={(day) => startDaily(day, 'week')} onBack={() => setScreen({ name: 'title' })} />;
@@ -193,7 +234,6 @@ export function App() {
 					calm={calm}
 					keysShown={keysShown}
 					tutorial={!data.tutorialDone}
-					brushMode={DEV_BRUSH}
 					onTutorialDone={() => update((d) => ({ ...d, tutorialDone: true }))}
 					onSave={(g: GameSave) => update((d) => ({ ...d, games: { ...d.games, [s.puzzle.id]: g } }))}
 					onFinish={(f) => onFinish(s, f)}
@@ -212,22 +252,25 @@ export function App() {
 
 	return (
 		<div className={`app${calm ? ' calm' : ''}`}>
-			<GlassDefs />
-			{body}
+			<div className="screen-fade" key={screen.name === 'play' ? `play-${playKey}` : screen.name}>
+				{body}
+			</div>
 			{settingsOpen && (
 				<SettingsModal
 					settings={data.settings}
 					onChange={setSettings}
 					onClose={() => setSettingsOpen(false)}
+					onShop={() => {
+						// From a game too: the game saves as it closes, and Back returns to it.
+						setSettingsOpen(false);
+						setScreen({ name: 'shop', from: screenRef.current });
+					}}
 					onTutorial={() => {
 						update((d) => ({ ...d, tutorialDone: false }));
 						setSettingsOpen(false);
 					}}
 					onWipe={() => {
-						const fresh = { ...load(), games: {}, finished: {}, tutorialDone: false, settings: defaultSettings() };
-						fresh.records = { easy: [], medium: [], hard: [], expert: [] };
-						fresh.practice = { easy: 0, medium: 0, hard: 0, expert: 0 };
-						fresh.streak = { current: 0, best: 0, lastDay: '' };
+						const fresh = freshSave();
 						store(fresh);
 						setData(fresh);
 						setSettingsOpen(false);

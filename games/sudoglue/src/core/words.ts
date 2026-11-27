@@ -6,7 +6,8 @@
 import { cellName } from './grid.ts';
 
 export const COLOR_NAMES = ['ruby', 'cobalt', 'amber', 'jade'] as const;
-export const PATTERN_NAMES = ['stripes', 'waves', 'dots', 'checks'] as const;
+/** The symbol each color shows with the Color shapes setting. */
+export const SHAPE_NAMES = ['circle', 'triangle', 'square', 'diamond'] as const;
 
 export type Token =
 	| string

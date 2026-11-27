@@ -1,8 +1,14 @@
 /**
- * All sound, made with Web Audio nodes. Each effect is rendered once into a buffer
- * with an OfflineAudioContext (filters, envelopes, a soft room reverb), then played
- * back cheaply. Notes come from one pentatonic scale, so everything sounds in tune.
- * Nothing is downloaded.
+ * All sound, made with Web Audio nodes. Nothing is downloaded.
+ *
+ * Each sound pack (a shop item) is one instrument: soft glass bells, a wooden
+ * kalimba, or a felt piano. Every effect and the music are played on that
+ * instrument, on one G-major pentatonic scale, so everything is in tune.
+ * Effects are rendered once per pack with an OfflineAudioContext (filters,
+ * envelopes, a small room), then played back cheaply.
+ *
+ * Mixing rules, to keep it soft: no raw noise bursts, no sharp attacks (4 ms or
+ * more), a low-pass on every voice, and quiet levels.
  */
 
 export type Sfx =
@@ -15,249 +21,277 @@ export type Sfx =
 	| 'color1'
 	| 'color2'
 	| 'color3'
-	| 'squish'
-	| 'click'
+	| 'glue'
 	| 'erase'
 	| 'note'
 	| 'undo'
 	| 'clash'
 	| 'locked'
-	| 'shimmer'
 	| 'solve'
 	| 'hint'
 	| 'ui'
-	| 'page';
+	| 'page'
+	| 'coin'
+	| 'buy';
 
 const RATE = 44100;
-// G major pentatonic.
 const hz = (midi: number) => 440 * 2 ** ((midi - 69) / 12);
-const G4 = 67;
+const G3 = 55;
 const SCALE = [0, 2, 4, 7, 9]; // G A B D E
-const note = (step: number) => hz(G4 + SCALE[((step % 5) + 5) % 5] + 12 * Math.floor(step / 5));
+/** Scale step 0 is G3; step 5 is G4, step 10 is G5. */
+const note = (step: number) => hz(G3 + SCALE[((step % 5) + 5) % 5] + 12 * Math.floor(step / 5));
 
-type Render = (ctx: OfflineAudioContext, out: AudioNode, wet: AudioNode) => void;
+type Voice = (ctx: BaseAudioContext, out: AudioNode, t: number, freq: number, level: number, length?: number) => void;
 
-function impulse(ctx: BaseAudioContext, seconds: number, decay: number): AudioBuffer {
-	const len = Math.floor(ctx.sampleRate * seconds);
-	const buf = ctx.createBuffer(2, len, ctx.sampleRate);
-	for (let ch = 0; ch < 2; ch++) {
-		const d = buf.getChannelData(ch);
-		for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** decay;
-	}
-	return buf;
-}
-
-function noiseBuffer(ctx: BaseAudioContext, seconds: number): AudioBuffer {
-	const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * seconds), ctx.sampleRate);
-	const d = buf.getChannelData(0);
-	for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-	return buf;
-}
-
-/** A glassy bell: a few inharmonic partials that fade at different speeds. */
-function glass(ctx: BaseAudioContext, dest: AudioNode, t: number, freq: number, level: number, length = 0.9) {
-	const partials: [number, number, number][] = [
-		[1, 1, 1],
-		[2.0, 0.35, 0.6],
-		[2.76, 0.22, 0.45],
-		[5.4, 0.08, 0.25],
-	];
-	for (const [ratio, amp, life] of partials) {
-		const o = ctx.createOscillator();
-		o.type = 'sine';
-		o.frequency.value = freq * ratio;
-		const g = ctx.createGain();
-		g.gain.setValueAtTime(0, t);
-		g.gain.linearRampToValueAtTime(level * amp, t + 0.004);
-		g.gain.exponentialRampToValueAtTime(0.0001, t + length * life);
-		o.connect(g).connect(dest);
-		o.start(t);
-		o.stop(t + length * life + 0.05);
-	}
-}
-
-/** A soft wooden tock. */
-function tock(ctx: BaseAudioContext, dest: AudioNode, t: number, freq: number, level: number) {
-	const o = ctx.createOscillator();
-	o.type = 'triangle';
-	o.frequency.setValueAtTime(freq * 1.6, t);
-	o.frequency.exponentialRampToValueAtTime(freq, t + 0.012);
-	const g = ctx.createGain();
-	g.gain.setValueAtTime(0, t);
-	g.gain.linearRampToValueAtTime(level, t + 0.003);
-	g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
-	const lp = ctx.createBiquadFilter();
-	lp.type = 'lowpass';
-	lp.frequency.value = 2400;
-	o.connect(g).connect(lp).connect(dest);
-	o.start(t);
-	o.stop(t + 0.2);
-}
-
-function noise(ctx: BaseAudioContext, dest: AudioNode, t: number, dur: number, type: BiquadFilterType, f0: number, f1: number, q: number, level: number, attack = 0.004) {
-	const src = ctx.createBufferSource();
-	src.buffer = noiseBuffer(ctx, dur + 0.05);
-	const f = ctx.createBiquadFilter();
-	f.type = type;
-	f.Q.value = q;
-	f.frequency.setValueAtTime(f0, t);
-	f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+function env(ctx: BaseAudioContext, t: number, level: number, attack: number, length: number): GainNode {
 	const g = ctx.createGain();
 	g.gain.setValueAtTime(0, t);
 	g.gain.linearRampToValueAtTime(level, t + attack);
-	g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-	src.connect(f).connect(g).connect(dest);
-	src.start(t);
-	src.stop(t + dur + 0.05);
+	g.gain.exponentialRampToValueAtTime(0.0001, t + length);
+	return g;
 }
 
-function glide(ctx: BaseAudioContext, dest: AudioNode, t: number, f0: number, f1: number, dur: number, level: number, type: OscillatorType = 'sine') {
+function osc(ctx: BaseAudioContext, type: OscillatorType, freq: number, t: number, length: number) {
 	const o = ctx.createOscillator();
 	o.type = type;
-	o.frequency.setValueAtTime(f0, t);
-	o.frequency.exponentialRampToValueAtTime(f1, t + dur);
-	const g = ctx.createGain();
-	g.gain.setValueAtTime(0, t);
-	g.gain.linearRampToValueAtTime(level, t + 0.006);
-	g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-	o.connect(g).connect(dest);
+	o.frequency.value = freq;
 	o.start(t);
-	o.stop(t + dur + 0.05);
+	o.stop(t + length + 0.05);
+	return o;
 }
 
-/** A warm pad chord: detuned saws through a slow lowpass. */
-function pad(ctx: BaseAudioContext, dest: AudioNode, t: number, freqs: number[], dur: number, level: number) {
+function lowpass(ctx: BaseAudioContext, freq: number, q = 0.5) {
+	const f = ctx.createBiquadFilter();
+	f.type = 'lowpass';
+	f.frequency.value = freq;
+	f.Q.value = q;
+	return f;
+}
+
+// ---------------------------------------------------------------- instruments
+
+/** Soft glass bell: near-harmonic partials, the upper ones fade first. */
+const bell: Voice = (ctx, out, t, f, level, length = 1.4) => {
+	const lp = lowpass(ctx, 4200);
+	lp.connect(out);
+	for (const [ratio, amp, life] of [
+		[1, 1, 1],
+		[2, 0.22, 0.5],
+		[3.01, 0.06, 0.28],
+	] as const) {
+		const o = osc(ctx, 'sine', f * ratio, t, length * life);
+		o.connect(env(ctx, t, level * amp, 0.006, length * life)).connect(lp);
+	}
+};
+
+/** Kalimba: a round tine with a tiny pitch settle and a soft overtone. */
+const kalimba: Voice = (ctx, out, t, f, level, length = 1.1) => {
+	const lp = lowpass(ctx, 3000);
+	lp.connect(out);
+	const o = osc(ctx, 'sine', f, t, length);
+	o.frequency.setValueAtTime(f * 1.012, t);
+	o.frequency.exponentialRampToValueAtTime(f, t + 0.04);
+	o.connect(env(ctx, t, level, 0.005, length)).connect(lp);
+	const over = osc(ctx, 'sine', f * 5.2, t, 0.12);
+	over.connect(env(ctx, t, level * 0.08, 0.004, 0.12)).connect(lp);
+	const body = osc(ctx, 'triangle', f / 2, t, 0.3);
+	body.connect(env(ctx, t, level * 0.12, 0.01, 0.3)).connect(lp);
+};
+
+/** Felt piano: a muted hammer, warm and close. */
+const felt: Voice = (ctx, out, t, f, level, length = 1.6) => {
 	const lp = ctx.createBiquadFilter();
 	lp.type = 'lowpass';
-	lp.Q.value = 0.4;
-	lp.frequency.setValueAtTime(400, t);
-	lp.frequency.linearRampToValueAtTime(1300, t + dur * 0.45);
-	lp.frequency.linearRampToValueAtTime(500, t + dur);
+	lp.Q.value = 0.3;
+	lp.frequency.setValueAtTime(2400, t);
+	lp.frequency.exponentialRampToValueAtTime(700, t + length * 0.6);
+	lp.connect(out);
+	for (const [type, ratio, amp, detune] of [
+		['triangle', 1, 1, 0],
+		['sine', 1, 0.5, 4],
+		['sine', 2, 0.18, -3],
+	] as const) {
+		const o = osc(ctx, type, f * ratio, t, length);
+		o.detune.value = detune;
+		o.connect(env(ctx, t, level * amp, 0.008, length)).connect(lp);
+	}
+};
+
+/** A warm pad for the music: stacked sines and triangles, slow in and out. */
+function pad(ctx: BaseAudioContext, out: AudioNode, t: number, freqs: number[], length: number, level: number) {
+	const lp = lowpass(ctx, 900, 0.3);
 	const g = ctx.createGain();
 	g.gain.setValueAtTime(0, t);
-	g.gain.linearRampToValueAtTime(level, t + dur * 0.35);
-	g.gain.linearRampToValueAtTime(0, t + dur);
-	lp.connect(g).connect(dest);
+	g.gain.linearRampToValueAtTime(level, t + length * 0.4);
+	g.gain.linearRampToValueAtTime(0, t + length);
+	lp.connect(g).connect(out);
 	for (const f of freqs) {
-		for (const detune of [-7, 6]) {
-			const o = ctx.createOscillator();
-			o.type = 'sawtooth';
-			o.frequency.value = f;
+		for (const [type, detune] of [
+			['sine', -5],
+			['triangle', 5],
+		] as const) {
+			const o = osc(ctx, type, f, t, length);
 			o.detune.value = detune;
 			o.connect(lp);
-			o.start(t);
-			o.stop(t + dur + 0.05);
 		}
 	}
 }
 
-const SOUNDS: Record<Sfx, { length: number; wet: number; render: Render }> = {
-	select: { length: 0.25, wet: 0.15, render: (c, o) => glass(c, o, 0, note(12), 0.12, 0.35) },
-	num0: { length: 0.3, wet: 0.2, render: (c, o) => tock(c, o, 0, note(5), 0.5) },
-	num1: { length: 0.3, wet: 0.2, render: (c, o) => tock(c, o, 0, note(6), 0.5) },
-	num2: { length: 0.3, wet: 0.2, render: (c, o) => tock(c, o, 0, note(7), 0.5) },
-	num3: { length: 0.3, wet: 0.2, render: (c, o) => tock(c, o, 0, note(8), 0.5) },
-	color0: { length: 0.9, wet: 0.35, render: (c, o) => glass(c, o, 0, note(10), 0.22) },
-	color1: { length: 0.9, wet: 0.35, render: (c, o) => glass(c, o, 0, note(11), 0.22) },
-	color2: { length: 0.9, wet: 0.35, render: (c, o) => glass(c, o, 0, note(12), 0.22) },
-	color3: { length: 0.9, wet: 0.35, render: (c, o) => glass(c, o, 0, note(13), 0.22) },
-	squish: {
-		length: 0.35,
-		wet: 0.1,
-		render: (c, o) => {
-			noise(c, o, 0, 0.2, 'bandpass', 1100, 260, 5, 0.5, 0.02);
-			glide(c, o, 0.01, 260, 120, 0.16, 0.28);
-		},
-	},
-	click: {
-		length: 0.6,
-		wet: 0.3,
-		render: (c, o) => {
-			noise(c, o, 0, 0.025, 'highpass', 5000, 3000, 0.7, 0.35);
-			tock(c, o, 0, 190, 0.45);
-			glass(c, o, 0.01, note(15), 0.08, 0.5);
-		},
-	},
-	erase: { length: 0.2, wet: 0.1, render: (c, o) => glide(c, o, 0, 520, 300, 0.09, 0.22, 'triangle') },
-	note: {
-		length: 0.15,
-		wet: 0,
-		render: (c, o) => {
-			noise(c, o, 0, 0.03, 'bandpass', 3800, 3000, 1.6, 0.18);
-			noise(c, o, 0.045, 0.03, 'bandpass', 3400, 2800, 1.6, 0.14);
-		},
-	},
-	undo: { length: 0.25, wet: 0.15, render: (c, o) => glide(c, o, 0, 700, 380, 0.12, 0.18, 'triangle') },
-	clash: {
-		length: 0.4,
-		wet: 0.15,
-		render: (c, o) => {
-			glide(c, o, 0, 170, 120, 0.22, 0.4);
-			noise(c, o, 0, 0.12, 'lowpass', 600, 200, 0.7, 0.2);
-		},
-	},
-	locked: {
-		length: 0.3,
-		wet: 0.1,
-		render: (c, o) => {
-			tock(c, o, 0, 150, 0.4);
-			tock(c, o, 0.07, 140, 0.25);
-		},
-	},
-	shimmer: {
-		length: 2.0,
-		wet: 0.55,
-		render: (c, o) => [12, 13, 15, 17].forEach((s, i) => glass(c, o, i * 0.07, note(s), 0.12, 1.2)),
-	},
-	solve: {
-		length: 4.2,
-		wet: 0.6,
-		render: (c, o) => {
-			pad(c, o, 0, [note(0) / 2, note(2) / 2, note(3) / 2, note(5) / 2], 3.6, 0.05);
-			[5, 7, 8, 10, 12, 13, 15].forEach((s, i) => glass(c, o, 0.1 + i * 0.11, note(s), 0.14, 1.6));
-		},
-	},
-	hint: { length: 1.4, wet: 0.5, render: (c, o) => [14, 12].forEach((s, i) => glass(c, o, i * 0.12, note(s), 0.13, 1.1)) },
-	ui: { length: 0.1, wet: 0, render: (c, o) => tock(c, o, 0, 880, 0.18) },
-	page: { length: 0.25, wet: 0.1, render: (c, o) => noise(c, o, 0, 0.14, 'bandpass', 1800, 900, 0.9, 0.12, 0.03) },
+/** A soft, round "blub" for glue: a falling sine through a low-pass. No noise. */
+function blub(ctx: BaseAudioContext, out: AudioNode, t: number, level: number) {
+	const o = osc(ctx, 'sine', 440, t, 0.18);
+	o.frequency.setValueAtTime(420, t);
+	o.frequency.exponentialRampToValueAtTime(190, t + 0.14);
+	const lp = lowpass(ctx, 1200);
+	o.connect(env(ctx, t, level, 0.008, 0.18)).connect(lp).connect(out);
+}
+
+/** A breath of air for page turns: filtered noise with a slow swell. */
+function breath(ctx: BaseAudioContext, out: AudioNode, t: number, level: number) {
+	const len = 0.35;
+	const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * len), ctx.sampleRate);
+	const d = buf.getChannelData(0);
+	for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+	const src = ctx.createBufferSource();
+	src.buffer = buf;
+	const g = ctx.createGain();
+	g.gain.setValueAtTime(0, t);
+	g.gain.linearRampToValueAtTime(level, t + 0.12);
+	g.gain.linearRampToValueAtTime(0, t + len);
+	src.connect(lowpass(ctx, 800)).connect(g).connect(out);
+	src.start(t);
+}
+
+// ---------------------------------------------------------------- packs
+
+export interface Pack {
+	voice: Voice;
+	/** Loudness trim for this instrument. */
+	trim: number;
+	/** Room size (reverb mix). */
+	room: number;
+	/** Music: beats per minute and how busy the melody is (0..1). */
+	bpm: number;
+	busy: number;
+}
+
+export const PACKS: Record<string, Pack> = {
+	bells: { voice: bell, trim: 1, room: 0.45, bpm: 60, busy: 0.35 },
+	kalimba: { voice: kalimba, trim: 1.1, room: 0.3, bpm: 72, busy: 0.5 },
+	felt: { voice: felt, trim: 1.25, room: 0.25, bpm: 56, busy: 0.3 },
 };
 
-async function renderSound(def: { length: number; wet: number; render: Render }): Promise<AudioBuffer> {
-	const off = new OfflineAudioContext(2, Math.ceil(RATE * (def.length + 0.6)), RATE);
-	const dry = off.createGain();
-	const verb = off.createConvolver();
-	verb.buffer = impulse(off, 1.6, 3);
-	const wet = off.createGain();
-	wet.gain.value = def.wet;
+type Render = (ctx: BaseAudioContext, out: AudioNode, v: Voice) => void;
+
+const SOUNDS: Record<Sfx, { length: number; render: Render }> = {
+	select: { length: 0.4, render: (c, o, v) => v(c, o, 0, note(12), 0.05, 0.35) },
+	num0: { length: 1, render: (c, o, v) => v(c, o, 0, note(5), 0.22, 0.9) },
+	num1: { length: 1, render: (c, o, v) => v(c, o, 0, note(6), 0.22, 0.9) },
+	num2: { length: 1, render: (c, o, v) => v(c, o, 0, note(7), 0.22, 0.9) },
+	num3: { length: 1, render: (c, o, v) => v(c, o, 0, note(8), 0.22, 0.9) },
+	color0: { length: 1, render: (c, o, v) => v(c, o, 0, note(10), 0.2, 0.9) },
+	color1: { length: 1, render: (c, o, v) => v(c, o, 0, note(11), 0.2, 0.9) },
+	color2: { length: 1, render: (c, o, v) => v(c, o, 0, note(12), 0.2, 0.9) },
+	color3: { length: 1, render: (c, o, v) => v(c, o, 0, note(13), 0.2, 0.9) },
+	glue: {
+		length: 1.2,
+		render: (c, o, v) => {
+			blub(c, o, 0, 0.22);
+			v(c, o, 0.09, note(15), 0.12, 1);
+		},
+	},
+	erase: { length: 0.6, render: (c, o, v) => v(c, o, 0, note(3), 0.12, 0.5) },
+	note: { length: 0.3, render: (c, o, v) => v(c, o, 0, note(17), 0.04, 0.25) },
+	undo: {
+		length: 0.7,
+		render: (c, o, v) => {
+			v(c, o, 0, note(9), 0.09, 0.4);
+			v(c, o, 0.07, note(7), 0.09, 0.5);
+		},
+	},
+	clash: {
+		length: 1,
+		render: (c, o, v) => {
+			v(c, o, 0, note(4), 0.16, 0.6);
+			v(c, o, 0.12, note(2), 0.16, 0.8);
+		},
+	},
+	locked: { length: 0.4, render: (c, o, v) => v(c, o, 0, note(0), 0.14, 0.3) },
+	solve: {
+		length: 4.5,
+		render: (c, o, v) => {
+			pad(c, o, 0, [note(0), note(2), note(3), note(5)], 4, 0.06);
+			[5, 7, 8, 10, 12, 13, 15].forEach((s, i) => v(c, o, 0.1 + i * 0.13, note(s), 0.13, 1.8));
+		},
+	},
+	hint: {
+		length: 1.4,
+		render: (c, o, v) => {
+			v(c, o, 0, note(13), 0.1, 1);
+			v(c, o, 0.14, note(15), 0.1, 1.1);
+		},
+	},
+	ui: { length: 0.25, render: (c, o, v) => v(c, o, 0, note(12), 0.05, 0.18) },
+	page: { length: 0.5, render: (c, o) => breath(c, o, 0, 0.05) },
+	coin: {
+		length: 0.8,
+		render: (c, o, v) => {
+			v(c, o, 0, note(15), 0.09, 0.5);
+			v(c, o, 0.06, note(17), 0.09, 0.6);
+		},
+	},
+	buy: { length: 1.6, render: (c, o, v) => [10, 12, 15, 17].forEach((s, i) => v(c, o, i * 0.07, note(s), 0.11, 1)) },
+};
+
+function impulse(ctx: BaseAudioContext, seconds: number): AudioBuffer {
+	const len = Math.floor(ctx.sampleRate * seconds);
+	const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+	for (let ch = 0; ch < 2; ch++) {
+		const d = buf.getChannelData(ch);
+		for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3.2;
+	}
+	return buf;
+}
+
+async function render(length: number, room: number, draw: (ctx: BaseAudioContext, out: AudioNode) => void): Promise<AudioBuffer> {
+	const off = new OfflineAudioContext(2, Math.ceil(RATE * (length + 1)), RATE);
 	const bus = off.createGain();
-	bus.connect(dry).connect(off.destination);
+	const verb = off.createConvolver();
+	verb.buffer = impulse(off, 1.8);
+	const wet = off.createGain();
+	wet.gain.value = room;
+	// A gentle overall low-pass takes the edge off.
+	const tone = lowpass(off, 6000);
+	bus.connect(tone).connect(off.destination);
 	bus.connect(verb).connect(wet).connect(off.destination);
-	def.render(off, bus, wet);
+	draw(off, bus);
 	return off.startRendering();
 }
 
 // ---------------------------------------------------------------- music
 
-/** Chords for the music: G, Em, C, D, as scale steps. */
+/** Gmaj7, Em7, Cmaj7, Dsus: as MIDI notes, low and close. */
 const CHORDS = [
-	[0, 2, 3],
-	[4, 0, 2],
-	[3, 4, 1],
-	[3, 0, 1],
-].map((steps) => steps.map((s) => note(s - 5)));
+	[43, 47, 50, 54],
+	[40, 47, 50, 55],
+	[48, 52, 55, 59],
+	[50, 55, 57, 62],
+].map((c) => c.map(hz));
 
 class Engine {
 	ctx: AudioContext | null = null;
-	sfxGain!: GainNode;
-	musicGain!: GainNode;
-	buffers = new Map<string, AudioBuffer>();
+	private sfxGain!: GainNode;
+	private musicGain!: GainNode;
+	private buffers = new Map<string, AudioBuffer>();
+	private rendering = new Map<string, Promise<void>>();
+	private pack = 'bells';
 	sfxLevel = 0.8;
 	musicLevel = 0.45;
 	private musicOn = false;
 	private nextBeat = 0;
 	private beat = 0;
 	private timer = 0;
-	private lastStep = 7;
+	private lastStep = 10;
 
 	/** Must run inside a tap or key press (browsers only allow sound after one). */
 	unlock() {
@@ -266,26 +300,45 @@ class Engine {
 			if (!Ctx) return;
 			this.ctx = new Ctx();
 			const comp = this.ctx.createDynamicsCompressor();
-			comp.threshold.value = -16;
-			comp.ratio.value = 3;
+			comp.threshold.value = -20;
+			comp.ratio.value = 2.5;
 			comp.connect(this.ctx.destination);
 			this.sfxGain = this.ctx.createGain();
 			this.musicGain = this.ctx.createGain();
 			this.sfxGain.connect(comp);
 			this.musicGain.connect(comp);
 			this.applyLevels();
-			void this.prepare();
+			void this.prepare(this.pack);
 		}
 		if (this.ctx.state === 'suspended') void this.ctx.resume();
 		if (this.musicOn) this.startMusic();
 	}
 
-	private async prepare() {
-		for (const [name, def] of Object.entries(SOUNDS)) this.buffers.set(name, await renderSound(def));
-		// Music box notes (2 octaves) and pad chords.
-		for (let s = 5; s < 16; s++) this.buffers.set(`box${s}`, await renderSound({ length: 1.8, wet: 0.5, render: (c, o) => glass(c, o, 0, note(s), 0.1, 1.8) }));
-		for (const [i, chord] of CHORDS.entries())
-			this.buffers.set(`pad${i}`, await renderSound({ length: 6.6, wet: 0.5, render: (c, o) => pad(c, o, 0, chord, 6.6, 0.035) }));
+	/** Renders every sound of a pack once. */
+	private prepare(id: string): Promise<void> {
+		const existing = this.rendering.get(id);
+		if (existing) return existing;
+		const p = PACKS[id] ?? PACKS.bells;
+		const job = (async () => {
+			for (const [name, def] of Object.entries(SOUNDS))
+				this.buffers.set(`${id}:${name}`, await render(def.length, p.room, (c, o) => def.render(c, o, (cc, oo, t, f, l, len) => p.voice(cc, oo, t, f, l * p.trim, len))));
+			for (let s = 8; s < 20; s++) this.buffers.set(`${id}:m${s}`, await render(2, p.room + 0.15, (c, o) => p.voice(c, o, 0, note(s), 0.07 * p.trim, 1.8)));
+			for (const [i, chord] of CHORDS.entries()) this.buffers.set(`pad${i}`, await render(8, 0.5, (c, o) => pad(c, o, 0, chord, 8, 0.03)));
+		})();
+		this.rendering.set(id, job);
+		return job;
+	}
+
+	setPack(id: string) {
+		this.pack = PACKS[id] ? id : 'bells';
+		if (this.ctx) void this.prepare(this.pack);
+	}
+
+	/** Plays a short phrase on a pack (for the shop). */
+	async preview(id: string) {
+		if (!this.ctx) return;
+		await this.prepare(id);
+		[10, 12, 13, 15].forEach((s, i) => this.playBuffer(`${id}:m${Math.min(19, s)}`, this.ctx!.currentTime + i * 0.16, this.sfxGain, 1.6));
 	}
 
 	setLevels(sfx: number, music: number) {
@@ -297,69 +350,58 @@ class Engine {
 	private applyLevels() {
 		if (!this.ctx) return;
 		const t = this.ctx.currentTime;
-		this.sfxGain.gain.setTargetAtTime(this.sfxLevel * 0.9, t, 0.05);
-		this.musicGain.gain.setTargetAtTime(this.musicLevel * 0.55, t, 0.3);
+		this.sfxGain.gain.setTargetAtTime(this.sfxLevel * 0.85, t, 0.05);
+		this.musicGain.gain.setTargetAtTime(this.musicLevel * 0.5, t, 0.3);
 	}
 
-	play(name: Sfx, opts: { delay?: number; rate?: number; gain?: number } = {}) {
+	play(name: Sfx, opts: { delay?: number; gain?: number } = {}) {
 		if (!this.ctx || this.sfxLevel <= 0) return;
-		const buf = this.buffers.get(name);
-		if (!buf) return;
-		const src = this.ctx.createBufferSource();
-		src.buffer = buf;
-		src.playbackRate.value = opts.rate ?? 1;
-		const g = this.ctx.createGain();
-		g.gain.value = opts.gain ?? 1;
-		src.connect(g).connect(this.sfxGain);
-		src.start(this.ctx.currentTime + (opts.delay ?? 0));
+		this.playBuffer(`${this.pack}:${name}`, this.ctx.currentTime + (opts.delay ?? 0), this.sfxGain, opts.gain ?? 1);
 	}
 
-	/** Lowers the music for a moment (for the solve chord). */
+	/** Lowers the music for a moment (under the solve chord). */
 	duck(seconds: number) {
 		if (!this.ctx) return;
 		const t = this.ctx.currentTime;
 		this.musicGain.gain.cancelScheduledValues(t);
-		this.musicGain.gain.setTargetAtTime(this.musicLevel * 0.15, t, 0.1);
-		this.musicGain.gain.setTargetAtTime(this.musicLevel * 0.55, t + seconds, 1);
+		this.musicGain.gain.setTargetAtTime(this.musicLevel * 0.12, t, 0.15);
+		this.musicGain.gain.setTargetAtTime(this.musicLevel * 0.5, t + seconds, 1.2);
 	}
 
 	setMusic(on: boolean) {
 		this.musicOn = on;
 		if (on) this.startMusic();
-		else this.stopMusic();
+		else {
+			clearInterval(this.timer);
+			this.timer = 0;
+		}
 	}
 
 	private startMusic() {
 		if (!this.ctx || this.timer) return;
-		this.nextBeat = this.ctx.currentTime + 0.3;
-		this.timer = window.setInterval(() => this.schedule(), 120);
+		this.nextBeat = this.ctx.currentTime + 0.4;
+		this.timer = window.setInterval(() => this.schedule(), 150);
 	}
 
-	private stopMusic() {
-		clearInterval(this.timer);
-		this.timer = 0;
-	}
-
-	/** A slow, sparse music box over soft chords. 66 beats a minute, in 8ths. */
+	/** Slow, sparse melody over soft chords. Two bars per chord, in eighths. */
 	private schedule() {
 		if (!this.ctx || this.musicLevel <= 0) return;
-		const eighth = 60 / 66 / 2;
-		while (this.nextBeat < this.ctx.currentTime + 0.4) {
+		const p = PACKS[this.pack] ?? PACKS.bells;
+		const eighth = 60 / p.bpm / 2;
+		while (this.nextBeat < this.ctx.currentTime + 0.5) {
 			const t = this.nextBeat;
-			const bar = Math.floor(this.beat / 8);
-			if (this.beat % 16 === 0) this.playAt(`pad${Math.floor(bar / 2) % 4}`, t, this.musicGain, 1);
+			if (this.beat % 16 === 0) this.playBuffer(`pad${Math.floor(this.beat / 16) % 4}`, t, this.musicGain, 1);
 			const strong = this.beat % 4 === 0;
-			if (Math.random() < (strong ? 0.75 : 0.22)) {
-				// A gentle random walk on the scale, drawn toward chord tones on strong beats.
-				this.lastStep = Math.max(5, Math.min(15, this.lastStep + [-2, -1, -1, 1, 1, 2, 0][Math.floor(Math.random() * 7)]));
-				this.playAt(`box${this.lastStep}`, t, this.musicGain, strong ? 0.9 : 0.55);
+			if (Math.random() < (strong ? 0.4 + p.busy * 0.5 : p.busy * 0.35)) {
+				this.lastStep = Math.max(8, Math.min(19, this.lastStep + [-2, -1, -1, 0, 1, 1, 2][Math.floor(Math.random() * 7)]));
+				this.playBuffer(`${this.pack}:m${this.lastStep}`, t, this.musicGain, strong ? 1 : 0.6);
 			}
 			this.beat++;
 			this.nextBeat += eighth;
 		}
 	}
 
-	private playAt(name: string, t: number, dest: AudioNode, gain: number) {
+	private playBuffer(name: string, t: number, dest: AudioNode, gain: number) {
 		const buf = this.buffers.get(name);
 		if (!buf || !this.ctx) return;
 		const src = this.ctx.createBufferSource();

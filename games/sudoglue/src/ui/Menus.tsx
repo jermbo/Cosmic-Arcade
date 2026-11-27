@@ -1,26 +1,22 @@
 /** Title, week, practice, records, how to play, and settings. */
+import type { ReactNode } from 'react';
 import { useState } from 'react';
 import type { SaveData, Settings } from '../app/save.ts';
 import { formatTime, liveStreak } from '../app/save.ts';
 import { levelOfDay, parseKey, weekOf } from '../core/daily.ts';
-import { makeRng } from '../core/rng.ts';
-import { randomSolution } from '../core/solve.ts';
 import type { Level } from '../core/types.ts';
 import { LEVELS } from '../core/types.ts';
-import { GLASS } from './art.ts';
-import { Icon, MiniPane, NumeralIcon, Swatch } from './bits.tsx';
+import { SHAPE_NAMES } from '../core/words.ts';
+import { colorName, Icon, Mini, Shape } from './bits.tsx';
 import { Gloop } from './Gloop.tsx';
 import { RULES } from './HintPanel.tsx';
 
 export const LEVEL_INFO: Record<Level, { name: string; needs: string; blurb: string }> = {
 	easy: { name: 'Easy', needs: 'Lines', blurb: 'Rows and columns are enough. More clues to start.' },
-	medium: { name: 'Medium', needs: 'Used pairs', blurb: 'Few clues. You need to track which pairs are taken.' },
-	hard: { name: 'Hard', needs: 'Pair hunt', blurb: 'Like Medium, plus one spot where you must ask “where can this pair go?”' },
+	medium: { name: 'Medium', needs: 'Used pairs', blurb: 'Few clues. Keep track of which pairs are taken.' },
+	hard: { name: 'Hard', needs: 'Pair hunt', blurb: 'Like Medium, plus one moment where you ask “where can this pair go?”' },
 	expert: { name: 'Expert', needs: 'Trades', blurb: 'Needs the trade rule: two rows swap their values in pairs.' },
 };
-
-/** A real finished window (from the generator), so the title art follows the rules. */
-const SHOW = randomSolution(makeRng(2026));
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -29,37 +25,35 @@ export function dayLabel(key: string) {
 	return `${DAY_NAMES[d.getDay()]} ${d.getDate()} ${d.toLocaleString('en', { month: 'short' })}`;
 }
 
+/** The logo is a little window of its own: 8 tiles, and no color twice in a row or column. */
+const LOGO: [string, number][] = [
+	['S', 0],
+	['u', 1],
+	['d', 2],
+	['o', 3],
+	['g', 2],
+	['l', 3],
+	['u', 0],
+	['e', 1],
+];
+
 function Logo() {
-	const letters = 'Sudoglue'.split('');
 	return (
 		<h1 className="logo" aria-label="Sudoglue">
-			{letters.map((l, i) => (
-				<span key={i} className="logo-l" style={{ ['--c' as string]: GLASS[i % 4].base, ['--d' as string]: `${i * 0.08}s` }} aria-hidden="true">
+			{LOGO.map(([l, c], i) => (
+				<span key={i} className={`logo-tile k${c}`} style={{ ['--i' as string]: i }} aria-hidden="true">
 					{l}
-					{i === 6 && (
-						<svg className="logo-drip" viewBox="0 0 40 50" aria-hidden="true">
-							<path d="M 4 4 C 12 2 28 2 36 4 C 36 10 30 10 29 16 C 28 24 30 34 25 38 C 20 42 16 38 17 30 C 18 22 14 14 8 12 C 4 10 4 7 4 4 Z" fill="#fffdf2" stroke="#241a2e" strokeWidth="3" strokeLinejoin="round" />
-							<path d="M 20 30 C 20 27 21 25 22 24" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
-						</svg>
-					)}
 				</span>
 			))}
 		</h1>
 	);
 }
 
-/** A small finished window that slowly glows, for the title screen. */
-function ShowWindow() {
-	const sol = SHOW;
-	const sample = sol.num.map((n, i) => [n, sol.color[i]]);
+export function CoinChip({ coins }: { coins: number }) {
 	return (
-		<div className="show-window" aria-hidden="true">
-			{sample.map(([n, c], i) => (
-				<span key={i} style={{ ['--i' as string]: i }}>
-					<MiniPane n={n} c={c} size={44} />
-				</span>
-			))}
-		</div>
+		<span className="coin-chip" aria-label={`${coins} coins`}>
+			<Icon name="coin" size={18} /> {coins}
+		</span>
 	);
 }
 
@@ -71,6 +65,7 @@ interface TitleProps {
 	onPractice: () => void;
 	onRecords: () => void;
 	onRules: () => void;
+	onShop: () => void;
 	onSettings: () => void;
 }
 
@@ -81,19 +76,22 @@ export function Title(p: TitleProps) {
 	const streak = liveStreak(p.data, p.today);
 	return (
 		<main className="screen title-screen" data-layer>
+			<div className="title-corner">
+				<CoinChip coins={p.data.coins} />
+				<button className="puff tool" onClick={p.onSettings} aria-label="Settings">
+					<Icon name="gear" />
+				</button>
+			</div>
 			<div className="title-top">
 				<Logo />
-				<p className="tagline">Glue the old workshop windows back together, one pane at a time.</p>
+				<p className="tagline">Mend the old workshop windows, one tile at a time.</p>
 			</div>
-			<div className="title-art">
-				<ShowWindow />
-				<div className="title-gloop">
-					<Gloop mood={done ? 'cheer' : 'idle'} size={76} />
-				</div>
+			<div className="title-gloop">
+				<Gloop mood={done ? 'cheer' : 'idle'} size={70} />
 			</div>
 			<nav className="title-menu">
 				<button className="btn btn-main btn-big" autoFocus onClick={p.onToday}>
-					<Icon name="sun" />
+					<Icon name="sun" size={26} />
 					<span>
 						Today’s window
 						<small>
@@ -101,32 +99,28 @@ export function Title(p: TitleProps) {
 						</small>
 					</span>
 				</button>
-				<div className="row">
+				<div className="menu-grid">
 					<button className="btn" onClick={p.onWeek}>
 						<Icon name="calendar" /> This week
 					</button>
 					<button className="btn" onClick={p.onPractice}>
 						<Icon name="shuffle" /> Practice
 					</button>
-				</div>
-				<div className="row">
+					<button className="btn" onClick={p.onShop}>
+						<Icon name="shop" /> Shop
+					</button>
 					<button className="btn" onClick={p.onRecords}>
 						<Icon name="trophy" /> Records
 					</button>
 					<button className="btn" onClick={p.onRules}>
 						<Icon name="book" /> How to play
 					</button>
-				</div>
-				<div className="row">
-					<button className="btn" onClick={p.onSettings}>
-						<Icon name="gear" /> Settings
-					</button>
 					<a className="btn" href="../">
 						<Icon name="back" /> Arcade
 					</a>
 				</div>
 				<p className="streak-line">
-					Daily streak: <b>{streak}</b> {streak === 1 ? 'day' : 'days'}
+					Daily streak <b>{streak}</b>
 					{p.data.streak.best > 0 && <span className="muted"> · best {p.data.streak.best}</span>}
 				</p>
 			</nav>
@@ -134,49 +128,47 @@ export function Title(p: TitleProps) {
 	);
 }
 
-function Back({ onBack, title }: { onBack: () => void; title: string }) {
+export function Back({ onBack, title, children }: { onBack: () => void; title: string; children?: ReactNode }) {
 	return (
 		<header className="screen-head">
-			<button className="icon-btn" onClick={onBack} aria-label="Back">
+			<button className="puff tool" onClick={onBack} aria-label="Back">
 				<Icon name="back" />
 			</button>
 			<h2>{title}</h2>
+			{children}
 		</header>
 	);
 }
 
 export function Week({ data, today, onPlay, onBack }: { data: SaveData; today: string; onPlay: (day: string) => void; onBack: () => void }) {
 	const days = weekOf(today);
-	const streak = liveStreak(data, today);
 	return (
 		<main className="screen" data-layer>
 			<Back onBack={onBack} title="This week" />
-			<p className="muted center">
-				A new window every day. Monday is gentle; the weekend is tough. Streak: <b>{streak}</b>
-			</p>
-			<div className="week">
+			<p className="muted lead">A new window every day. Monday is gentle; the weekend is tough. Only today’s window counts for the streak.</p>
+			<div className="list">
 				{days.map((day, i) => {
 					const id = `daily-${day}`;
 					const done = data.finished[id];
 					const going = data.games[id];
 					const future = day > today;
-					const level = levelOfDay(day);
 					return (
 						<button
 							key={day}
-							className={`day card${day === today ? ' today' : ''}${done ? ' done' : ''}`}
+							className={`puff row-card${day === today ? ' today' : ''}${done ? ' done' : ''}`}
 							disabled={future}
 							autoFocus={day === today}
 							onClick={() => onPlay(day)}
+							style={{ ['--i' as string]: i }}
 						>
-							<span className="day-pane" aria-hidden="true">
-								{done ? <MiniPane n={i % 4} c={(i + 1) % 4} size={40} /> : <span className={`day-empty${going ? ' going' : ''}`} />}
+							<span className="row-icon" aria-hidden="true">
+								{done ? <Mini c={i % 4} size={34} /> : <span className={`ring${going ? ' going' : ''}`} />}
 							</span>
-							<span className="day-text">
+							<span className="row-text">
 								<b>{dayLabel(day)}</b>
-								<small>{LEVEL_INFO[level].name}</small>
+								<small>{LEVEL_INFO[levelOfDay(day)].name}</small>
 							</span>
-							<span className="day-state">
+							<span className="row-state">
 								{future ? 'Soon' : done ? `${formatTime(done.time)}${done.hints ? ` · ${done.hints} hint${done.hints > 1 ? 's' : ''}` : ''}` : going ? 'Keep going' : day === today ? 'Today' : 'Open'}
 							</span>
 						</button>
@@ -191,22 +183,22 @@ export function Practice({ data, onPlay, onBack }: { data: SaveData; onPlay: (le
 	return (
 		<main className="screen" data-layer>
 			<Back onBack={onBack} title="Practice" />
-			<p className="muted center">Endless windows. Levels go by the logic each one needs, not just the number of clues.</p>
-			<div className="levels">
+			<p className="muted lead">Endless windows. Each level goes by the logic it needs, not just the number of clues.</p>
+			<div className="list">
 				{LEVELS.map((level, i) => {
 					const info = LEVEL_INFO[level];
 					const best = data.records[level][0];
 					return (
-						<button key={level} className="level card" onClick={() => onPlay(level)} autoFocus={i === 0}>
-							<span className="level-gem" aria-hidden="true">
-								<Swatch c={i} size={40} />
+						<button key={level} className="puff row-card level" onClick={() => onPlay(level)} autoFocus={i === 0} style={{ ['--i' as string]: i }}>
+							<span className="row-icon" aria-hidden="true">
+								<Mini c={i} n={i} size={40} />
 							</span>
-							<span className="level-text">
+							<span className="row-text">
 								<b>{info.name}</b>
 								<small>Needs: {info.needs}</small>
 								<span>{info.blurb}</span>
 							</span>
-							<span className="level-state">
+							<span className="row-state">
 								#{data.practice[level] + 1}
 								{best && <small>best {formatTime(best.time)}</small>}
 							</span>
@@ -223,7 +215,7 @@ export function Records({ data, today, onBack }: { data: SaveData; today: string
 	return (
 		<main className="screen" data-layer>
 			<Back onBack={onBack} title="Records" />
-			<div className="record-top">
+			<div className="stat-row">
 				<div className="card stat">
 					<b>{all.length}</b>
 					<span>windows mended</span>
@@ -234,7 +226,7 @@ export function Records({ data, today, onBack }: { data: SaveData; today: string
 				</div>
 				<div className="card stat">
 					<b>{liveStreak(data, today)}</b>
-					<span>day streak (best {data.streak.best})</span>
+					<span>day streak · best {data.streak.best}</span>
 				</div>
 			</div>
 			<div className="record-lists">
@@ -267,14 +259,14 @@ export function Rules({ onBack }: { onBack: () => void }) {
 			<Back onBack={onBack} title="How to play" />
 			<section className="card">
 				<h3>The window</h3>
-				<p>
-					Each of the 16 tiles needs one number (<NumeralIcon v={0} size={16} /> <NumeralIcon v={1} size={16} /> <NumeralIcon v={2} size={16} />{' '}
-					<NumeralIcon v={3} size={16} />) and one glass color. Every color has its own pattern:
-				</p>
+				<p>Each of the 16 tiles needs one number (1–4) and one color. The colors are chosen to stay easy to tell apart, also with color blindness. Turn on <b>Color shapes</b> in Settings to add a symbol to each:</p>
 				<ul className="glass-list">
-					{GLASS.map((g, i) => (
-						<li key={g.name}>
-							<Swatch c={i} size={24} /> {g.name} <span className="muted">({g.pattern})</span>
+					{[0, 1, 2, 3].map((c) => (
+						<li key={c}>
+							<Mini c={c} size={26} /> {colorName(c)}{' '}
+							<span className="muted rule-shape">
+								<Shape c={c} /> {SHAPE_NAMES[c]}
+							</span>
 						</li>
 					))}
 				</ul>
@@ -283,7 +275,7 @@ export function Rules({ onBack }: { onBack: () => void }) {
 					<li>Each number + color pair (like ruby 2) is used once in the whole window.</li>
 					<li>There are no boxes, unlike Sudoku. Just rows, columns and pairs.</li>
 				</ol>
-				<p>Parts with a dark number badge or corner rivets are set in lead: they are clues and stay put. The parts you add are held with glue.</p>
+				<p>Clues are bold, and clue colors have a small bar in the corner. They can’t change.</p>
 			</section>
 			<section className="card">
 				<h3>Controls</h3>
@@ -291,13 +283,13 @@ export function Rules({ onBack }: { onBack: () => void }) {
 					<tbody>
 						<tr>
 							<th>Touch / mouse</th>
-							<td>Tap a tile, then tap a number and a color. Tap the same one again to take it off.</td>
+							<td>Tap a tile, then a number and a color at the bottom. Tap the same one again to take it off.</td>
 						</tr>
 						<tr>
 							<th>Keyboard</th>
 							<td>
 								Arrows move · <kbd>1</kbd>–<kbd>4</kbd> numbers · <kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> colors · <kbd>N</kbd> notes · <kbd>⌫</kbd> erase ·{' '}
-								<kbd>Z</kbd>/<kbd>Y</kbd> undo/redo · <kbd>H</kbd> hint · <kbd>Esc</kbd> pause
+								<kbd>Z</kbd>/<kbd>Y</kbd> undo/redo · <kbd>H</kbd> hint · <kbd>P</kbd> pairs · <kbd>Esc</kbd> pause
 							</td>
 						</tr>
 						<tr>
@@ -335,18 +327,18 @@ function TradeDemo() {
 	const a = [0, 1, 2, 3];
 	const b = [2, 3, 0, 1];
 	return (
-		<div className="trade-demo" aria-label="Example: row 1 is 1 2 3 4, row 2 is 3 4 1 2. Where row 1 has 1, row 2 has 3, and where row 1 has 3, row 2 has 1.">
+		<div className="trade-demo" aria-label="Example: row 1 is 1 2 3 4, row 2 is 3 4 1 2. 1 and 3 swap places, and so do 2 and 4.">
 			<div>
 				{a.map((n, i) => (
 					<span key={i} className={i === 0 || i === 2 ? 'hl' : ''}>
-						<NumeralIcon v={n} size={22} />
+						{n + 1}
 					</span>
 				))}
 			</div>
 			<div>
 				{b.map((n, i) => (
 					<span key={i} className={i === 0 || i === 2 ? 'hl' : ''}>
-						<NumeralIcon v={n} size={22} />
+						{n + 1}
 					</span>
 				))}
 			</div>
@@ -360,13 +352,14 @@ interface SettingsProps {
 	onChange: (s: Settings) => void;
 	onClose: () => void;
 	onTutorial: () => void;
+	onShop: () => void;
 	onWipe: () => void;
 }
 
-export function SettingsModal({ settings, onChange, onClose, onTutorial, onWipe }: SettingsProps) {
+export function SettingsModal({ settings, onChange, onClose, onTutorial, onShop, onWipe }: SettingsProps) {
 	const [wipe, setWipe] = useState(false);
 	const set = <K extends keyof Settings>(k: K, v: Settings[K]) => onChange({ ...settings, [k]: v });
-	const toggle = (k: 'showTimer' | 'showClashes' | 'helpers' | 'haptics', label: string, note: string) => (
+	const toggle = (k: 'showTimer' | 'showClashes' | 'helpers' | 'haptics' | 'colorShapes' | 'bigText', label: string, note: string) => (
 		<label className="toggle">
 			<input type="checkbox" checked={settings[k]} onChange={(e) => set(k, e.target.checked)} />
 			<span className="switch" aria-hidden="true" />
@@ -381,37 +374,45 @@ export function SettingsModal({ settings, onChange, onClose, onTutorial, onWipe 
 			<div className="card modal settings" role="dialog" aria-label="Settings">
 				<header>
 					<h2>Settings</h2>
-					<button className="icon-btn" onClick={onClose} aria-label="Close settings" autoFocus>
+					<button className="puff tool" onClick={onClose} aria-label="Close settings" autoFocus>
 						<Icon name="close" />
 					</button>
 				</header>
+				<h3>Sound</h3>
 				<label className="slider">
-					<span>Sound effects</span>
+					<span>Effects</span>
 					<input type="range" min="0" max="1" step="0.05" value={settings.sound} onChange={(e) => set('sound', Number(e.target.value))} />
 				</label>
 				<label className="slider">
 					<span>Music</span>
 					<input type="range" min="0" max="1" step="0.05" value={settings.music} onChange={(e) => set('music', Number(e.target.value))} />
 				</label>
+				<h3>Play</h3>
+				{toggle('showTimer', 'Show the clock', 'It still counts for records.')}
+				{toggle('showClashes', 'Show rule clashes', 'Tiles that break a rule get a red ring.')}
+				{toggle('helpers', 'Helpers', 'Light up the row, column and matches of the picked tile.')}
+				{toggle('haptics', 'Vibration', 'Small taps on phones that support it.')}
+				<h3>Seeing and motion</h3>
 				<div className="seg" role="radiogroup" aria-label="Motion">
 					<span>Motion</span>
 					{(['auto', 'reduced', 'full'] as const).map((m) => (
 						<button key={m} role="radio" aria-checked={settings.motion === m} className={settings.motion === m ? 'on' : ''} onClick={() => set('motion', m)}>
-							{m === 'auto' ? 'Device' : m === 'reduced' ? 'Reduced' : 'Full'}
+							{m === 'auto' ? 'Device' : m === 'reduced' ? 'Less' : 'Full'}
 						</button>
 					))}
 				</div>
-				{toggle('showTimer', 'Show the clock', 'It still counts for records.')}
-				{toggle('showClashes', 'Show rule clashes', 'Cracks show tiles that break a rule.')}
-				{toggle('helpers', 'Helpers', 'Light up the row, column and matches of the picked tile.')}
-				{toggle('haptics', 'Vibration', 'Small taps on phones that support it.')}
+				{toggle('colorShapes', 'Color shapes', 'A symbol on each color: ● ruby, ▲ cobalt, ■ amber, ◆ jade.')}
+				{toggle('bigText', 'Big numbers', 'Larger numbers and notes on the tiles.')}
+				<button className="btn" onClick={onShop}>
+					<Icon name="shop" /> Themes, tiles and sounds
+				</button>
 				<div className="row">
 					<button className="btn" onClick={onTutorial}>
 						Replay tutorial
 					</button>
 					{wipe ? (
 						<button className="btn btn-danger" onClick={onWipe}>
-							Really erase everything
+							Really erase all
 						</button>
 					) : (
 						<button className="btn" onClick={() => setWipe(true)}>
@@ -419,7 +420,7 @@ export function SettingsModal({ settings, onChange, onClose, onTutorial, onWipe 
 						</button>
 					)}
 				</div>
-				<p className="muted small">Progress lives only in this browser.</p>
+				<p className="muted small">Progress and coins live only in this browser.</p>
 			</div>
 		</div>
 	);

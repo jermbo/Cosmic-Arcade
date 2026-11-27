@@ -7,7 +7,7 @@
 		"dev": "vite --open --host --port 4015",
 		"build": "npm test && tsc && vite build",
 		"preview": "vite preview",
-		"test": "node scripts/test-puzzles.ts",
+		"test": "node scripts/test-puzzles.ts && node scripts/check-colors.ts",
 		"compare-controls": "node scripts/compare-controls.ts"
 	},
 	"arcade": {
