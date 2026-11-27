@@ -20,7 +20,8 @@ import type { Face, FaceAnim } from './Board.tsx';
 import { Board } from './Board.tsx';
 import type { FxApi } from './Fx.tsx';
 import { Fx, tileCenter } from './Fx.tsx';
-import { Gloop } from './Gloop.tsx';
+import type { MozziMood } from './Mozzi.tsx';
+import { lookAt, Mozzi } from './Mozzi.tsx';
 import { HintPanel, marksFor } from './HintPanel.tsx';
 
 export interface FinishInfo {
@@ -70,6 +71,16 @@ export function Play(props: Props) {
 	const [flash, setFlash] = useState<number[]>([]);
 	const [toast, setToast] = useState('');
 	const [live, setLive] = useState('');
+	// Mozzi: a mood that falls back to idle, a tile color that hops, and a nap when left alone.
+	const [mood, setMood] = useState<MozziMood>('idle');
+	const [hop, setHop] = useState<{ color: number; n: number } | null>(null);
+	const moodTimer = useRef(0);
+	const lastAct = useRef(performance.now());
+	const feel = useCallback((m: MozziMood, ms = 700) => {
+		clearTimeout(moodTimer.current);
+		setMood(m);
+		if (m !== 'cheer') moodTimer.current = window.setTimeout(() => setMood('idle'), ms);
+	}, []);
 	const [tut, setTut] = useState(props.tutorial ? 0 : -1);
 	const fx = useRef<FxApi>(null);
 	const gameRef = useRef(game);
@@ -104,19 +115,31 @@ export function Play(props: Props) {
 
 	// ---------------------------------------------------------------- feel: sound, particles, motion, and spoken updates
 	useEffect(() => {
+		if (game.events.length) lastAct.current = performance.now();
 		for (const e of game.events) react(e);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [game.tick]);
+
+	// Mozzi dozes off after 25 seconds without a move, and wakes on the next one.
+	useEffect(() => {
+		const id = window.setInterval(() => {
+			if (performance.now() - lastAct.current > 25000 && !gameRef.current.solved && !gameRef.current.hint) setMood((m) => (m === 'idle' ? 'sleep' : m));
+		}, 3000);
+		return () => clearInterval(id);
+	}, []);
 
 	function react(e: Event) {
 		const g = gameRef.current;
 		switch (e.kind) {
 			case 'select':
 				audio.play('select');
+				if (mood === 'sleep') feel('happy', 500);
 				break;
 			case 'place': {
 				const { cx, cy } = tileCenter(e.cell);
 				bump(e.cell, e.full ? 'full' : e.axis === 'num' ? 'num' : 'color');
+				feel(e.full ? 'squish' : 'happy', e.full ? 550 : 450);
+				if (e.axis === 'color') setHop((h) => ({ color: e.value, n: (h?.n ?? 0) + 1 }));
 				audio.play(e.axis === 'num' ? (`num${e.value}` as 'num0') : (`color${e.value}` as 'color0'));
 				const n = g.board.num[e.cell];
 				const c = g.board.color[e.cell];
@@ -144,6 +167,7 @@ export function Play(props: Props) {
 				break;
 			case 'locked':
 				audio.play('locked');
+				feel('no', 900);
 				setShake([e.cell]);
 				window.setTimeout(() => setShake([]), 380);
 				say('That part is a clue. It can’t change.');
@@ -151,12 +175,14 @@ export function Play(props: Props) {
 				break;
 			case 'clash':
 				audio.play('clash', { delay: 0.15 });
+				window.setTimeout(() => feel('wince', 1300), 120);
 				setShake(e.cells);
 				window.setTimeout(() => setShake([]), 420);
 				buzz(30);
 				tell(`Clash: ${e.cells.map(cellName).join(' and ')} break a rule.`);
 				break;
 			case 'solved': {
+				feel('cheer');
 				audio.duck(5);
 				audio.play('solve', { delay: 0.2 });
 				buzz(40);
@@ -174,6 +200,7 @@ export function Play(props: Props) {
 			}
 			case 'hint':
 				audio.play('hint');
+				feel('think', 900);
 				break;
 			case 'reset':
 				audio.play('page');
@@ -441,6 +468,14 @@ export function Play(props: Props) {
 								<span className={`mode${g.notesMode ? ' on' : ''}`} aria-live="polite">
 									<Icon name="pencil" size={15} /> {g.notesMode ? 'Notes on' : 'Notes off'}
 								</span>
+								<Mozzi
+									mood={g.solved ? 'cheer' : mood}
+									look={lookAt(g.sel)}
+									hop={hop}
+									size={46}
+									label="Mozzi. Tap for a hint."
+									onClick={() => dispatch({ type: 'hint' })}
+								/>
 								<button className="pairs-chip" onClick={() => setPairsOpen(true)} aria-label={`Pairs used: ${used} of 16. Show all pairs.`}>
 									<Icon name="grid" size={15} /> Pairs <b>{used}</b>/16
 								</button>
@@ -513,7 +548,6 @@ export function Play(props: Props) {
 				<Coach
 					step={tut}
 					keys={props.keysShown}
-					onNext={() => setTut((t) => t + 1)}
 					onDone={() => {
 						setTut(-1);
 						props.onTutorialDone();
@@ -643,8 +677,8 @@ function Results({ r, label, onNext, nextLabel, onQuit, calm }: { r: FinishInfo 
 	return (
 		<div className="overlay results-overlay" data-layer>
 			<div className="card modal results" role="dialog" aria-label="Window mended">
-				<div className="results-gloop">
-					<Gloop mood="cheer" size={72} />
+				<div className="results-mascot">
+					<Mozzi mood="cheer" size={84} />
 				</div>
 				<h2>Window mended!</h2>
 				<p className="muted">{label}</p>
@@ -705,7 +739,8 @@ function Results({ r, label, onNext, nextLabel, onQuit, calm }: { r: FinishInfo 
 }
 
 /** The first-play tutorial: short coach cards that move on as you do each thing. */
-function Coach({ step: s, keys, onNext, onDone }: { step: number; keys: boolean; onNext: () => void; onDone: () => void }) {
+/** Coach cards move on as you act. Skip ends the whole tutorial; the rules stay in How to play. */
+function Coach({ step: s, keys, onDone }: { step: number; keys: boolean; onDone: () => void }) {
 	const cards = [
 		{ title: 'Pick a tile', body: keys ? 'Tap a tile in the window, or use the arrow keys.' : 'Tap a tile in the window.' },
 		{ title: 'Give it a number', body: keys ? 'Tap a number below, or press 1–4.' : 'Tap a number below.' },
@@ -715,6 +750,12 @@ function Coach({ step: s, keys, onNext, onDone }: { step: number; keys: boolean;
 		return (
 			<div className="overlay" data-layer>
 				<div className="card modal coach-rules" role="dialog" aria-label="The rules">
+					<div className="coach-hello">
+						<Mozzi mood="happy" size={64} />
+						<p>
+							Hi, I’m <b>Mozzi</b>! I’ll keep you company. Tap me any time for a hint.
+						</p>
+					</div>
 					<h2>The rules</h2>
 					<ul className="rules-list">
 						<li>
@@ -727,7 +768,7 @@ function Coach({ step: s, keys, onNext, onDone }: { step: number; keys: boolean;
 							<b>Clues:</b> bold numbers, and colors with a small bar in the corner, are clues. They can’t change.
 						</li>
 						<li>
-							<b>Stuck?</b> <Icon name="bulb" size={16} /> Hint shows where to look, then why, then what.
+							<b>Stuck?</b> Tap Mozzi or <Icon name="bulb" size={16} /> Hint. Mozzi shows where to look, then why, then what.
 						</li>
 					</ul>
 					<p className="muted small">Gamepad: D-pad moves, A cycles numbers, X cycles colors, Y notes, B erase, Select hint, Start pause.</p>
@@ -741,12 +782,13 @@ function Coach({ step: s, keys, onNext, onDone }: { step: number; keys: boolean;
 	const c = cards[s];
 	return (
 		<div className={`coach coach-${s}`} role="status">
+			<Mozzi mood={s === 0 ? 'idle' : 'happy'} size={44} />
 			<span className="coach-step">{s + 1}/4</span>
 			<div>
 				<b>{c.title}</b>
 				<p>{c.body}</p>
 			</div>
-			<button className="link" onClick={onNext}>
+			<button className="link" onClick={onDone} aria-label="Skip the tutorial">
 				Skip
 			</button>
 		</div>

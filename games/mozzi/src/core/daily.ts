@@ -42,6 +42,8 @@ export function weekOf(key: string): string[] {
 
 export const levelOfDay = (key: string): Level => WEEKDAY_LEVEL[parseKey(key).getDay()];
 
+// The seed text still says "sudoglue", the game's first name: changing it would
+// change every daily and practice puzzle, and the records that point at them.
 export function dailyPuzzle(key: string): Puzzle {
 	return makePuzzle(`daily-${key}`, `sudoglue-daily-${key}`, levelOfDay(key));
 }

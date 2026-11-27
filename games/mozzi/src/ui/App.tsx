@@ -91,9 +91,9 @@ export function App() {
 	const settingsRef = useRef(settingsOpen);
 	settingsRef.current = settingsOpen;
 	useEffect(() => {
-		history.pushState({ sudoglue: true }, '');
+		history.pushState({ mozzi: true }, '');
 		const onPop = () => {
-			history.pushState({ sudoglue: true }, '');
+			history.pushState({ mozzi: true }, '');
 			goBack();
 		};
 		window.addEventListener('popstate', onPop);

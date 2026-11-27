@@ -5,6 +5,7 @@ import { TIER_NAMES } from '../core/logic.ts';
 import type { Tier } from '../core/logic.ts';
 import { Icon, Words } from './bits.tsx';
 import type { Marks } from './Board.tsx';
+import { Mozzi } from './Mozzi.tsx';
 
 export const RULES: Record<Tier, string> = {
 	1: 'Each row and each column has every number once and every color once.',
@@ -60,6 +61,7 @@ export function HintPanel({ view, onWhy, onShow, onClose, onFlash, keys }: Props
 		return (
 			<section className="hint card" aria-live="polite">
 				<header>
+					<Mozzi mood="happy" size={40} />
 					<b>Hint</b>
 					{close}
 				</header>
@@ -72,6 +74,7 @@ export function HintPanel({ view, onWhy, onShow, onClose, onFlash, keys }: Props
 		return (
 			<section className="hint card hint-wrong" aria-live="polite">
 				<header>
+					<Mozzi key={view.level} mood="talk" size={40} />
 					{steps}
 					{close}
 				</header>
@@ -107,6 +110,7 @@ export function HintPanel({ view, onWhy, onShow, onClose, onFlash, keys }: Props
 	return (
 		<section className="hint card" aria-live="polite">
 			<header>
+				<Mozzi key={view.level} mood="talk" size={40} />
 				{steps}
 				{close}
 			</header>

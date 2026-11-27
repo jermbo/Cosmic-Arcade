@@ -1,21 +1,21 @@
 ---
-name: Sudoglue v2 decisions
-description: "The decision log of Sudoglue v2: each question, the options, the choice and the reason."
+name: Mozzi v2 decisions
+description: "The decision log of Mozzi v2: each question, the options, the choice and the reason."
 altitude: initiative
 tags:
-  - sudoglue
+  - mozzi
 parent: README.md
 ---
 
-[Wiki](../../../README.md) / [Sudoglue v2](README.md) / Decisions
+[Wiki](../../../README.md) / [Mozzi v2](README.md) / Decisions
 
-# Sudoglue v2 decisions
+# Mozzi v2 decisions
 
 ## D1. The look is soft clay
 
 **Date:** 2026-11-27
 
-**Question:** Which look should Sudoglue have?
+**Question:** Which look should the game have?
 
 **Options:** A prototype on the real board showed six styles: A frosted glass with one dock, B paper and pastel, C night glow with a ring menu, D a 5×5 pair palette, E quiet mono with side columns, F soft clay with one flipping row.
 
@@ -102,3 +102,27 @@ parent: README.md
 **Choice:** Two of them together. The patterns go. Every theme's colors are tuned to stay apart for color-blind players, and a **Color shapes** setting (● ruby, ▲ cobalt, ■ amber, ◆ jade) adds a symbol for players who need more. A test checks the colors on every run.
 
 **Reason:** The board stays clean for most players. The tuning helps everyone with no setting at all. The shapes are clear and calm, and letters would sit too close to the numbers. A simulation showed ruby and jade were almost the same for deuteranopia before the tuning.
+
+## D9. The game is called Mozzi
+
+**Date:** 2026-11-27
+
+**Question:** Is "Sudoglue" the right name?
+
+**Options:** Names on the pairs idea, on tiles and mosaic, or on the window story. In the tiles direction the shortlist was Tilly, Mozzi and Quadri. A quick web search found close names for Tilly (TILY, Teacher Tilly) and a crowded "Quadr-" space (Quadris, Quadrata), and no game called Mozzi.
+
+**Choice:** Mozzi. Rename everything: the folder (`games/mozzi`), the package, the arcade entry and its URL (`/games/mozzi/`), the docs folder and the save key. An old save moves to the new key once. The puzzle seeds keep the old name, so no puzzle changes.
+
+**Reason:** The arcade is for the owner, so search crowding does not matter much, and Mozzi is the more distinctive name. It is still early, so changing the URL is cheap.
+
+## D10. The mascot is Mozzi, a four-tile creature, and it gives the hints
+
+**Date:** 2026-11-27
+
+**Question:** Who is the mascot, and what does it do?
+
+**Options:** Tilly, a clay tile; Mozzi, four tiles in a 2×2 body; Gloop the glue bottle with a job. Then: buddy and hint giver, reactions only, or a buddy you can poke for small tips.
+
+**Choice:** Mozzi, one tile per color, as a buddy and hint giver. It sits in the status line, reacts to play (looks at the picked tile, hops the color you used, winces at a clash, dozes when idle, bursts apart on the solve), and talks in the hint card. Gloop is gone.
+
+**Reason:** The name and the mascot are one thing, and the four colors are the game. Giving Mozzi the hints makes it useful, not just decoration.

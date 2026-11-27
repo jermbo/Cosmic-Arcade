@@ -1,5 +1,5 @@
 /*
- * Sudoglue v2: soft clay and calm colors, tuned to stay apart for color-blind players.
+ * Mozzi v2: soft clay and calm colors, tuned to stay apart for color-blind players.
  *
  * Themes set color tokens: [data-theme='id'] (see CATALOG in src/app/shop.ts).
  * Tile styles set shape tokens: [data-tiles='id']. Tokens (not selectors) carry
@@ -1635,7 +1635,7 @@ kbd {
 	overflow: visible;
 }
 
-.results-gloop {
+.results-mascot {
 	margin-top: -62px;
 	animation: hop-loop 0.9s ease-in-out infinite alternate;
 }
@@ -1766,7 +1766,7 @@ kbd {
 
 .logo {
 	display: grid;
-	grid-template-columns: repeat(4, clamp(58px, 18vw, 84px));
+	grid-template-columns: repeat(5, clamp(52px, 15vw, 76px));
 	gap: 9px;
 	margin: 0;
 	justify-content: center;
@@ -1802,8 +1802,8 @@ kbd {
 	color: var(--muted);
 }
 
-.title-gloop {
-	animation: bob 3s ease-in-out infinite;
+.title-mascot {
+	margin: 6px 0 4px;
 }
 
 @keyframes bob {
@@ -2259,7 +2259,7 @@ kbd {
 		grid-template-columns: 1fr 1fr;
 		grid-template-areas:
 			'top menu'
-			'gloop menu';
+			'mascot menu';
 		align-content: center;
 		column-gap: 36px;
 	}
@@ -2269,8 +2269,8 @@ kbd {
 		margin-top: 30px;
 	}
 
-	.title-gloop {
-		grid-area: gloop;
+	.title-mascot {
+		grid-area: mascot;
 		justify-self: center;
 	}
 
@@ -2281,7 +2281,7 @@ kbd {
 	}
 
 	.logo {
-		grid-template-columns: repeat(4, 52px);
+		grid-template-columns: repeat(5, 46px);
 	}
 
 	.logo-tile {
@@ -2404,4 +2404,429 @@ kbd {
 	width: 13px;
 	height: 13px;
 	color: var(--muted);
+}
+
+/* ============================================================ Mozzi */
+
+.mozzi {
+	--g: calc(var(--mz) * 0.06);
+	position: relative;
+	display: inline-block;
+	flex: none;
+	width: var(--mz);
+	height: var(--mz);
+	padding: 0;
+	vertical-align: middle;
+}
+
+button.mozzi {
+	cursor: pointer;
+	border-radius: 30%;
+}
+
+.mz-body {
+	position: absolute;
+	inset: 0;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: var(--g);
+	animation: mz-bob 3.2s ease-in-out infinite;
+	transform-origin: 50% 100%;
+}
+
+.mz-t {
+	border-radius: var(--t-radius);
+	background-color: var(--tc);
+	background-image: var(--t-sheen);
+	box-shadow: 0 calc(var(--mz) * 0.05) 0 var(--drop), inset 0 calc(var(--mz) * -0.05) 0 var(--edge), inset 0 calc(var(--mz) * 0.03) 0 rgba(255, 255, 255, 0.35);
+	transition: transform 0.25s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+.mz-t.hop {
+	animation: mz-hop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+
+.mz-face {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	animation: mz-bob 3.2s ease-in-out infinite;
+}
+
+.mz-eye {
+	position: absolute;
+	top: 30%;
+	width: 22%;
+	height: 26%;
+	border-radius: 50%;
+	background: #fff;
+	box-shadow: 0 0 0 calc(var(--mz) * 0.02) rgba(0, 0, 0, 0.12);
+	animation: mz-blink 5s infinite;
+	transform-origin: 50% 50%;
+	transition: height 0.15s, top 0.15s, border-radius 0.15s;
+}
+
+.mz-eye.l {
+	left: 24%;
+}
+
+.mz-eye.r {
+	right: 24%;
+}
+
+.mz-eye i {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	width: 56%;
+	height: 56%;
+	margin: -28% 0 0 -28%;
+	border-radius: 50%;
+	background: #2a2430;
+	transform: translate(calc(var(--lx) * 34%), calc(var(--ly) * 30%));
+	transition: transform 0.25s ease-out;
+}
+
+.mz-eye i::after {
+	content: '';
+	position: absolute;
+	right: 18%;
+	top: 16%;
+	width: 30%;
+	height: 30%;
+	border-radius: 50%;
+	background: #fff;
+}
+
+.mz-cheek {
+	position: absolute;
+	top: 56%;
+	width: 12%;
+	height: 7%;
+	border-radius: 50%;
+	background: rgba(255, 120, 140, 0.55);
+}
+
+.mz-cheek.l {
+	left: 14%;
+}
+
+.mz-cheek.r {
+	right: 14%;
+}
+
+.mz-mouth {
+	position: absolute;
+	left: 50%;
+	top: 60%;
+	width: 18%;
+	height: 9%;
+	margin-left: -9%;
+	border: calc(var(--mz) * 0.035) solid #2a2430;
+	border-top: 0;
+	border-radius: 0 0 99px 99px;
+	transition: all 0.15s;
+}
+
+@keyframes mz-bob {
+	50% {
+		transform: translateY(calc(var(--mz) * -0.03)) scale(1.01, 0.99);
+	}
+}
+
+@keyframes mz-blink {
+	0%,
+	92%,
+	100% {
+		transform: scaleY(1);
+	}
+	95% {
+		transform: scaleY(0.1);
+	}
+}
+
+@keyframes mz-hop {
+	40% {
+		transform: translateY(calc(var(--mz) * -0.18)) rotate(-6deg);
+	}
+}
+
+/* Happy: a quick squash, and a big smile. */
+.mood-happy .mz-body,
+.mood-happy .mz-face {
+	animation: mz-squash 0.45s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+.mood-happy .mz-mouth,
+.mood-cheer .mz-mouth {
+	height: 14%;
+	width: 24%;
+	margin-left: -12%;
+	background: #2a2430;
+	border-radius: 0 0 99px 99px;
+}
+
+@keyframes mz-squash {
+	35% {
+		transform: scale(1.12, 0.86);
+	}
+	70% {
+		transform: scale(0.95, 1.06);
+	}
+}
+
+/* Squish: a tile got glued in; the four tiles bump together. */
+.mood-squish .mz-body {
+	animation: mz-squash 0.5s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+.mood-squish .mz-face {
+	animation: mz-squash 0.5s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+/* Wince: a clash. Squeezed eyes, a wobbly mouth, a shiver. */
+.mood-wince .mz-eye {
+	height: 6%;
+	top: 40%;
+	border-radius: 99px;
+	background: #2a2430;
+	animation: none;
+}
+
+.mood-wince .mz-eye i {
+	display: none;
+}
+
+.mood-wince .mz-mouth {
+	top: 62%;
+	width: 14%;
+	height: 10%;
+	margin-left: -7%;
+	border: calc(var(--mz) * 0.035) solid #2a2430;
+	border-radius: 50%;
+}
+
+.mood-wince .mz-body,
+.mood-no .mz-body,
+.mood-no .mz-face,
+.mood-wince .mz-face {
+	animation: mz-shake 0.4s ease-in-out 2;
+}
+
+@keyframes mz-shake {
+	25% {
+		transform: translateX(calc(var(--mz) * -0.05)) rotate(-4deg);
+	}
+	75% {
+		transform: translateX(calc(var(--mz) * 0.05)) rotate(4deg);
+	}
+}
+
+/* No: that part is a clue. A flat mouth and a head shake. */
+.mood-no .mz-mouth {
+	height: 0;
+	border-radius: 0;
+	border-width: 0 0 calc(var(--mz) * 0.035) 0;
+}
+
+/* Think: looking up, one tile lifted, a small flat mouth. */
+.mood-think .mz-eye i {
+	transform: translate(20%, -30%);
+}
+
+.mood-think .t1 {
+	transform: translateY(calc(var(--mz) * -0.08)) rotate(8deg);
+}
+
+.mood-think .mz-mouth {
+	width: 10%;
+	margin-left: -2%;
+	height: 0;
+	border-radius: 0;
+	border-width: 0 0 calc(var(--mz) * 0.035) 0;
+}
+
+/* Talk: the mouth opens and closes while a hint is on screen. */
+.mood-talk .mz-mouth {
+	background: #2a2430;
+	border-radius: 40%;
+	width: 16%;
+	margin-left: -8%;
+	animation: mz-talk 0.32s ease-in-out 6 alternate;
+}
+
+@keyframes mz-talk {
+	from {
+		height: 4%;
+	}
+	to {
+		height: 13%;
+	}
+}
+
+/* Cheer: the four tiles burst apart and snap back, again and again. */
+.mood-cheer .mz-body {
+	animation: mz-jump 0.7s ease-in-out infinite;
+}
+
+.mood-cheer .mz-face {
+	animation: mz-jump 0.7s ease-in-out infinite;
+}
+
+.mood-cheer .t0 {
+	animation: mz-out0 0.7s ease-in-out infinite;
+}
+
+.mood-cheer .t1 {
+	animation: mz-out1 0.7s ease-in-out infinite;
+}
+
+.mood-cheer .t2 {
+	animation: mz-out2 0.7s ease-in-out infinite;
+}
+
+.mood-cheer .t3 {
+	animation: mz-out3 0.7s ease-in-out infinite;
+}
+
+.mood-cheer .mz-eye {
+	height: 10%;
+	top: 36%;
+	background: transparent;
+	box-shadow: none;
+	border: calc(var(--mz) * 0.035) solid #2a2430;
+	border-bottom: 0;
+	border-radius: 99px 99px 0 0;
+	animation: none;
+}
+
+.mood-cheer .mz-eye i {
+	display: none;
+}
+
+@keyframes mz-jump {
+	50% {
+		transform: translateY(calc(var(--mz) * -0.12));
+	}
+}
+
+@keyframes mz-out0 {
+	50% {
+		transform: translate(calc(var(--mz) * -0.08), calc(var(--mz) * -0.08)) rotate(-8deg);
+	}
+}
+
+@keyframes mz-out1 {
+	50% {
+		transform: translate(calc(var(--mz) * 0.08), calc(var(--mz) * -0.08)) rotate(8deg);
+	}
+}
+
+@keyframes mz-out2 {
+	50% {
+		transform: translate(calc(var(--mz) * -0.08), calc(var(--mz) * 0.04)) rotate(6deg);
+	}
+}
+
+@keyframes mz-out3 {
+	50% {
+		transform: translate(calc(var(--mz) * 0.08), calc(var(--mz) * 0.04)) rotate(-6deg);
+	}
+}
+
+/* Sleep: you've been away a while. Eyes closed, slow breathing. */
+.mood-sleep .mz-eye {
+	height: 5%;
+	top: 42%;
+	border-radius: 99px;
+	background: #2a2430;
+	animation: none;
+}
+
+.mood-sleep .mz-eye i {
+	display: none;
+}
+
+.mood-sleep .mz-mouth {
+	width: 8%;
+	height: 6%;
+	margin-left: -4%;
+	border-radius: 50%;
+	border: calc(var(--mz) * 0.03) solid #2a2430;
+}
+
+.mood-sleep .mz-body,
+.mood-sleep .mz-face {
+	animation: mz-breathe 3.6s ease-in-out infinite;
+}
+
+@keyframes mz-breathe {
+	50% {
+		transform: scale(1.03, 0.97);
+	}
+}
+
+.calm .mozzi * {
+	animation: none !important;
+}
+
+/* Mozzi in the status line, the hint card, the tutorial and the results. */
+.status .mozzi {
+	margin: -6px 0;
+}
+
+.hint header {
+	justify-content: flex-start;
+}
+
+.hint header .hint-steps {
+	flex: 1;
+}
+
+.hint-lead,
+.hint-wrong .hint-lead {
+	position: relative;
+	padding: 8px 12px;
+	border-radius: 14px;
+	background: var(--bg);
+}
+
+.hint-lead::before {
+	content: '';
+	position: absolute;
+	left: 14px;
+	top: -7px;
+	border: 7px solid transparent;
+	border-top: 0;
+	border-bottom-color: var(--bg);
+}
+
+.coach .mozzi {
+	margin: -4px 0;
+}
+
+.coach-step {
+	position: absolute;
+	left: 6px;
+	bottom: 4px;
+	width: auto;
+	height: auto;
+	padding: 1px 6px;
+	font-size: 10px;
+	border-radius: 99px;
+}
+
+.coach-hello {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	margin-bottom: 4px;
+}
+
+.coach-hello p {
+	margin: 0;
+	padding: 10px 12px;
+	border-radius: 16px;
+	background: var(--bg);
+	line-height: 1.4;
 }

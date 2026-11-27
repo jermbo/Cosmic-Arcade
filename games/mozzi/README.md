@@ -1,6 +1,6 @@
-# Sudoglue
+# Mozzi
 
-A daily logic puzzle. Glue the broken stained-glass windows of an old workshop back together: give each of the 16 panes one number (1–4) and one glass color.
+A daily logic puzzle: fill a small mosaic window by giving each of its 16 tiles one number (1–4) and one color. Mozzi, a creature made of four tiles, keeps you company and gives the hints. (The game was first called Sudoglue.)
 
 **Rules.** Each row and each column has every number once and every color once. Each number + color pair (like "ruby 2") is used once in the whole window. No boxes. Some parts start locked ("set in lead"): those are the clues.
 
@@ -10,12 +10,12 @@ TypeScript, React and Vite. The puzzle logic has no UI code and runs in Node for
 
 | Command | What it does |
 | ------- | ------------ |
-| `npm run dev -w sudoglue` | Dev server on port 4015. |
-| `npm test -w sudoglue` | Builds and checks 590 puzzles (about 15 s). |
-| `npm run compare-controls -w sudoglue` | Counts the inputs of the two control styles. |
-| `npm run build -w sudoglue` | Tests, type check, then a static build in `dist/`. |
+| `npm run dev -w mozzi` | Dev server on port 4015. |
+| `npm test -w mozzi` | Builds and checks 590 puzzles (about 15 s). |
+| `npm run compare-controls -w mozzi` | Counts the inputs of the two control styles. |
+| `npm run build -w mozzi` | Tests, type check, then a static build in `dist/`. |
 
-The arcade serves the build from `/games/sudoglue/play/`. The title screen links back with `../`.
+The arcade serves the build from `/games/mozzi/play/`. The title screen links back with `../`.
 
 ## Folders
 
@@ -55,6 +55,7 @@ flowchart LR
 | `src/app/shop.ts` | Every shop item, price and coin reward, as data. |
 | `src/ui/Board.tsx` | The window: a 4×4 grid of HTML buttons. All its looks come from CSS tokens. |
 | `src/ui/Play.tsx` | The play screen (layout C), hint and pairs sheets, results and the tutorial. |
+| `src/ui/Mozzi.tsx` | The mascot and its moods. |
 | `src/style.css` | Themes (`[data-theme]`), tile styles (`[data-tiles]`), layout and motion. |
 | `scripts/` | Tests and the control-style comparison. |
 
@@ -136,7 +137,7 @@ flowchart TD
 
 Because the human solver only makes true deductions, "it can finish" also means "exactly one solution". The tests check that again with the exact solver.
 
-The same seed always gives the same puzzle, so everyone gets the same daily window. Practice puzzles use `sudoglue-practice-<level>-<n>`.
+The same seed always gives the same puzzle, so everyone gets the same daily window. Practice puzzles use `sudoglue-practice-<level>-<n>`. (The seeds keep the first name on purpose: changing them would change every puzzle.)
 
 ## Hints
 
@@ -184,7 +185,7 @@ Version 1 tried two control styles, counting the inputs to fill real puzzles in 
 
 Tile first won: fewer taps in a natural order, and it works the same with a keyboard and a gamepad.
 
-Version 2 kept tile first and picked the layout with two prototypes (see the [decision log](../../docs/initiatives/sudoglue/v2/decision-log.md)). The winner is **layout C, the thumb zone**:
+Version 2 kept tile first and picked the layout with two prototypes (see the [decision log](../../docs/initiatives/mozzi/v2/decision-log.md)). The winner is **layout C, the thumb zone**:
 
 - **Top bar:** pause, the clock, then undo, redo, notes, erase and hint. On phones narrower than 380px redo hides (Y still redoes).
 - **Board:** takes all the space that is left, as a square.
@@ -204,6 +205,22 @@ Soft clay: puffy tiles that press down, calm flat colors, no hard outlines. The 
 - **Clues:** bold numbers; clue colors carry a small bar in the corner.
 - **Smooth motion:** effects on a tile (squish, shake, hint flash, the solved ripple) run on its inner face, so they never fight the tile's lift and press.
 - **Reduced motion** (setting, or the device setting): animations stop; the solved glow holds still.
+
+## Mozzi
+
+Mozzi is four tiles in a 2×2 body, one per color, with a face across them. It is drawn in HTML and CSS (`src/ui/Mozzi.tsx`), so it always wears the current theme and tile style.
+
+| Moment | What Mozzi does |
+| ------ | --------------- |
+| You pick a tile | Its eyes look toward that tile. |
+| A number or color goes in | A quick squash; the tile of that color hops. |
+| A tile gets both parts | A bigger squish, with the glue drops. |
+| A clash | Squeezed eyes and a shiver. |
+| You touch a clue | A flat mouth and a head shake. |
+| You ask for a hint | It looks up, thinking, then talks in the hint card while the hint shows. Tap Mozzi in the status line for a hint too. |
+| 25 seconds with no move | It dozes off, and wakes on your next move. |
+| The window is mended | The four tiles burst apart and snap back, over and over. |
+| Title screen | Big Mozzi follows your pointer with its eyes; tap it to say hello. |
 
 ## Shop, coins, themes, tiles and sounds
 
@@ -234,7 +251,7 @@ All sound is made in code with Web Audio (`src/app/audio.ts`). Each sound pack i
 
 ## Save data
 
-One localStorage entry, `sudoglue:v1`: settings, windows in progress, finished windows, best 5 times per level (with hints used), the next practice number per level, the daily streak, coins, owned items, the theme, tile style and sound pack in use, and whether the tutorial was seen. A daily counts for the streak when it is finished on its own day.
+One localStorage entry, `mozzi:v1` (an old `sudoglue:v1` save moves over on the first load): settings, windows in progress, finished windows, best 5 times per level (with hints used), the next practice number per level, the daily streak, coins, owned items, the theme, tile style and sound pack in use, and whether the tutorial was seen. A daily counts for the streak when it is finished on its own day.
 
 ## Tuning knobs
 

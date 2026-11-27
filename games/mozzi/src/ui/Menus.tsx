@@ -1,6 +1,7 @@
 /** Title, week, practice, records, how to play, and settings. */
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { audio } from '../app/audio.ts';
 import type { SaveData, Settings } from '../app/save.ts';
 import { formatTime, liveStreak } from '../app/save.ts';
 import { levelOfDay, parseKey, weekOf } from '../core/daily.ts';
@@ -8,7 +9,8 @@ import type { Level } from '../core/types.ts';
 import { LEVELS } from '../core/types.ts';
 import { SHAPE_NAMES } from '../core/words.ts';
 import { colorName, Icon, Mini, Shape } from './bits.tsx';
-import { Gloop } from './Gloop.tsx';
+import type { MozziMood } from './Mozzi.tsx';
+import { Mozzi } from './Mozzi.tsx';
 import { RULES } from './HintPanel.tsx';
 
 export const LEVEL_INFO: Record<Level, { name: string; needs: string; blurb: string }> = {
@@ -25,21 +27,18 @@ export function dayLabel(key: string) {
 	return `${DAY_NAMES[d.getDay()]} ${d.getDate()} ${d.toLocaleString('en', { month: 'short' })}`;
 }
 
-/** The logo is a little window of its own: 8 tiles, and no color twice in a row or column. */
+/** The logo: one tile per letter, in Mozzi's four colors. */
 const LOGO: [string, number][] = [
-	['S', 0],
-	['u', 1],
-	['d', 2],
-	['o', 3],
-	['g', 2],
-	['l', 3],
-	['u', 0],
-	['e', 1],
+	['M', 0],
+	['o', 1],
+	['z', 2],
+	['z', 3],
+	['i', 0],
 ];
 
 function Logo() {
 	return (
-		<h1 className="logo" aria-label="Sudoglue">
+		<h1 className="logo" aria-label="Mozzi">
 			{LOGO.map(([l, c], i) => (
 				<span key={i} className={`logo-tile k${c}`} style={{ ['--i' as string]: i }} aria-hidden="true">
 					{l}
@@ -69,6 +68,48 @@ interface TitleProps {
 	onSettings: () => void;
 }
 
+/** The big Mozzi on the title: its eyes follow your pointer, and it likes a tap. */
+function TitleMozzi({ cheer }: { cheer: boolean }) {
+	const ref = useRef<HTMLDivElement>(null);
+	const [look, setLook] = useState({ x: 0, y: 0 });
+	const [mood, setMood] = useState<MozziMood>(cheer ? 'happy' : 'idle');
+	const [hop, setHop] = useState<{ color: number; n: number } | null>(null);
+	useEffect(() => {
+		const move = (e: PointerEvent) => {
+			const r = ref.current?.getBoundingClientRect();
+			if (!r) return;
+			const dx = e.clientX - (r.left + r.width / 2);
+			const dy = e.clientY - (r.top + r.height / 2);
+			const d = Math.max(1, Math.hypot(dx, dy));
+			setLook({ x: (dx / d) * Math.min(1, d / 120), y: (dy / d) * Math.min(1, d / 120) });
+		};
+		window.addEventListener('pointermove', move);
+		window.addEventListener('pointerdown', move);
+		return () => {
+			window.removeEventListener('pointermove', move);
+			window.removeEventListener('pointerdown', move);
+		};
+	}, []);
+	return (
+		<div className="title-mascot" ref={ref}>
+			<Mozzi
+				mood={mood}
+				look={look}
+				hop={hop}
+				size={104}
+				label="Mozzi. Say hello."
+				onClick={() => {
+					const color = Math.floor(Math.random() * 4);
+					setHop((h) => ({ color, n: (h?.n ?? 0) + 1 }));
+					setMood('happy');
+					audio.play(`color${color}` as 'color0');
+					window.setTimeout(() => setMood('idle'), 500);
+				}}
+			/>
+		</div>
+	);
+}
+
 export function Title(p: TitleProps) {
 	const id = `daily-${p.today}`;
 	const done = p.data.finished[id];
@@ -84,11 +125,9 @@ export function Title(p: TitleProps) {
 			</div>
 			<div className="title-top">
 				<Logo />
-				<p className="tagline">Mend the old workshop windows, one tile at a time.</p>
+				<p className="tagline">A daily tile puzzle. Give every tile a number and a color.</p>
 			</div>
-			<div className="title-gloop">
-				<Gloop mood={done ? 'cheer' : 'idle'} size={70} />
-			</div>
+			<TitleMozzi cheer={!!done} />
 			<nav className="title-menu">
 				<button className="btn btn-main btn-big" autoFocus onClick={p.onToday}>
 					<Icon name="sun" size={26} />

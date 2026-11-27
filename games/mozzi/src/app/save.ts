@@ -67,7 +67,19 @@ export interface SaveData {
 	looks: Looks;
 }
 
-const KEY = 'sudoglue:v1';
+const KEY = 'mozzi:v1';
+/** The game was called Sudoglue first. Its save moves over once, on the first load. */
+const OLD_KEY = 'sudoglue:v1';
+
+function moveOldSave() {
+	try {
+		const old = localStorage.getItem(OLD_KEY);
+		if (old && !localStorage.getItem(KEY)) localStorage.setItem(KEY, old);
+		if (old) localStorage.removeItem(OLD_KEY);
+	} catch {
+		// Storage can be blocked; then there is nothing to move.
+	}
+}
 
 export const defaultSettings = (): Settings => ({
 	sound: 0.8,
@@ -96,6 +108,7 @@ export const freshSave = (): SaveData => ({
 });
 
 export function load(): SaveData {
+	moveOldSave();
 	try {
 		const raw = localStorage.getItem(KEY);
 		if (!raw) return freshSave();

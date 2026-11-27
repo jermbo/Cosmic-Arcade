@@ -1,15 +1,15 @@
 ---
-title: Sudoglue
-tagline: A daily logic puzzle. Glue the broken stained-glass windows of an old workshop back together.
+title: Mozzi
+tagline: A daily tile puzzle. Fill a small mosaic window with Mozzi, a little creature made of four tiles.
 status: playable
 kind: video
-build: "sudoglue"
+build: "mozzi"
 platforms: [desktop, mobile]
 inputs: [mouse, keyboard, touch, gamepad]
 tags: [logic, puzzle, daily]
 ---
 
-A small logic puzzle with a new window every day. Each window is a 4×4 grid of glass panes. Give every pane a number and a glass color.
+A small logic puzzle with a new mosaic window every day. Each window is a 4×4 grid of tiles. Give every tile a number and a color. Mozzi, a creature made of four tiles, watches you play and gives the hints.
 
 ## Rules
 
@@ -39,4 +39,4 @@ Each window you mend earns coins: more for harder levels, no hints, a new best t
 
 ## Hints
 
-A hint goes in three steps: where to look, why it must be so, and what goes there. It always checks for a wrong pane first. Every window can be finished with hints alone, with no guessing.
+A hint goes in three steps: where to look, why it must be so, and what goes there. Mozzi always checks for a wrong tile first. Every window can be finished with hints alone, with no guessing.
