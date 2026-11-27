@@ -107,13 +107,13 @@ parent: README.md
 
 **Date:** 2026-11-27
 
-**Question:** Is "Sudoglue" the right name?
+**Question:** What should the game be called?
 
 **Options:** Names on the pairs idea, on tiles and mosaic, or on the window story. In the tiles direction the shortlist was Tilly, Mozzi and Quadri. A quick web search found close names for Tilly (TILY, Teacher Tilly) and a crowded "Quadr-" space (Quadris, Quadrata), and no game called Mozzi.
 
-**Choice:** Mozzi. Rename everything: the folder (`games/mozzi`), the package, the arcade entry and its URL (`/games/mozzi/`), the docs folder and the save key. An old save moves to the new key once. The puzzle seeds keep the old name, so no puzzle changes.
+**Choice:** Mozzi. The repo folder is `games/mozzi`, the arcade entry and play URL are `/games/mozzi/`, docs live under `docs/initiatives/mozzi/`, saves use `mozzi:v1`, and puzzle seeds use the `mozzi-daily-*` and `mozzi-practice-*` prefixes.
 
-**Reason:** The arcade is for the owner, so search crowding does not matter much, and Mozzi is the more distinctive name. It is still early, so changing the URL is cheap.
+**Reason:** The arcade is for the owner, so search crowding does not matter much, and Mozzi is the more distinctive name.
 
 ## D10. The mascot is Mozzi, a four-tile creature, and it gives the hints
 

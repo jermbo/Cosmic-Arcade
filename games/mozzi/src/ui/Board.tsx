@@ -44,13 +44,21 @@ interface Props {
 	children?: ReactNode;
 }
 
-function describe(b: BoardData, givens: BoardData, i: number): string {
+function describe(b: BoardData, givens: BoardData, i: number, noteNum: number, noteColor: number): string {
 	const n = b.num[i];
 	const c = b.color[i];
 	const parts = [cellName(i)];
 	if (n < 0 && c < 0) parts.push('empty');
 	if (n >= 0) parts.push(`${n + 1}${givens.num[i] >= 0 ? ', clue' : ''}`);
 	if (c >= 0) parts.push(`${COLOR_NAMES[c]}${givens.color[i] >= 0 ? ', clue' : ''}`);
+	if (n < 0 && noteNum) {
+		const nums = [0, 1, 2, 3].filter((v) => noteNum & (1 << v)).map((v) => v + 1);
+		if (nums.length) parts.push(`number notes ${nums.join(' ')}`);
+	}
+	if (c < 0 && noteColor) {
+		const cols = [0, 1, 2, 3].filter((v) => noteColor & (1 << v)).map((v) => COLOR_NAMES[v]);
+		if (cols.length) parts.push(`color notes ${cols.join(', ')}`);
+	}
 	return parts.join(', ');
 }
 
@@ -86,6 +94,8 @@ export const Board = memo(
 								const match = p.helpers && p.showSel && !p.solved && i !== sel && selN >= 0 && n === selN;
 								const matchC = p.helpers && p.showSel && !p.solved && i !== sel && selC >= 0 && c === selC;
 								const face = p.faces[i];
+								const showNumNotes = n < 0 && p.noteNum[i];
+								const showColorNotes = c < 0 && p.noteColor[i];
 								const cls = [
 									'tile',
 									c >= 0 ? `k${c}` : 'blank',
@@ -112,7 +122,7 @@ export const Board = memo(
 										data-cell={i}
 										tabIndex={i === sel ? 0 : -1}
 										aria-selected={i === sel}
-										aria-label={describe(board, p.givens, i)}
+										aria-label={describe(board, p.givens, i, p.noteNum[i], p.noteColor[i])}
 										style={{ ['--d' as string]: r + col }}
 										onPointerDown={(e) => {
 											if (e.button !== 0) return;
@@ -127,24 +137,28 @@ export const Board = memo(
 										<span key={face.bump} className={`face anim-${face.anim}`}>
 											<span className="glass" />
 											{n >= 0 && <span className={`num${lockN ? ' given' : ''}`}>{n + 1}</span>}
-											{n < 0 && c < 0 && (p.noteNum[i] || p.noteColor[i]) ? (
-												<span className="notes" aria-hidden="true">
-													<span>
-														{[0, 1, 2, 3].map((v) => (
-															<i key={v}>{p.noteNum[i] & (1 << v) ? v + 1 : ''}</i>
-														))}
-													</span>
-													<span>
-														{[0, 1, 2, 3].map((v) => (
-															<b key={v} className={p.noteColor[i] & (1 << v) ? `nd k${v}` : 'nd off'}>
-																<Shape c={v} />
-															</b>
-														))}
-													</span>
-												</span>
-											) : null}
 											{lockC && <span className="pin" aria-hidden="true" />}
 											{c >= 0 && <Shape c={c} />}
+											{showNumNotes || showColorNotes ? (
+												<span className="notes" aria-hidden="true">
+													{showNumNotes ? (
+														<span className="nums">
+															{[0, 1, 2, 3].map((v) => (
+																<i key={v}>{p.noteNum[i] & (1 << v) ? v + 1 : ''}</i>
+															))}
+														</span>
+													) : null}
+													{showColorNotes ? (
+														<span className="cols">
+															{[0, 1, 2, 3].map((v) => (
+																<b key={v} className={p.noteColor[i] & (1 << v) ? `nd k${v}` : 'nd off'}>
+																	<Shape c={v} />
+																</b>
+															))}
+														</span>
+													) : null}
+												</span>
+											) : null}
 										</span>
 										{marks && marks.ruled.includes(i) && (
 											<span className="badge ruled" aria-hidden="true">

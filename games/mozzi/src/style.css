@@ -593,6 +593,7 @@ kbd {
 .glass {
 	position: absolute;
 	inset: 0;
+	z-index: 0;
 	border-radius: inherit;
 	background-color: var(--tc, transparent);
 	background-image: var(--t-sheen);
@@ -607,6 +608,7 @@ kbd {
 
 .num {
 	position: relative;
+	z-index: 2;
 	font-size: 2.15em;
 	font-weight: 600;
 	line-height: 1;
@@ -636,6 +638,7 @@ kbd {
 /* A clue color carries a small bar (not a dot, so it never looks like ruby's circle). */
 .pin {
 	position: absolute;
+	z-index: 2;
 	left: 10%;
 	top: 11%;
 	width: 0.7em;
@@ -647,10 +650,12 @@ kbd {
 
 .notes {
 	position: absolute;
+	z-index: 3;
 	inset: 9%;
 	display: flex;
 	flex-direction: column;
 	justify-content: space-between;
+	pointer-events: none;
 	font: 700 0.78em/1 system-ui, sans-serif;
 	color: var(--muted);
 }
@@ -659,7 +664,8 @@ kbd {
 	font-size: 0.95em;
 }
 
-.notes span {
+.notes .nums,
+.notes .cols {
 	display: flex;
 	justify-content: space-between;
 }
@@ -668,6 +674,44 @@ kbd {
 	font-style: normal;
 	width: 0.8em;
 	text-align: center;
+}
+
+/* Number pencil marks: opaque chip so contrast holds on every glass color (WCAG). */
+.tile:not(.blank) .notes {
+	top: 13%;
+	bottom: 24%;
+	left: 8%;
+	right: 8%;
+	justify-content: flex-start;
+	color: var(--ink);
+	isolation: isolate;
+}
+
+.tile:not(.blank) .notes .nums {
+	padding: 0.14em 0.26em;
+	border-radius: 0.5em;
+	font-weight: 800;
+	color: var(--ink);
+	background: var(--surface);
+	box-shadow:
+		0 1px 4px color-mix(in srgb, var(--ink) 32%, transparent),
+		0 0 0 1.5px color-mix(in srgb, var(--ink) 22%, transparent);
+}
+
+.tile:not(.blank) .notes .nums i {
+	color: var(--ink);
+	font-weight: 800;
+}
+
+@media (prefers-contrast: more) {
+	.tile:not(.blank) .notes .nums {
+		background: var(--bg);
+		box-shadow: 0 0 0 2px var(--ink);
+	}
+}
+
+.tile.lock-c:not(.blank) .notes {
+	top: 22%;
 }
 
 .nd {
@@ -2336,6 +2380,7 @@ kbd {
 /* On a tile: bottom-right corner. */
 .face > .shape {
 	position: absolute;
+	z-index: 2;
 	right: 9%;
 	bottom: 9%;
 	width: 0.62em;

@@ -1,6 +1,6 @@
 # Mozzi
 
-A daily logic puzzle: fill a small mosaic window by giving each of its 16 tiles one number (1–4) and one color. Mozzi, a creature made of four tiles, keeps you company and gives the hints. (The game was first called Sudoglue.)
+A daily logic puzzle: fill a small mosaic window by giving each of its 16 tiles one number (1–4) and one color. Mozzi, a creature made of four tiles, keeps you company and gives the hints.
 
 **Rules.** Each row and each column has every number once and every color once. Each number + color pair (like "ruby 2") is used once in the whole window. No boxes. Some parts start locked ("set in lead"): those are the clues.
 
@@ -123,7 +123,7 @@ We checked all 6,912 windows by computer, and it holds in every one (rows, colum
 
 ```mermaid
 flowchart TD
-  A[Seed text, e.g. 'sudoglue-daily-2026-11-26'] --> B[Random full window]
+  A[Seed text, e.g. 'mozzi-daily-2026-11-26'] --> B[Random full window]
   B --> C[Start with all 32 parts shown]
   C --> D[Try to hide each part, in random order]
   D --> E{Can the human solver still finish,<br/>using only this level's tiers?}
@@ -138,7 +138,7 @@ flowchart TD
 
 Because the human solver only makes true deductions, "it can finish" also means "exactly one solution". The tests check that again with the exact solver.
 
-The same seed always gives the same puzzle, so everyone gets the same daily window. Practice puzzles use `sudoglue-practice-<level>-<n>`. (The seeds keep the first name on purpose: changing them would change every puzzle.)
+The same seed always gives the same puzzle, so everyone gets the same daily window. Practice puzzles use `mozzi-practice-<level>-<n>`.
 
 ## Hints
 
@@ -262,7 +262,7 @@ Mozzi installs as an app and plays offline, the same way as Wordkin:
 
 ## Save data
 
-One localStorage entry, `mozzi:v1` (an old `sudoglue:v1` save moves over on the first load): settings, windows in progress, finished windows, best 5 times per level (with hints used), the next practice number per level, the daily streak, coins, owned items, the theme, tile style and sound pack in use, and whether the tutorial was seen. A daily counts for the streak when it is finished on its own day.
+One localStorage entry, `mozzi:v1`: settings, windows in progress, finished windows, best 5 times per level (with hints used), the next practice number per level, the daily streak, coins, owned items, the theme, tile style and sound pack in use, and whether the tutorial was seen. A daily counts for the streak when it is finished on its own day.
 
 ## Tuning knobs
 
