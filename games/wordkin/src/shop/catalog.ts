@@ -1,6 +1,8 @@
 // Everything the shop sells. Each item is bought once, then picked.
-// The first item in each section is free and owned from the start.
+// The first item in each section is free and owned from the start (themes: the kit's free light and dark).
 // Prices are drafts: tune them here.
+
+import { FREE_THEMES, THEMES as KIT_THEMES } from '@arcade/cozy-kit/themes.js';
 
 export type Category = 'theme' | 'tiles' | 'sound' | 'motion';
 
@@ -11,13 +13,10 @@ export interface ShopItem {
 	blurb: string;
 }
 
-export const THEMES: ShopItem[] = [
-	{ id: 'paper', name: 'Paper', price: 0, blurb: 'Warm cream and bold ink.' },
-	{ id: 'sorbet', name: 'Sorbet', price: 120, blurb: 'Pink and sweet.' },
-	{ id: 'meadow', name: 'Meadow', price: 120, blurb: 'Fresh greens.' },
-	{ id: 'sky', name: 'Sky', price: 150, blurb: 'Cool blues.' },
-	{ id: 'dusk', name: 'Dusk', price: 250, blurb: 'A night sky behind bright cards.' },
-];
+/** Theme prices. Tune here. The kit's FREE_THEMES (Oat and Plum) are always free. The themes themselves are the cozy kit's, shared with the other cozy games. */
+const THEME_PRICE: Record<string, number> = { sage: 120, blossom: 120, sky: 150, tide: 200, hearth: 200 };
+
+export const THEMES: ShopItem[] = KIT_THEMES.map((t) => ({ id: t.id, name: t.name, price: FREE_THEMES.includes(t.id) ? 0 : (THEME_PRICE[t.id] ?? 120), blurb: t.blurb }));
 
 export const TILES: ShopItem[] = [
 	{ id: 'classic', name: 'Classic', price: 0, blurb: 'Square-ish, hard shadow.' },

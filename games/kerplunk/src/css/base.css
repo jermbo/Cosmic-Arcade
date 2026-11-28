@@ -1,37 +1,9 @@
-/* The page: the fonts, the design variables, the reset, the app shell, and what every block shares. */
-
-@font-face {
-	font-family: 'Archivo Black';
-	src: url('../fonts/archivo-black-latin-400-normal.woff2') format('woff2');
-	font-weight: 400;
-	font-display: swap;
-}
+/* The page: DM Mono (the other fonts come from the cozy kit, kit/fonts.css), the design variables, the reset, the app shell, and what every block shares. */
 
 @font-face {
 	font-family: 'DM Mono';
 	src: url('../fonts/dm-mono-latin-500-normal.woff2') format('woff2');
 	font-weight: 500;
-	font-display: swap;
-}
-
-@font-face {
-	font-family: 'Space Grotesk';
-	src: url('../fonts/space-grotesk-latin-500-normal.woff2') format('woff2');
-	font-weight: 500;
-	font-display: swap;
-}
-
-@font-face {
-	font-family: 'Space Grotesk';
-	src: url('../fonts/space-grotesk-latin-700-normal.woff2') format('woff2');
-	font-weight: 700;
-	font-display: swap;
-}
-
-@font-face {
-	font-family: 'Bricolage Grotesque';
-	src: url('../fonts/bricolage-grotesque-latin-800-normal.woff2') format('woff2');
-	font-weight: 800;
 	font-display: swap;
 }
 
@@ -143,7 +115,7 @@ button {
 	color: var(--text);
 	border: var(--bw) solid var(--ink);
 	border-radius: var(--r);
-	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	box-shadow: var(--shx) var(--sh) 0 var(--shadow);
 }
 
 /* The ✦ of Plunks inside small or mono type: bold and a little bigger, so it does not read as a "+". */

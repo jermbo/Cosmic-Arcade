@@ -1,0 +1,126 @@
+---
+import { getCollection, getEntry } from 'astro:content';
+import Base from '../layouts/base.astro';
+import GameCard from '../components/game-card.astro';
+import { kindLabel } from '../games/game-fields';
+import { entryUpdatedAt } from '../games/entry-updated';
+import { gamePath, GAMES_PATH } from '../games/game-urls';
+
+const entries = await getCollection('games');
+
+const games = await Promise.all(
+	entries.map(async (entry) => {
+		const build =
+			entry.data.kind === 'video' && entry.data.build ? await getEntry(entry.data.build) : undefined;
+		const updated = entryUpdatedAt(entry.id, build?.data.folder);
+		return { entry, engine: build?.data.engine, updated };
+	}),
+);
+
+const latest = [...games]
+	.filter(({ entry }) => !entry.data.title.startsWith('STUB:'))
+	.sort((a, b) => b.updated.getTime() - a.updated.getTime())
+	.slice(0, 3);
+---
+
+<Base
+	title="Home"
+	description="A personal arcade: games I've always meant to make, built in public while I learn what AI is actually good at."
+>
+	<div class="home">
+		<h1 class="home__title">Cosmic Arcade</h1>
+
+		<div class="home__intro">
+			<p>
+				For years I kept a mental list of games I meant to build someday—a tower defense, a cozy puzzle,
+				a JRPG, tabletop scribbles. This site is where <em>someday</em> finally happens.
+			</p>
+			<p>
+				I work with AI every day, but work isn't a great place to experiment. Games are the sandbox: different
+				genres, different engines, nobody hurt if I break something. I'm building in public—messy parts included—so
+				if you're curious how that actually feels day to day, you're in the right place.
+			</p>
+			<p>
+				Most cabinets here are meant to be playable for a few minutes. Some will grow; some will stay rough.
+				There's no shop, no accounts, no ads—just walk up, play, and wander back when you're done.
+			</p>
+			<p>
+				Games are built with <a href="https://kit.cozy.sh">Cozy Kit</a> and <a href="https://astro.build">Astro</a>.
+			</p>
+		</div>
+
+		<section class="home__latest" aria-labelledby="latest-heading">
+			<div class="home__latest-head">
+				<h2 id="latest-heading" class="home__section-title">Recently touched</h2>
+				<a class="home__all" href={GAMES_PATH}>Browse all games</a>
+			</div>
+			{
+				latest.length === 0 ? (
+					<p>No games yet. <a href={GAMES_PATH}>The catalog</a> will list them when they land.</p>
+				) : (
+					<ul class="home__list">
+						{latest.map(({ entry, engine, updated }) => (
+							<li>
+								<GameCard
+									href={gamePath(entry.id)}
+									title={entry.data.title}
+									tagline={entry.data.tagline}
+									kind={kindLabel(entry.data.kind)}
+									status={entry.data.status}
+									engine={engine}
+									updated={updated}
+								/>
+							</li>
+						))}
+					</ul>
+				)
+			}
+		</section>
+	</div>
+</Base>
+
+<style>
+	.home__title {
+		margin: 0 0 var(--space-body);
+		font-size: var(--text-title);
+	}
+
+	.home__intro {
+		max-width: 42rem;
+	}
+
+	.home__intro p {
+		margin-block: 0 var(--space-body);
+	}
+
+	.home__section-title {
+		margin: 0;
+		font-size: var(--text-body);
+	}
+
+	.home__latest {
+		margin-block-start: var(--space-large);
+	}
+
+	.home__latest-head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: var(--space-small) var(--space-body);
+		margin-block-end: var(--space-body);
+	}
+
+	.home__all {
+		font-size: var(--text-small);
+	}
+
+	.home__list {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+		gap: var(--space-body);
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+</style>

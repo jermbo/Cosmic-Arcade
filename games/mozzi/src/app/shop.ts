@@ -1,10 +1,11 @@
 /**
  * The shop: every item, every price and every coin reward lives here as data.
  * Add an item: add it to CATALOG, then give it a look:
- *  - theme: a `[data-theme='id']` block of color tokens in style.css;
+ *  - theme: themes come from the cozy kit (games/cozy-kit/themes.js);
  *  - tiles: `[data-tiles='id']` rules in style.css;
  *  - sound: an entry in PACKS in audio.ts.
  */
+import { FREE_THEMES, THEMES } from '@arcade/cozy-kit/themes.js';
 import type { Level } from '../core/types.ts';
 
 export type Kind = 'theme' | 'tiles' | 'sound';
@@ -19,13 +20,12 @@ export interface Item {
 	tone?: 'light' | 'dark';
 }
 
+/** Theme prices. Tune here. The kit's FREE_THEMES (Oat and Plum) are always free. */
+const THEME_PRICE: Record<string, number> = { sage: 60, blossom: 60, sky: 60, tide: 90, hearth: 90 };
+
 export const CATALOG: Item[] = [
-	{ id: 'linen', kind: 'theme', name: 'Linen', blurb: 'Warm cream, like morning in the workshop.', price: 0, tone: 'light' },
-	{ id: 'dusk', kind: 'theme', name: 'Dusk', blurb: 'Soft plum, for late-night windows.', price: 0, tone: 'dark' },
-	{ id: 'meadow', kind: 'theme', name: 'Meadow', blurb: 'Fresh mint and spring light.', price: 60, tone: 'light' },
-	{ id: 'blossom', kind: 'theme', name: 'Blossom', blurb: 'Peach and petal pink.', price: 60, tone: 'light' },
-	{ id: 'deepsea', kind: 'theme', name: 'Deep Sea', blurb: 'Calm navy with a teal glow.', price: 90, tone: 'dark' },
-	{ id: 'ember', kind: 'theme', name: 'Ember', blurb: 'Charcoal and a warm hearth.', price: 90, tone: 'dark' },
+	// Themes are the cozy kit's, shared with the other cozy games. Prices are Mozzi's.
+	...THEMES.map((t): Item => ({ id: t.id, kind: 'theme', name: t.name, blurb: t.blurb, price: FREE_THEMES.includes(t.id) ? 0 : (THEME_PRICE[t.id] ?? 60), tone: t.tone })),
 
 	{ id: 'clay', kind: 'tiles', name: 'Clay', blurb: 'Soft, puffy tiles that press down.', price: 0 },
 	{ id: 'paper', kind: 'tiles', name: 'Paper', blurb: 'Flat cut paper with a crisp edge.', price: 80 },
@@ -72,5 +72,5 @@ export interface Looks {
 	sound: string;
 }
 
-export const DEFAULT_LOOKS: Looks = { theme: 'linen', tiles: 'clay', sound: 'bells' };
+export const DEFAULT_LOOKS: Looks = { theme: 'oat', tiles: 'clay', sound: 'bells' };
 export const FREE_ITEMS = CATALOG.filter((i) => i.price === 0).map((i) => i.id);

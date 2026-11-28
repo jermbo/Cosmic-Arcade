@@ -11,6 +11,8 @@ export interface Settings {
 	haptics: boolean;
 	lessMotion: boolean;
 	difficulty: Difficulty;
+	/** The cozy kit style: soft clay or bold ink. */
+	style: 'soft' | 'bold';
 }
 
 export interface DailyResult {
@@ -58,7 +60,7 @@ function fresh(): SaveData {
 	const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 	return {
 		version: VERSION,
-		settings: { sound: true, haptics: true, lessMotion: reduced, difficulty: 'medium' },
+		settings: { sound: true, haptics: true, lessMotion: reduced, difficulty: 'medium', style: 'soft' },
 		seenHelp: {},
 		daily: {},
 		stats: { crack: freshStats(), secret: freshStats(), link: freshStats(), blitz: freshStats() },
@@ -67,8 +69,8 @@ function fresh(): SaveData {
 		chain: {},
 		chainStreak: { streak: 0, best: 0, last: null },
 		coins: EARN.start,
-		owned: { theme: ['paper'], tiles: ['classic'], sound: ['paper'], motion: ['bouncy'] },
-		looks: { theme: 'paper', tiles: 'classic', sound: 'paper', motion: 'bouncy' },
+		owned: { theme: ['oat', 'plum'], tiles: ['classic'], sound: ['paper'], motion: ['bouncy'] },
+		looks: { theme: 'oat', tiles: 'classic', sound: 'paper', motion: 'bouncy' },
 		best: { runPuzzles: 0, runScore: 0, blitz: 0 },
 		seenRun: false,
 	};
@@ -82,6 +84,7 @@ function load(): SaveData {
 			if (data.version === VERSION) {
 				const base = fresh();
 				data.settings.difficulty ??= 'medium';
+				data.settings.style ??= 'soft';
 				data.book ??= base.book;
 				data.hat ??= null;
 				data.chain ??= base.chain;
@@ -90,6 +93,10 @@ function load(): SaveData {
 				data.coins ??= base.coins;
 				data.owned ??= base.owned;
 				data.looks ??= base.looks;
+				// Theme ids from before the cozy kit. The kit's free themes are owned by everyone.
+				const alias: Record<string, string> = { paper: 'oat', sorbet: 'blossom', meadow: 'sage', dusk: 'plum' };
+				data.looks.theme = alias[data.looks.theme] ?? data.looks.theme;
+				data.owned.theme = [...new Set([...base.owned.theme, ...(data.owned.theme ?? []).map((id) => alias[id] ?? id)])];
 				data.best ??= base.best;
 				data.seenRun ??= false;
 				return data;

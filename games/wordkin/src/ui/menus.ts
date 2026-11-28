@@ -3,6 +3,7 @@ import { sfx } from '../audio.ts';
 import { DIFFICULTY, LEVEL_NAMES } from '../core/tuning.ts';
 import type { ModeId } from '../core/types.ts';
 import { MODE_BY_ID, MODES } from '../modes/meta.ts';
+import { applyLooks } from '../shop/wallet.ts';
 import { persist, resetAll, save, type Settings } from '../save.ts';
 import { h } from './dom.ts';
 import { openModal, type ModalHandle } from './modal.ts';
@@ -35,7 +36,7 @@ export function openHelp(mode: ModeId, parent?: HTMLElement, onClose?: () => voi
 }
 
 export function openSettings(): void {
-	const toggle = (key: Exclude<keyof Settings, 'difficulty'>, label: string, note: string) => {
+	const toggle = (key: Exclude<keyof Settings, 'difficulty' | 'style'>, label: string, note: string) => {
 		const input = h('input', { type: 'checkbox', class: 'switch__input', checked: save.settings[key] });
 		input.addEventListener('change', () => {
 			save.settings[key] = input.checked;
@@ -45,6 +46,15 @@ export function openSettings(): void {
 		});
 		return h('label', { class: 'switch' }, h('span', { class: 'switch__text' }, h('strong', {}, label), h('small', {}, note)), input, h('span', { class: 'switch__knob', 'aria-hidden': 'true' }));
 	};
+	// The cozy kit style: Soft (the default) or Bold. Free, and it changes the whole game at once.
+	const bold = h('input', { type: 'checkbox', class: 'switch__input', checked: save.settings.style === 'bold' });
+	bold.addEventListener('change', () => {
+		save.settings.style = bold.checked ? 'bold' : 'soft';
+		persist();
+		applyLooks();
+		sfx.ui();
+	});
+	const styleSwitch = h('label', { class: 'switch' }, h('span', { class: 'switch__text' }, h('strong', {}, 'Bold style'), h('small', {}, 'Ink outlines and hard shadows. Off: soft clay.')), bold, h('span', { class: 'switch__knob', 'aria-hidden': 'true' }));
 	const reset = h(
 		'button',
 		{
@@ -67,7 +77,7 @@ export function openSettings(): void {
 	);
 	openModal({
 		title: 'Settings',
-		body: [toggle('sound', 'Sound', 'Soft taps and chimes'), toggle('haptics', 'Buzz', 'Phone buzz on mistakes'), toggle('lessMotion', 'Less motion', 'Shorter, calmer animations'), reset],
+		body: [toggle('sound', 'Sound', 'Soft taps and chimes'), toggle('haptics', 'Buzz', 'Phone buzz on mistakes'), toggle('lessMotion', 'Less motion', 'Shorter, calmer animations'), styleSwitch, reset],
 	});
 }
 

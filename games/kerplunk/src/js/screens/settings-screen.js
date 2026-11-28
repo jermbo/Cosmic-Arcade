@@ -6,6 +6,7 @@ import { store } from '../app/storage.js';
 import { $, showModal, hideModals } from '../app/dom.js';
 import { state, view, save } from '../play/session.js';
 import { updateBestLabels } from './title.js';
+import { applyLooks } from '../looks/looks.js';
 
 const RESET_DONE_MS = 1500; // how long "Best scores reset" stays on the button
 const RESET_ARMED_MS = 3000; // how long the button waits for the second tap
@@ -48,6 +49,7 @@ document.addEventListener('change', (event) => {
 
 function changeSetting(input) {
 	store.settings[input.dataset.setting] = input.checked;
+	if (input.dataset.setting === 'bold') applyLooks();
 	applySettings();
 	save();
 	audio.ui();

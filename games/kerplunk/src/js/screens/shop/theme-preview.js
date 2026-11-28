@@ -1,15 +1,15 @@
 // A small picture of a theme in the shop: its paper and its cards. Random in use shows its current roll.
 
-import { LIGHT, DARK, RANDOM_BACKGROUNDS } from '../../looks/themes.js';
+import { kitTheme, RANDOM_BACKGROUNDS } from '../../looks/themes.js';
 import { store } from '../../app/storage.js';
 import { makeElement } from '../../app/dom.js';
-import { activeTheme } from '../../looks/looks.js';
+import { activeTheme, activeKitStyle } from '../../looks/looks.js';
 
 export function themePreview(item) {
 	const preview = makeElement('div', 'theme-preview');
 	const rolled = item.id === 'random' && store.looks.theme === 'random';
 	if (item.id === 'random' && !rolled) return randomPreview(preview);
-	const theme = rolled ? activeTheme() : item.id === 'dark' ? DARK : LIGHT;
+	const theme = rolled ? activeTheme() : kitTheme(item.id, activeKitStyle());
 	preview.style.backgroundColor = theme.bg;
 	preview.style.backgroundImage = `radial-gradient(${theme.dot} 1.2px, transparent 1.4px)`;
 	preview.style.borderColor = theme.ink;
@@ -30,6 +30,6 @@ function previewCard(color, theme) {
 	const card = makeElement('i', 'theme-preview__card');
 	card.style.background = color;
 	card.style.borderColor = theme.ink;
-	card.style.boxShadow = `2px 2px 0 ${theme.shadow}`;
+	card.style.boxShadow = `${theme.shadowSideways ? 2 : 0}px 2px 0 ${theme.shadow}`;
 	return card;
 }

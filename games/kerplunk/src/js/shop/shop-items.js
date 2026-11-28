@@ -2,10 +2,11 @@
 // (Boosts for one game are in screens/boosts-screen.js, rerolls and second wind in play/second-chances.js. Prices are in prices.js.)
 
 import { BAG_UPGRADE_COSTS, THEME_PRICES, STYLE_PRICES } from './prices.js';
+import { FREE_THEMES, THEMES as KIT_THEMES } from '../../kit/themes.js';
 
+// The cozy kit's themes (shared with the arcade's other cozy games), then Random. The kit's FREE_THEMES are always free.
 export const THEMES = [
-	{ id: 'light', name: 'Light', price: THEME_PRICES.light, text: 'Cream paper, black ink.' },
-	{ id: 'dark', name: 'Dark', price: THEME_PRICES.dark, text: 'Near black, off-white ink.' },
+	...KIT_THEMES.map((t) => ({ id: t.id, name: t.name, price: FREE_THEMES.includes(t.id) ? 0 : (THEME_PRICES[t.id] ?? 150), text: t.blurb })),
 	{ id: 'random', name: 'Random', price: THEME_PRICES.random, text: 'A new look each game. Tap New look for another.' },
 ];
 

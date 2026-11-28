@@ -1,4 +1,5 @@
 // Coins, buying and using shop items, and putting the chosen looks on screen.
+import { applyLooks as kitLooks } from '@arcade/cozy-kit/themes.js';
 import { setSoundPack } from '../audio.ts';
 import { persist, save } from '../save.ts';
 import { MOTION_FEEL, SECTIONS, type Category, type ShopItem } from './catalog.ts';
@@ -25,7 +26,8 @@ export function earn(amount: number): number {
 }
 
 export function owns(cat: Category, id: string): boolean {
-	return (save.owned[cat] ??= []).includes(id) || SECTIONS.find((s) => s.id === cat)!.items[0].id === id;
+	// Free items (price 0) are owned from the start.
+	return (save.owned[cat] ??= []).includes(id) || SECTIONS.find((s) => s.id === cat)!.items.some((i) => i.id === id && i.price === 0);
 }
 
 export function inUse(cat: Category): string {
@@ -53,16 +55,13 @@ export function use(cat: Category, id: string): void {
 /** Puts the chosen theme, tile style, motion and sound pack in place. */
 export function applyLooks(): void {
 	const root = document.documentElement;
-	root.dataset.theme = save.looks.theme;
+	kitLooks(save.looks.theme, save.settings.style);
 	root.dataset.tiles = save.looks.tiles;
 	root.dataset.motion = save.looks.motion;
 	const feel = MOTION_FEEL[save.looks.motion] ?? MOTION_FEEL.bouncy;
 	root.style.setProperty('--t', String(feel.speed));
 	root.style.setProperty('--spring', feel.spring);
 	root.style.setProperty('--out', feel.out);
-	const meta = document.querySelector('meta[name="theme-color"]');
-	const page = getComputedStyle(root).getPropertyValue('--paper').trim();
-	if (meta && page) meta.setAttribute('content', page);
 	setSoundPack(save.looks.sound);
 }
 

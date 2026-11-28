@@ -69,8 +69,9 @@ body {
 	background: var(--accent);
 	color: var(--on-accent);
 	border: var(--bw) solid var(--ink);
-	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	box-shadow: var(--shx) var(--sh) 0 var(--shadow);
 	font-family: var(--font-display);
+	font-weight: var(--display-weight, 400);
 	font-size: 1.8rem;
 	white-space: nowrap;
 	pointer-events: none;

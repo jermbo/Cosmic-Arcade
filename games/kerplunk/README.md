@@ -252,17 +252,20 @@ The look has two parts. The player picks one of each in the shop: a **theme** an
 
 ### Themes
 
-A theme is a set of design variables: the CSS custom properties on the page, which the canvas also reads. A new theme changes only the values. The themes live in `src/js/looks/themes.js`.
+A theme is a set of design variables: the CSS custom properties on the page, which the canvas also reads. The colors come from the **cozy kit** (`games/cozy-kit`), shared with the arcade's other cozy puzzle games; `npm run kit` (and every build) copies it to `src/kit/`. `src/js/looks/themes.js` turns a kit theme and a kit style into a Kerplunk theme (`kitTheme`).
 
-| Theme  | What it is                                                                                    | Price |
-| ------ | --------------------------------------------------------------------------------------------- | ----- |
-| Light  | Cream dotted paper `#FFF8E7`, white cards, black ink, a yellow score card and a teal Plunks card. | Free, the default |
-| Dark   | Near black `#121212` dotted paper, dark cards, off-white outlines and shadows.                 | ✦150 |
-| Random | Each new game rolls a new look inside fixed rules. The look stays the same for the whole game. | ✦300 |
+| Theme  | What it is | Price |
+| ------ | ---------- | ----- |
+| Oat, Plum | The kit's free light and dark themes. Oat is the default (it was Light; Dark is now Plum). | Free |
+| Sage, Blossom, Sky | The kit's other light themes. | ✦150 |
+| Tide, Hearth | The kit's other dark themes. | ✦200 |
+| Random | Each new game rolls a new set of colors inside fixed rules. The colors stay the same for the whole game. | ✦300 |
 
-Light values: outline 3px, hard shadow 4px right and 4px down, corner 6px. Block colors: Ember `#FF6B6B`, Amber `#FFD93D`, Moss `#6BCB77`, Tide `#4D96FF`, Dusk `#C084FC`. Dark keeps the same block colors.
+**Style** is a free setting (Settings, Bold style): **Soft** (the default: no outlines, soft shadows straight down, round corners, Bricolage Grotesque) or **Bold** (3px ink outlines, hard shadows 4px right and 4px down, 6px corners, a slight score tilt, Archivo Black and Space Grotesk). Every theme works in both.
 
-A Random roll picks a background, two card colors (never the same as the background, or the same as each other), a well color, one of four block color sets, the display type (Archivo Black or Bricolage Grotesque), the outline, shadow, corner and score tilt. Text on a colored card is black or white, whichever has more contrast. The ink is always `#111111`. When Random is in use, the title screen and the menus keep the look of the last game. The game rolls one look when it opens, if there is none yet. In the shop, Random in use has a **New look** button: each tap rolls a new look at once, for free. A new roll always has another background than the last one.
+Block colors are the kit's five color-blind-safe colors, in the order Ember (red), Amber (yellow), Moss (green), Tide (blue), Dusk (purple). Light and dark themes use the kit's light and dark palettes.
+
+A Random roll picks a background, two card colors (never the same as the background, or the same as each other), a well color and one of four block color sets. The shape (fonts, outline, shadow, corners) comes from the Style setting. Text on a colored card is black or white, whichever has more contrast. When Random is in use, the title screen and the menus keep the look of the last game. The game rolls one look when it opens, if there is none yet. In the shop, Random in use has a **New look** button: each tap rolls a new look at once, for free. A new roll always has another background than the last one.
 
 ### Block styles
 

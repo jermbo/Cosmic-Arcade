@@ -6,9 +6,14 @@ interface Props {
 	kind: string;
 	status: string;
 	engine?: string;
+	updated?: Date;
 }
 
-const { href, title, tagline, kind, status, engine } = Astro.props;
+const { href, title, tagline, kind, status, engine, updated } = Astro.props;
+
+const updatedLabel = updated
+	? new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(updated)
+	: undefined;
 ---
 
 <article class="game-card">
@@ -18,6 +23,11 @@ const { href, title, tagline, kind, status, engine } = Astro.props;
 		<span>{kind}</span>
 		<span>{status}</span>
 		{engine && <span>{engine}</span>}
+		{updatedLabel && (
+			<time class="game-card__updated" datetime={updated!.toISOString()}>
+				Updated {updatedLabel}
+			</time>
+		)}
 	</p>
 </article>
 

@@ -39,3 +39,5 @@ Works offline after the first load. Tap **Install** on the title screen (or Add 
 ## Credits
 
 Guess word list: Webster's Second International (public domain), from the system word list.
+
+**Style:** Soft (soft clay) or Bold (ink outlines and hard shadows), a free setting. The themes are shared with the arcade's other cozy puzzle games.

@@ -1,6 +1,5 @@
-import '@fontsource/bricolage-grotesque/500.css';
-import '@fontsource/bricolage-grotesque/700.css';
-import '@fontsource/bricolage-grotesque/800.css';
+import '@arcade/cozy-kit/fonts.css';
+import '@arcade/cozy-kit/kit.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './style.css';

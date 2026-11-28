@@ -2,7 +2,7 @@
 // A new VERSION makes a new cache; the page then shows "Update ready, tap to reload".
 // FILES lists every file the game needs offline. The labs (labs/) are not cached.
 
-const VERSION = '2.0.0';
+const VERSION = '2.1.0';
 const CACHE = `kerplunk-${VERSION}`;
 const FILES = [
 	'./',
@@ -92,11 +92,15 @@ const FILES = [
 	'js/view/sprites/block-sprites.js',
 	'js/view/stickers.js',
 	'js/view/view.js',
-	'fonts/archivo-black-latin-400-normal.woff2',
 	'fonts/dm-mono-latin-500-normal.woff2',
-	'fonts/space-grotesk-latin-500-normal.woff2',
-	'fonts/space-grotesk-latin-700-normal.woff2',
-	'fonts/bricolage-grotesque-latin-800-normal.woff2',
+	'kit/themes.js',
+	'kit/fonts.css',
+	'kit/fonts/archivo-black-latin-400-normal.woff2',
+	'kit/fonts/bricolage-grotesque-latin-500-normal.woff2',
+	'kit/fonts/bricolage-grotesque-latin-700-normal.woff2',
+	'kit/fonts/bricolage-grotesque-latin-800-normal.woff2',
+	'kit/fonts/space-grotesk-latin-500-normal.woff2',
+	'kit/fonts/space-grotesk-latin-700-normal.woff2',
 	'icons/favicon.svg',
 	'icons/icon-32.png',
 	'icons/icon-192.png',

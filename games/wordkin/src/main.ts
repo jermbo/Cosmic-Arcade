@@ -1,6 +1,5 @@
-import '@fontsource/archivo-black/400.css';
-import '@fontsource/space-grotesk/500.css';
-import '@fontsource/space-grotesk/700.css';
+import '@arcade/cozy-kit/fonts.css';
+import '@arcade/cozy-kit/kit.css';
 import './style.css';
 import { boot } from './app.ts';
 import { unlockAudio } from './audio.ts';

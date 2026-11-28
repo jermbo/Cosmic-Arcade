@@ -6,7 +6,7 @@ updated: 2026-11-05
 
 # Design rules
 
-These rules belong to the arcade site only. A game project draws its own look and does not use these tokens. Change them when the owner agrees a new scale or category.
+These rules belong to the arcade site only. A game project draws its own look and does not use these tokens. The cozy puzzle games (Mozzi, Hueway, Wordkin, Kerplunk, and new ones like them) share the cozy kit: `games/cozy-kit/README.md`. Change them when the owner agrees a new scale or category.
 
 ## Files of the variables
 

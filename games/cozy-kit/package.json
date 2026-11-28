@@ -1,0 +1,22 @@
+{
+	"name": "@arcade/cozy-kit",
+	"private": true,
+	"version": "1.0.0",
+	"type": "module",
+	"description": "Shared themes and styles (Soft and Bold) for the arcade's cozy puzzle games.",
+	"exports": {
+		"./themes.js": {
+			"types": "./themes.d.ts",
+			"default": "./themes.js"
+		},
+		"./kit.css": "./kit.css",
+		"./fonts.css": "./fonts.css",
+		"./components.css": "./components.css"
+	},
+	"scripts": {
+		"css": "node scripts/make-css.js",
+		"fonts": "node scripts/copy-fonts.js",
+		"test": "node scripts/check-colors.js",
+		"page": "node scripts/make-page.js"
+	}
+}

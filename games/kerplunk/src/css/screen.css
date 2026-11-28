@@ -62,7 +62,7 @@
 	padding-top: 0.06em;
 	background: center / 100% no-repeat;
 	font-family: var(--font-display);
-	font-weight: 400;
+	font-weight: var(--display-weight, 400);
 	font-size: calc(var(--tile-size) * 0.66);
 	line-height: 1;
 	/* White with a thick outline in the ink of the blocks, so the letter reads on every block style and theme. */
@@ -156,7 +156,7 @@
 }
 
 .arcade-link:focus-visible {
-	outline: 3px solid var(--ink);
+	outline: 3px solid var(--text);
 	outline-offset: 2px;
 }
 
@@ -176,7 +176,7 @@
 	color: var(--on-accent2);
 	border: var(--bw) solid var(--ink);
 	border-radius: var(--r);
-	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	box-shadow: var(--shx) var(--sh) 0 var(--shadow);
 	font-weight: 700;
 	text-align: center;
 }

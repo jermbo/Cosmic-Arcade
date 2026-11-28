@@ -6,172 +6,49 @@
  * the look, so a shop preview can show another theme or tile style inside the page.
  */
 
-/* ============================================================ themes */
+/* ============================================================ tokens
+ * Themes, the two styles (Soft and Bold) and the fonts come from the cozy kit
+ * (games/cozy-kit), loaded first in main.tsx. These are Mozzi's own names,
+ * made from kit tokens. They sit on every [data-theme] box too, so a shop
+ * preview shows its own theme.
+ */
 
 :root,
-[data-theme='linen'] {
-	--bg: #f2ede6;
-	--bg-glow: #fbe9d6;
-	--surface: #fbf8f4;
-	--surface-2: #e8e1d7;
-	--ink: #3a3340;
-	--muted: #857a8c;
-	--line: #d9d0c4;
-	--drop: rgba(90, 70, 50, 0.13);
-	--edge: rgba(0, 0, 0, 0.07);
-	--shine: rgba(255, 255, 255, 0.7);
-	--peer: #f1ebe3;
-	--k0: #fd5f5b;
-	--k1: #aeceff;
-	--k2: #eac35a;
-	--k3: #5dc286;
-	--kink: #3a3340;
-	--bad: #e5484d;
-	--accent: #f29a2e;
-	--accent-soft: #ffe2b8;
-	--glue: #fffdf6;
-	--edge-line: rgba(58, 51, 64, 0.25);
-	color-scheme: light;
+[data-theme] {
+	--bg-glow: var(--glow);
+	--k0: var(--c0);
+	--k1: var(--c1);
+	--k2: var(--c2);
+	--k3: var(--c3);
+	--kink: var(--on-color);
+	--peer: color-mix(in srgb, var(--surface-2) 45%, var(--surface));
+	--glue: var(--surface);
+	--edge-line: color-mix(in srgb, var(--ink) 25%, transparent);
+	/* The clay shadow under a part, and the soft bevel inside it. */
+	--mz-drop: var(--mz-bevel);
+	--mz-bevel: rgba(0, 0, 0, 0.07);
 }
 
-[data-theme='meadow'] {
-	--bg: #e6f2ec;
-	--bg-glow: #f4fbe2;
-	--surface: #f8fcfa;
-	--surface-2: #d5e8de;
-	--ink: #2d3c35;
-	--muted: #6f8579;
-	--line: #c3d9cc;
-	--drop: rgba(40, 80, 60, 0.13);
-	--edge: rgba(0, 0, 0, 0.06);
-	--shine: rgba(255, 255, 255, 0.75);
-	--peer: #eaf5ef;
-	--k0: #f47062;
-	--k1: #a3c0e5;
-	--k2: #face22;
-	--k3: #69d399;
-	--kink: #2d3c35;
-	--bad: #de4848;
-	--accent: #ff8a4c;
-	--accent-soft: #ffe0c9;
-	--glue: #fffff8;
-	--edge-line: rgba(45, 60, 53, 0.25);
-	color-scheme: light;
+[data-tone='dark'],
+[data-tone='dark'] [data-theme] {
+	--mz-bevel: rgba(0, 0, 0, 0.25);
 }
 
-[data-theme='blossom'] {
-	--bg: #fbede8;
-	--bg-glow: #ffe1e6;
-	--surface: #fffaf8;
-	--surface-2: #f3dcd4;
-	--ink: #4a2f40;
-	--muted: #9a7887;
-	--line: #ecccc4;
-	--drop: rgba(120, 60, 70, 0.13);
-	--edge: rgba(0, 0, 0, 0.06);
-	--shine: rgba(255, 255, 255, 0.75);
-	--peer: #fcefeb;
-	--k0: #ff6376;
-	--k1: #b3c7f1;
-	--k2: #f3c466;
-	--k3: #6ac7a2;
-	--kink: #4a2f40;
-	--bad: #d93a56;
-	--accent: #e8577a;
-	--accent-soft: #ffd6e0;
-	--glue: #fffdfb;
-	--edge-line: rgba(74, 47, 64, 0.25);
-	color-scheme: light;
+/* Bold: a hard ink shadow, no bevel, no shine. */
+[data-style='bold'],
+[data-style='bold'] [data-theme] {
+	--mz-drop: var(--ink);
+	--mz-bevel: transparent;
+	--shine: transparent;
 }
-
-[data-theme='dusk'] {
-	--bg: #1e1a23;
-	--bg-glow: #2e2440;
-	--surface: #2d2834;
-	--surface-2: #3b3544;
-	--ink: #f2edf5;
-	--muted: #a99fb3;
-	--line: #4a4354;
-	--drop: rgba(0, 0, 0, 0.38);
-	--edge: rgba(0, 0, 0, 0.25);
-	--shine: rgba(255, 255, 255, 0.08);
-	--peer: #35303d;
-	--k0: #ec545f;
-	--k1: #3480f7;
-	--k2: #ebc149;
-	--k3: #8edfb3;
-	--kink: #231d29;
-	--bad: #ff6b70;
-	--accent: #ffcf6b;
-	--accent-soft: #4a3d2a;
-	--glue: #f4eefa;
-	--edge-line: rgba(0, 0, 0, 0.4);
-	color-scheme: dark;
-}
-
-[data-theme='deepsea'] {
-	--bg: #0f1c26;
-	--bg-glow: #12323f;
-	--surface: #182a37;
-	--surface-2: #22394a;
-	--ink: #e6f2f6;
-	--muted: #8ea8b5;
-	--line: #2d4556;
-	--drop: rgba(0, 0, 0, 0.4);
-	--edge: rgba(0, 0, 0, 0.25);
-	--shine: rgba(255, 255, 255, 0.07);
-	--peer: #1e3241;
-	--k0: #ff5362;
-	--k1: #007aec;
-	--k2: #e8b32a;
-	--k3: #72e4c4;
-	--kink: #0e1a22;
-	--bad: #ff6b6b;
-	--accent: #5ee6d0;
-	--accent-soft: #17423f;
-	--glue: #eefcff;
-	--edge-line: rgba(0, 0, 0, 0.4);
-	color-scheme: dark;
-}
-
-[data-theme='ember'] {
-	--bg: #1f1a17;
-	--bg-glow: #3a2416;
-	--surface: #2e2723;
-	--surface-2: #3c332d;
-	--ink: #f6ede6;
-	--muted: #b5a497;
-	--line: #4b4039;
-	--drop: rgba(0, 0, 0, 0.4);
-	--edge: rgba(0, 0, 0, 0.25);
-	--shine: rgba(255, 255, 255, 0.07);
-	--peer: #362e29;
-	--k0: #e85040;
-	--k1: #4980ba;
-	--k2: #efab0f;
-	--k3: #aadfb8;
-	--kink: #241c17;
-	--bad: #ff6b5e;
-	--accent: #ff9f4a;
-	--accent-soft: #4a3020;
-	--glue: #fff7ef;
-	--edge-line: rgba(0, 0, 0, 0.4);
-	color-scheme: dark;
-}
-
-/*
- * Colors are tuned so all four, and an empty tile, stay clearly apart under
- * normal vision and the three common kinds of color blindness (checked with a
- * simulation; see the README). "Color shapes" adds a symbol to each color.
- */
 
 /* ============================================================ tile styles */
 
 :root,
 [data-tiles='clay'] {
 	--t-radius: 24%;
-	--t-shadow: 0 0.35em 0 var(--drop), inset 0 -0.3em 0 var(--edge), inset 0 0.18em 0 var(--shine);
-	--t-press: 0 0.1em 0 var(--drop), inset 0 -0.18em 0 var(--edge), inset 0 0.18em 0 var(--shine);
+	--t-shadow: 0 0.35em 0 var(--mz-drop), inset 0 -0.3em 0 var(--mz-bevel), inset 0 0.18em 0 var(--shine);
+	--t-press: 0 0.1em 0 var(--mz-drop), inset 0 -0.18em 0 var(--mz-bevel), inset 0 0.18em 0 var(--shine);
 	--t-lift: -0.22em;
 	--t-sheen: linear-gradient(transparent, transparent);
 	--t-blank: var(--surface);
@@ -197,8 +74,8 @@
 
 [data-tiles='gem'] {
 	--t-radius: 12%;
-	--t-shadow: 0 0.3em 0 var(--drop), inset 0 0 0 0.16em rgba(255, 255, 255, 0.22), inset 0 -0.35em 0.6em rgba(0, 0, 0, 0.16);
-	--t-press: 0 0.1em 0 var(--drop), inset 0 0 0 0.16em rgba(255, 255, 255, 0.22), inset 0 -0.2em 0.4em rgba(0, 0, 0, 0.16);
+	--t-shadow: 0 0.3em 0 var(--mz-drop), inset 0 0 0 0.16em rgba(255, 255, 255, 0.22), inset 0 -0.35em 0.6em rgba(0, 0, 0, 0.16);
+	--t-press: 0 0.1em 0 var(--mz-drop), inset 0 0 0 0.16em rgba(255, 255, 255, 0.22), inset 0 -0.2em 0.4em rgba(0, 0, 0, 0.16);
 	--t-lift: -0.2em;
 	--t-sheen: linear-gradient(155deg, rgba(255, 255, 255, 0.5) 0 20%, transparent 20% 58%, rgba(0, 0, 0, 0.1) 58%), linear-gradient(25deg, transparent 72%, rgba(255, 255, 255, 0.32) 72%);
 	--t-blank: var(--surface);
@@ -230,15 +107,14 @@ body {
 	min-height: 100%;
 	background: var(--bg);
 	color: var(--ink);
-	font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+	font-family: var(--font-ui);
 	-webkit-tap-highlight-color: transparent;
 	overscroll-behavior: none;
 	transition: background-color 0.35s, color 0.35s;
 }
 
 body {
-	background: radial-gradient(90% 60% at 50% -10%, var(--bg-glow), transparent 70%), var(--bg);
-	background-attachment: fixed;
+	background: var(--page-bg);
 }
 
 h1,
@@ -250,7 +126,7 @@ h3,
 .logo,
 .stat b,
 .stats dd {
-	font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+	font-family: var(--font-display);
 }
 
 button,
@@ -326,8 +202,8 @@ kbd {
 
 .puff {
 	background-color: var(--surface);
-	border-radius: 18px;
-	box-shadow: 0 5px 0 var(--drop), inset 0 -4px 0 var(--edge), inset 0 2px 0 var(--shine);
+	border-radius: var(--r);
+	box-shadow: 0 5px 0 var(--mz-drop), inset 0 -4px 0 var(--mz-bevel), inset 0 2px 0 var(--shine);
 	transition: transform 0.16s cubic-bezier(0.3, 1.5, 0.5, 1), box-shadow 0.16s, background-color 0.2s, opacity 0.2s;
 }
 
@@ -337,7 +213,7 @@ kbd {
 
 .puff:not(:disabled):active {
 	transform: translateY(4px) scale(0.98);
-	box-shadow: 0 1px 0 var(--drop), inset 0 -2px 0 var(--edge), inset 0 2px 0 var(--shine);
+	box-shadow: 0 1px 0 var(--mz-drop), inset 0 -2px 0 var(--mz-bevel), inset 0 2px 0 var(--shine);
 }
 
 .puff:disabled {
@@ -350,13 +226,13 @@ kbd {
 	position: relative;
 	width: 42px;
 	height: 42px;
-	border-radius: 14px;
+	border-radius: var(--r);
 	flex: none;
 }
 
 .tool.on {
 	background-color: var(--accent-soft);
-	box-shadow: 0 5px 0 var(--drop), 0 0 0 2.5px var(--accent);
+	box-shadow: 0 5px 0 var(--mz-drop), 0 0 0 2.5px var(--accent);
 }
 
 .tool kbd {
@@ -372,9 +248,9 @@ kbd {
 	gap: 8px;
 	min-height: 50px;
 	padding: 10px 18px;
-	border-radius: 18px;
+	border-radius: var(--r);
 	background-color: var(--surface);
-	box-shadow: 0 5px 0 var(--drop), inset 0 -4px 0 var(--edge), inset 0 2px 0 var(--shine);
+	box-shadow: 0 5px 0 var(--mz-drop), inset 0 -4px 0 var(--mz-bevel), inset 0 2px 0 var(--shine);
 	font-weight: 700;
 	font-size: 16px;
 	text-decoration: none;
@@ -388,12 +264,12 @@ kbd {
 
 .btn:active {
 	transform: translateY(4px) scale(0.98);
-	box-shadow: 0 1px 0 var(--drop), inset 0 -2px 0 var(--edge);
+	box-shadow: 0 1px 0 var(--mz-drop), inset 0 -2px 0 var(--mz-bevel);
 }
 
 .btn-main {
 	background-color: var(--accent);
-	color: var(--kink);
+	color: var(--accent-ink);
 	box-shadow: 0 5px 0 color-mix(in srgb, var(--accent) 55%, #000), inset 0 -4px 0 rgba(0, 0, 0, 0.12), inset 0 2px 0 rgba(255, 255, 255, 0.35);
 }
 
@@ -406,7 +282,7 @@ kbd {
 	min-height: 40px;
 	padding: 6px 14px;
 	font-size: 15px;
-	border-radius: 14px;
+	border-radius: var(--r);
 }
 
 .btn-big {
@@ -438,8 +314,8 @@ kbd {
 
 .card {
 	background: var(--surface);
-	border-radius: 22px;
-	box-shadow: 0 6px 0 var(--drop), inset 0 2px 0 var(--shine);
+	border-radius: var(--r-lg);
+	box-shadow: 0 6px 0 var(--mz-drop), inset 0 2px 0 var(--shine);
 }
 
 .row {
@@ -464,7 +340,7 @@ kbd {
 	padding: 6px 12px;
 	border-radius: 999px;
 	background: var(--surface);
-	box-shadow: 0 3px 0 var(--drop);
+	box-shadow: 0 3px 0 var(--mz-drop);
 	font-weight: 800;
 	color: var(--ink);
 }
@@ -497,7 +373,7 @@ kbd {
 .chip-num {
 	min-width: 1.5em;
 	justify-content: center;
-	font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+	font-family: var(--font-display);
 }
 
 /* A tiny tile. */
@@ -510,12 +386,12 @@ kbd {
 	border-radius: var(--t-radius);
 	background-color: var(--tc, var(--t-blank));
 	background-image: var(--t-sheen);
-	box-shadow: 0 2px 0 var(--drop), inset 0 0 0 1px var(--edge);
+	box-shadow: 0 2px 0 var(--mz-drop), inset 0 0 0 1px var(--mz-bevel);
 	vertical-align: middle;
 }
 
 .mini b {
-	font: 800 calc(var(--s) * 0.5) / 1 'Bricolage Grotesque', system-ui, sans-serif;
+	font: 800 calc(var(--s) * 0.5) / 1 var(--font-display);
 	color: var(--kink);
 }
 
@@ -719,7 +595,7 @@ kbd {
 	height: 0.62em;
 	border-radius: 50%;
 	background: var(--tc);
-	box-shadow: inset 0 0 0 1px var(--edge);
+	box-shadow: inset 0 0 0 1px var(--mz-bevel);
 }
 
 .nd.off {
@@ -969,7 +845,7 @@ kbd {
 .frost {
 	position: absolute;
 	inset: -10px;
-	border-radius: 24px;
+	border-radius: var(--r-lg);
 	background: color-mix(in srgb, var(--bg) 70%, transparent);
 	backdrop-filter: blur(14px);
 	-webkit-backdrop-filter: blur(14px);
@@ -1121,7 +997,7 @@ kbd {
 	justify-content: center;
 	gap: 3px;
 	height: clamp(52px, 7.4dvh, 68px);
-	border-radius: 18px;
+	border-radius: var(--r);
 }
 
 .key-n {
@@ -1167,7 +1043,7 @@ kbd {
 }
 
 .key.on {
-	box-shadow: 0 5px 0 var(--drop), 0 0 0 3px var(--ink);
+	box-shadow: 0 5px 0 var(--mz-drop), 0 0 0 3px var(--ink);
 	transform: translateY(-2px);
 }
 
@@ -1218,7 +1094,7 @@ kbd {
 
 .key-color.noted {
 	background-color: var(--tc);
-	box-shadow: 0 5px 0 var(--drop), 0 0 0 3px var(--accent);
+	box-shadow: 0 5px 0 var(--mz-drop), 0 0 0 3px var(--accent);
 }
 
 /* Hint sheet (in the dock). */
@@ -1273,7 +1149,7 @@ kbd {
 
 .hint-steps li.on {
 	background: var(--accent);
-	color: var(--kink);
+	color: var(--accent-ink);
 }
 
 .hint-lead {
@@ -1378,7 +1254,7 @@ kbd {
 	gap: 12px;
 	width: min(440px, calc(100vw - 24px));
 	padding: 10px 12px;
-	border-radius: 18px;
+	border-radius: var(--r);
 	background: var(--ink);
 	color: var(--bg);
 	box-shadow: 0 10px 30px var(--drop);
@@ -1402,7 +1278,7 @@ kbd {
 	height: 34px;
 	border-radius: 50%;
 	background: var(--accent);
-	color: var(--ink);
+	color: var(--accent-ink);
 	font-weight: 800;
 	font-size: 12px;
 	flex: none;
@@ -1419,7 +1295,7 @@ kbd {
 	z-index: 30;
 	transform: translateX(-50%);
 	padding: 10px 16px;
-	border-radius: 14px;
+	border-radius: var(--r);
 	background: var(--ink);
 	color: var(--bg);
 	font-weight: 700;
@@ -1611,7 +1487,7 @@ kbd {
 
 .seg button.on {
 	background: var(--accent);
-	color: var(--kink);
+	color: var(--accent-ink);
 }
 
 .toggle {
@@ -1643,7 +1519,7 @@ kbd {
 	height: 30px;
 	border-radius: 20px;
 	background: var(--surface-2);
-	box-shadow: inset 0 2px 0 var(--edge);
+	box-shadow: inset 0 2px 0 var(--mz-bevel);
 	transition: background 0.2s;
 }
 
@@ -1698,7 +1574,7 @@ kbd {
 }
 
 .stats div {
-	border-radius: 14px;
+	border-radius: var(--r);
 	padding: 8px 4px;
 	background: var(--bg);
 }
@@ -1912,7 +1788,7 @@ kbd {
 }
 
 .row-card.today {
-	box-shadow: 0 5px 0 var(--drop), 0 0 0 3px var(--accent);
+	box-shadow: 0 5px 0 var(--mz-drop), 0 0 0 3px var(--accent);
 }
 
 .row-icon {
@@ -2071,7 +1947,7 @@ kbd {
 	margin-top: 10px;
 	padding: 10px;
 	background: var(--bg);
-	border-radius: 14px;
+	border-radius: var(--r);
 }
 
 .trade-demo div {
@@ -2087,12 +1963,12 @@ kbd {
 	border-radius: 9px;
 	background: var(--surface);
 	font-weight: 800;
-	box-shadow: 0 2px 0 var(--drop);
+	box-shadow: 0 2px 0 var(--mz-drop);
 }
 
 .trade-demo span.hl {
 	background: var(--accent-soft);
-	box-shadow: 0 2px 0 var(--drop), 0 0 0 2px var(--accent);
+	box-shadow: 0 2px 0 var(--mz-drop), 0 0 0 2px var(--accent);
 }
 
 /* Shop. */
@@ -2129,13 +2005,13 @@ kbd {
 	align-items: center;
 	gap: 14px;
 	padding: 12px 14px;
-	border-radius: 22px;
+	border-radius: var(--r-lg);
 	animation: rise 0.3s ease-out both;
 	animation-delay: calc(var(--i) * 40ms);
 }
 
 .shop-item.using {
-	box-shadow: 0 5px 0 var(--drop), 0 0 0 3px var(--accent);
+	box-shadow: 0 5px 0 var(--mz-drop), 0 0 0 3px var(--accent);
 }
 
 .shop-item.shake {
@@ -2483,7 +2359,7 @@ button.mozzi {
 	border-radius: var(--t-radius);
 	background-color: var(--tc);
 	background-image: var(--t-sheen);
-	box-shadow: 0 calc(var(--mz) * 0.05) 0 var(--drop), inset 0 calc(var(--mz) * -0.05) 0 var(--edge), inset 0 calc(var(--mz) * 0.03) 0 rgba(255, 255, 255, 0.35);
+	box-shadow: 0 calc(var(--mz) * 0.05) 0 var(--drop), inset 0 calc(var(--mz) * -0.05) 0 var(--mz-bevel), inset 0 calc(var(--mz) * 0.03) 0 rgba(255, 255, 255, 0.35);
 	transition: transform 0.25s cubic-bezier(0.3, 1.4, 0.5, 1);
 }
 
@@ -2832,7 +2708,7 @@ button.mozzi {
 .hint-wrong .hint-lead {
 	position: relative;
 	padding: 8px 12px;
-	border-radius: 14px;
+	border-radius: var(--r);
 	background: var(--bg);
 }
 
@@ -2916,3 +2792,19 @@ button.mozzi {
 		padding-top: max(14px, env(safe-area-inset-top));
 	}
 }
+
+/* ============================================================ Bold style: ink outlines */
+
+[data-style='bold'] :is(.puff, .btn, .card, .coin-chip, .mini, .tile, .glass, .logo-tile, .row-card, .shop-item) {
+	border: var(--bw) solid var(--outline);
+}
+
+[data-style='bold'] .btn-main {
+	box-shadow: 0 5px 0 var(--shade);
+}
+
+[data-style='bold'] :is(h1, h2, h3, .num, .key-n, .timer, .logo, .stat b, .stats dd) {
+	font-weight: var(--display-weight);
+	letter-spacing: var(--display-spacing);
+}
+

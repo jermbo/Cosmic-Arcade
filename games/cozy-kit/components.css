@@ -1,0 +1,460 @@
+/*
+ * The cozy kit's shared parts. They read only kit tokens, so every part
+ * works in every theme and in both styles (Soft and Bold).
+ * Load after kit.css and fonts.css. A game adds its own board and pieces.
+ *
+ * Parts: page, .btn, .icon-btn, .coin-chip, .bar, .card, .sheet-back + .sheet,
+ * .setting + .toggle + .seg, .tabs, .badge, .row, .muted, .center, .calm.
+ */
+
+/* ------------------------------------------------------------ page */
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	min-height: 100%;
+	background: var(--bg);
+	color: var(--ink);
+	font-family: var(--font-ui);
+	font-weight: 500;
+	-webkit-font-smoothing: antialiased;
+	-webkit-tap-highlight-color: transparent;
+}
+
+body {
+	background: var(--page-bg);
+	overscroll-behavior: none;
+}
+
+button,
+input,
+select {
+	font: inherit;
+	color: inherit;
+}
+
+button {
+	cursor: pointer;
+	touch-action: manipulation;
+}
+
+:focus-visible {
+	outline: 3px solid var(--accent);
+	outline-offset: 2px;
+}
+
+h1,
+h2,
+.ck-title {
+	font-family: var(--font-display);
+	font-weight: var(--display-weight);
+	letter-spacing: var(--display-spacing);
+}
+
+.muted {
+	color: var(--muted);
+}
+
+.center {
+	text-align: center;
+}
+
+/* ------------------------------------------------------------ buttons */
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	min-height: 46px;
+	padding: 0 18px;
+	border: var(--bw) solid var(--outline);
+	border-radius: var(--r);
+	background: var(--surface-2);
+	color: var(--ink);
+	font-weight: 700;
+	text-decoration: none;
+	box-shadow: var(--shadow);
+	transition:
+		transform 0.12s ease,
+		box-shadow 0.12s ease,
+		background 0.2s ease;
+}
+
+.btn:active:not(:disabled) {
+	transform: var(--press);
+	box-shadow: var(--shadow-press);
+}
+
+.btn.primary {
+	background: var(--accent);
+	color: var(--accent-ink);
+}
+
+.btn.bad {
+	background: var(--bad);
+	color: #fff;
+}
+
+.btn.ghost {
+	background: transparent;
+	border-color: transparent;
+	box-shadow: none;
+	color: var(--muted);
+	min-height: 40px;
+	padding: 0 12px;
+}
+
+.btn.ghost:hover {
+	color: var(--ink);
+}
+
+.btn.ghost:active {
+	transform: none;
+}
+
+.btn.small {
+	min-height: 38px;
+	padding: 0 14px;
+	border-radius: var(--r-sm);
+	font-size: 0.95rem;
+}
+
+.btn.wide {
+	width: 100%;
+}
+
+.btn:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
+.icon-btn {
+	display: grid;
+	place-items: center;
+	width: 44px;
+	height: 44px;
+	flex: none;
+	padding: 0;
+	border: var(--bw) solid var(--outline);
+	border-radius: var(--r);
+	background: var(--surface);
+	color: var(--ink);
+	box-shadow: var(--shadow);
+}
+
+.icon-btn:active {
+	transform: var(--press);
+	box-shadow: var(--shadow-press);
+}
+
+.icon-btn.small {
+	width: 38px;
+	height: 38px;
+	border-radius: var(--r-sm);
+}
+
+.row {
+	display: flex;
+	gap: 10px;
+	justify-content: center;
+}
+
+.row > .btn {
+	flex: 1;
+}
+
+.row.wrap {
+	flex-wrap: wrap;
+}
+
+.coin-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px 6px 8px;
+	border: var(--bw) solid var(--outline);
+	border-radius: 999px;
+	background: var(--surface);
+	box-shadow: var(--shadow-sm);
+	font-weight: 800;
+	color: var(--ink);
+	font-variant-numeric: tabular-nums;
+}
+
+.coin-chip .icon {
+	color: #d9a21b;
+}
+
+.badge {
+	align-self: center;
+	padding: 4px 12px;
+	border: var(--bw) solid var(--outline);
+	border-radius: 999px;
+	background: var(--accent-soft);
+	color: var(--ink);
+	font-weight: 800;
+	font-size: 0.9rem;
+}
+
+/* ------------------------------------------------------------ top bar */
+
+.bar {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-height: 48px;
+}
+
+.bar-title {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	line-height: 1.15;
+}
+
+.bar-title b {
+	font-family: var(--font-display);
+	font-weight: var(--display-weight);
+	letter-spacing: var(--display-spacing);
+	font-size: 1.15rem;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.bar-title span {
+	color: var(--muted);
+	font-size: 0.85rem;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* ------------------------------------------------------------ cards */
+
+.card {
+	border: var(--bw) solid var(--outline);
+	border-radius: var(--r-lg);
+	background: var(--surface);
+	box-shadow: var(--shadow-lg);
+}
+
+/* ------------------------------------------------------------ sheets (dialogs) */
+
+.sheet-back {
+	position: fixed;
+	inset: 0;
+	z-index: 20;
+	display: flex;
+	align-items: flex-end;
+	justify-content: center;
+	padding: 16px;
+	padding-bottom: max(16px, env(safe-area-inset-bottom));
+	background: color-mix(in srgb, var(--bg) 55%, transparent);
+	backdrop-filter: blur(3px);
+	animation: ck-fade 0.25s ease both;
+}
+
+@media (min-height: 700px) and (min-width: 600px) {
+	.sheet-back {
+		align-items: center;
+	}
+}
+
+.sheet {
+	width: 100%;
+	max-width: 440px;
+	max-height: calc(100dvh - 32px);
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	padding: 22px 20px 20px;
+	border: var(--bw) solid var(--outline);
+	border-radius: calc(var(--r-lg) + 4px);
+	background: var(--surface);
+	box-shadow: var(--shadow-lg);
+	animation: ck-rise 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+.sheet h2 {
+	margin: 0;
+	font-size: 1.5rem;
+	text-align: center;
+}
+
+.sheet p {
+	margin: 0;
+	text-align: center;
+}
+
+.sheet-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.sheet-head h2 {
+	text-align: left;
+}
+
+@keyframes ck-fade {
+	from {
+		opacity: 0;
+	}
+}
+
+@keyframes ck-rise {
+	from {
+		transform: translateY(24px) scale(0.98);
+		opacity: 0;
+	}
+}
+
+/* ------------------------------------------------------------ settings */
+
+.setting {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	min-height: 44px;
+	font-weight: 700;
+}
+
+.setting > span {
+	display: flex;
+	flex-direction: column;
+}
+
+.setting small {
+	color: var(--muted);
+	font-weight: 500;
+	font-size: 0.8rem;
+}
+
+.setting input[type='range'] {
+	width: 52%;
+	accent-color: var(--accent);
+}
+
+.setting select {
+	padding: 8px 10px;
+	border-radius: var(--r-sm);
+	border: max(2px, var(--bw)) solid var(--line);
+	background: var(--surface);
+}
+
+.toggle input {
+	appearance: none;
+	position: relative;
+	width: 50px;
+	height: 30px;
+	flex: none;
+	margin: 0;
+	border: var(--bw) solid var(--outline);
+	border-radius: 999px;
+	background: var(--surface-2);
+	box-shadow: inset 0 0 0 2px var(--line);
+	cursor: pointer;
+	transition: background 0.2s ease;
+}
+
+/* The knob sits inside the track's border with the same 3px gap in both styles:
+   it shrinks by the outline width, so the outline never pushes it out. The track is
+   30px tall, so the knob is 30 - 2 × outline - 2 × 3px, and travels 50 - 30 = 20px. */
+.toggle input::after {
+	content: '';
+	position: absolute;
+	top: 3px;
+	left: 3px;
+	width: calc(24px - 2 * var(--bw));
+	height: calc(24px - 2 * var(--bw));
+	border: min(2px, var(--bw)) solid var(--outline);
+	border-radius: 50%;
+	background: var(--surface);
+	box-shadow: var(--shadow-sm);
+	transition: transform 0.2s ease;
+}
+
+.toggle input:checked {
+	background: var(--accent);
+	box-shadow: none;
+}
+
+.toggle input:checked::after {
+	transform: translateX(20px);
+}
+
+/* A segmented choice, such as Style: Soft / Bold. */
+.seg {
+	display: inline-flex;
+	gap: 4px;
+	padding: 4px;
+	border: var(--bw) solid var(--outline);
+	border-radius: var(--r);
+	background: var(--surface-2);
+}
+
+.seg button {
+	min-height: 36px;
+	padding: 0 14px;
+	border: 0;
+	border-radius: var(--r-sm);
+	background: transparent;
+	color: var(--muted);
+	font-weight: 700;
+}
+
+.seg button[aria-pressed='true'] {
+	background: var(--surface);
+	color: var(--ink);
+	box-shadow: var(--shadow-sm);
+}
+
+/* ------------------------------------------------------------ tabs */
+
+.tabs {
+	display: grid;
+	grid-auto-flow: column;
+	grid-auto-columns: 1fr;
+	gap: 4px;
+	padding: 4px;
+	border: var(--bw) solid var(--outline);
+	border-radius: var(--r);
+	background: var(--surface-2);
+}
+
+.tabs button {
+	min-height: 40px;
+	border: 0;
+	border-radius: var(--r-sm);
+	background: transparent;
+	font-weight: 700;
+	color: var(--muted);
+}
+
+.tabs button.on,
+.tabs button[aria-selected='true'] {
+	background: var(--surface);
+	color: var(--ink);
+	box-shadow: var(--shadow-sm);
+}
+
+/* ------------------------------------------------------------ calm (less motion) */
+
+.calm *,
+.calm *::before,
+.calm *::after {
+	animation-duration: 0.01ms !important;
+	animation-iteration-count: 1 !important;
+	transition-duration: 0.01ms !important;
+}
