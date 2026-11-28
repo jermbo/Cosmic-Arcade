@@ -1,3 +1,4 @@
+export const HOME_PATH = '/';
 export const GAMES_PATH = '/games/';
 
 export function gamePath(slug: string): string {

@@ -1,6 +1,6 @@
 ---
 import '../styles/tokens.css';
-import { GAMES_PATH } from '../games/game-urls';
+import { GAMES_PATH, HOME_PATH } from '../games/game-urls';
 
 interface Props {
 	title: string;
@@ -21,7 +21,10 @@ const { title, description } = Astro.props;
 	</head>
 	<body class="site">
 		<header class="site__header">
-			<a class="site__home" href={GAMES_PATH}>Cosmic Arcade</a>
+			<a class="site__home" href={HOME_PATH}>Cosmic Arcade</a>
+			<nav class="site__nav" aria-label="Site">
+				<a class="site__nav-link" href={GAMES_PATH}>All games</a>
+			</nav>
 		</header>
 		<main class="site__main">
 			<slot />
@@ -47,7 +50,27 @@ const { title, description } = Astro.props;
 	}
 
 	.site__header {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: var(--space-body);
 		padding-block: var(--space-body);
+	}
+
+	.site__nav {
+		display: flex;
+		gap: var(--space-body);
+		font-size: var(--text-small);
+	}
+
+	.site__nav-link {
+		color: var(--color-text-muted);
+		text-decoration: none;
+	}
+
+	.site__nav-link:hover {
+		color: var(--color-accent);
 	}
 
 	.site__home {
