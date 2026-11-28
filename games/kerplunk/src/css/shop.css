@@ -33,7 +33,7 @@
 }
 
 .shapecard:focus-visible {
-	outline: 3px solid var(--ink);
+	outline: 3px solid var(--text);
 	outline-offset: 2px;
 }
 
@@ -173,6 +173,7 @@
 
 .theme-preview__mark {
 	font-family: var(--font-display);
+	font-weight: var(--display-weight, 400);
 	font-size: 1.1rem;
 	color: #111111;
 }

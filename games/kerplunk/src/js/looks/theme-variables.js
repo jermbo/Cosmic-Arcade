@@ -27,9 +27,13 @@ function cssVariables(theme) {
 		'block-ink': theme.blockInk,
 		bw: `${theme.outlineWidth}px`,
 		sh: `${theme.shadowOffset}px`,
+		// The sideways part of a shadow: as deep as it drops in Bold, none in Soft.
+		shx: `${theme.shadowSideways ? theme.shadowOffset : 0}px`,
 		r: `${theme.cornerRadius}px`,
 		tilt: `${theme.tilt}deg`,
 		'font-display': `'${theme.displayFont}', 'Arial Black', sans-serif`,
+		'display-weight': theme.displayFont === 'Archivo Black' ? '400' : '800',
+		'font-ui': `'${theme.uiFont}', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`,
 	};
 	theme.blocks.forEach((color, index) => (variables[`c${index}`] = color));
 	return variables;

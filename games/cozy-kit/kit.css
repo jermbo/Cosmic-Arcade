@@ -1,0 +1,310 @@
+/*
+ * The cozy kit: shared tokens for the arcade's cozy puzzle games.
+ * MADE BY scripts/make-css.js FROM themes.js. Do not edit by hand.
+ *
+ * Put data-theme, data-tone and data-style on <html> (applyLooks in themes.js does it).
+ * A box with its own data-theme (a shop preview) shows that theme inside the page.
+ *
+ * Shape tokens: --bw (outline width), --outline (outline color: stroke in Bold,
+ * clear in Soft), --shade (shadow color), --sx (1 in Bold, 0 in Soft: multiply
+ * a shadow's x offset by it, so a hard diagonal shadow drops straight down in
+ * Soft), --shadow / --shadow-sm / --shadow-lg / --shadow-press, --press (the
+ * pressed move), --r-lg / --r / --r-sm, --font-display / --font-ui,
+ * --display-weight, --display-spacing, --page-bg.
+ */
+
+:root,
+[data-theme='oat'] {
+	--bg: #f6efe3;
+	--glow: #fde4cc;
+	--dot: #e6d8c1;
+	--surface: #fffaf3;
+	--surface-2: #eee5d8;
+	--well: #faf4ec;
+	--board: #ebe1d3;
+	--ink: #2e2730;
+	--stroke: #2e2730;
+	--muted: #6b5e65;
+	--line: #dbcfbf;
+	--edge: rgba(110, 80, 50, 0.2);
+	--drop: rgba(110, 80, 50, 0.16);
+	--accent: #c24f2a;
+	--accent-ink: #fffaf5;
+	--accent-soft: #fcdcca;
+	--bad: #c8352f;
+	--good: #1f7341;
+	--c0: #fd4f48;
+	--c1: #92abe8;
+	--c2: #fbbc37;
+	--c3: #4ed089;
+	--c4: #a56bfe;
+	--c5: #f6914a;
+	--c6: #3fc1b8;
+	--c7: #f28fbc;
+	--c8: #b8875f;
+	--c9: #9aa1ad;
+	--on-color: #2b2430;
+	--shine: rgba(255, 255, 255, 0.6);
+	color-scheme: light;
+}
+
+[data-theme='sage'] {
+	--bg: #e8f0e3;
+	--glow: #f4f5d6;
+	--dot: #cfdfc6;
+	--surface: #f9fcf6;
+	--surface-2: #dae6d4;
+	--well: #f2f8ef;
+	--board: #d6e2cf;
+	--ink: #263127;
+	--stroke: #263127;
+	--muted: #536553;
+	--line: #c3d5bd;
+	--edge: rgba(50, 80, 50, 0.2);
+	--drop: rgba(50, 80, 50, 0.15);
+	--accent: #357849;
+	--accent-ink: #f8fff8;
+	--accent-soft: #d2ead5;
+	--bad: #c23a33;
+	--good: #1f7341;
+	--c0: #fd4f48;
+	--c1: #92abe8;
+	--c2: #fbbc37;
+	--c3: #4ed089;
+	--c4: #a56bfe;
+	--c5: #f6914a;
+	--c6: #3fc1b8;
+	--c7: #f28fbc;
+	--c8: #b8875f;
+	--c9: #9aa1ad;
+	--on-color: #2b2430;
+	--shine: rgba(255, 255, 255, 0.6);
+	color-scheme: light;
+}
+
+[data-theme='blossom'] {
+	--bg: #fbebe8;
+	--glow: #ffd9e1;
+	--dot: #f2cdcd;
+	--surface: #fffafa;
+	--surface-2: #f4dbd7;
+	--well: #fff5f3;
+	--board: #f1d6d1;
+	--ink: #40263a;
+	--stroke: #40263a;
+	--muted: #7a5866;
+	--line: #eac6c1;
+	--edge: rgba(140, 60, 80, 0.18);
+	--drop: rgba(140, 60, 80, 0.14);
+	--accent: #bd3b61;
+	--accent-ink: #fff8fa;
+	--accent-soft: #fcd2de;
+	--bad: #bf2f45;
+	--good: #1f7341;
+	--c0: #fd4f48;
+	--c1: #92abe8;
+	--c2: #fbbc37;
+	--c3: #4ed089;
+	--c4: #a56bfe;
+	--c5: #f6914a;
+	--c6: #3fc1b8;
+	--c7: #f28fbc;
+	--c8: #b8875f;
+	--c9: #9aa1ad;
+	--on-color: #2b2430;
+	--shine: rgba(255, 255, 255, 0.6);
+	color-scheme: light;
+}
+
+[data-theme='sky'] {
+	--bg: #e5effa;
+	--glow: #def0ff;
+	--dot: #c9d9ee;
+	--surface: #f8fbff;
+	--surface-2: #d7e4f3;
+	--well: #f1f6fd;
+	--board: #d3e0f0;
+	--ink: #24303e;
+	--stroke: #24303e;
+	--muted: #526379;
+	--line: #c1d2e6;
+	--edge: rgba(40, 70, 120, 0.18);
+	--drop: rgba(40, 70, 120, 0.14);
+	--accent: #2c68c8;
+	--accent-ink: #f7fbff;
+	--accent-soft: #d3e3fb;
+	--bad: #c23838;
+	--good: #1f7341;
+	--c0: #fd4f48;
+	--c1: #92abe8;
+	--c2: #fbbc37;
+	--c3: #4ed089;
+	--c4: #a56bfe;
+	--c5: #f6914a;
+	--c6: #3fc1b8;
+	--c7: #f28fbc;
+	--c8: #b8875f;
+	--c9: #9aa1ad;
+	--on-color: #2b2430;
+	--shine: rgba(255, 255, 255, 0.6);
+	color-scheme: light;
+}
+
+[data-theme='plum'] {
+	--bg: #221c27;
+	--glow: #3a2a45;
+	--dot: #33293b;
+	--surface: #2f2836;
+	--surface-2: #3d3546;
+	--well: #2a2331;
+	--board: #3a3243;
+	--ink: #f5eef6;
+	--stroke: #0a070c;
+	--muted: #ad9fb5;
+	--line: #4b4255;
+	--edge: rgba(0, 0, 0, 0.42);
+	--drop: rgba(0, 0, 0, 0.35);
+	--accent: #ffb46b;
+	--accent-ink: #2b1f1a;
+	--accent-soft: #4c3a32;
+	--bad: #ff7b7f;
+	--good: #79dba0;
+	--c0: #ed5857;
+	--c1: #336aef;
+	--c2: #ffad21;
+	--c3: #aeffd9;
+	--c4: #cfb2ff;
+	--c5: #ff8f57;
+	--c6: #4fd4cd;
+	--c7: #ff9ccb;
+	--c8: #cf9c70;
+	--c9: #b0b7c3;
+	--on-color: #1f1823;
+	--shine: rgba(255, 255, 255, 0.12);
+	color-scheme: dark;
+}
+
+[data-theme='tide'] {
+	--bg: #111d29;
+	--glow: #163448;
+	--dot: #1c2d3d;
+	--surface: #1a2a39;
+	--surface-2: #24384b;
+	--well: #172534;
+	--board: #213547;
+	--ink: #e8f2f7;
+	--stroke: #03080d;
+	--muted: #93abb9;
+	--line: #2f4659;
+	--edge: rgba(0, 0, 0, 0.45);
+	--drop: rgba(0, 0, 0, 0.38);
+	--accent: #63d3c5;
+	--accent-ink: #0d1f24;
+	--accent-soft: #1f4447;
+	--bad: #ff7c7c;
+	--good: #77dfa6;
+	--c0: #ed5857;
+	--c1: #336aef;
+	--c2: #ffad21;
+	--c3: #aeffd9;
+	--c4: #cfb2ff;
+	--c5: #ff8f57;
+	--c6: #4fd4cd;
+	--c7: #ff9ccb;
+	--c8: #cf9c70;
+	--c9: #b0b7c3;
+	--on-color: #1f1823;
+	--shine: rgba(255, 255, 255, 0.12);
+	color-scheme: dark;
+}
+
+[data-theme='hearth'] {
+	--bg: #1f1b19;
+	--glow: #3b2618;
+	--dot: #2e2724;
+	--surface: #2b2522;
+	--surface-2: #3a322d;
+	--well: #26201d;
+	--board: #362e29;
+	--ink: #f7ede4;
+	--stroke: #080605;
+	--muted: #b4a395;
+	--line: #4a3f38;
+	--edge: rgba(0, 0, 0, 0.45);
+	--drop: rgba(0, 0, 0, 0.38);
+	--accent: #ff9446;
+	--accent-ink: #2a1708;
+	--accent-soft: #4e3320;
+	--bad: #ff7a6c;
+	--good: #7fdc9c;
+	--c0: #ed5857;
+	--c1: #336aef;
+	--c2: #ffad21;
+	--c3: #aeffd9;
+	--c4: #cfb2ff;
+	--c5: #ff8f57;
+	--c6: #4fd4cd;
+	--c7: #ff9ccb;
+	--c8: #cf9c70;
+	--c9: #b0b7c3;
+	--on-color: #1f1823;
+	--shine: rgba(255, 255, 255, 0.12);
+	color-scheme: dark;
+}
+
+:root,
+[data-style='soft'],
+[data-style='soft'] [data-theme] {
+	--bw: 0px;
+	--r-lg: 24px;
+	--r: 16px;
+	--r-sm: 12px;
+	--lift: 3px;
+	--font-display: 'Bricolage Grotesque', 'Arial Black', system-ui, sans-serif;
+	--font-ui: 'Bricolage Grotesque', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--display-weight: 800;
+	--display-spacing: -0.02em;
+	--outline: transparent;
+	--sx: 0;
+	--shade: var(--edge);
+	--shadow: 0 var(--lift) 0 var(--edge);
+	--shadow-sm: 0 2px 0 var(--edge);
+	--shadow-lg: 0 5px 0 var(--edge), 0 14px 30px -14px var(--drop);
+	--shadow-press: 0 1px 0 var(--edge);
+	--press: translateY(calc(var(--lift) - 1px));
+	--page-bg: radial-gradient(120% 60% at 50% -10%, var(--glow), transparent 70%) fixed, var(--bg);
+}
+
+[data-style='bold'],
+[data-style='bold'] [data-theme] {
+	--bw: 3px;
+	--r-lg: 14px;
+	--r: 10px;
+	--r-sm: 6px;
+	--lift: 4px;
+	--font-display: 'Archivo Black', 'Arial Black', system-ui, sans-serif;
+	--font-ui: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--display-weight: 400;
+	--display-spacing: 0;
+	--outline: var(--stroke);
+	--sx: 1;
+	--shade: var(--stroke);
+	--shadow: var(--lift) var(--lift) 0 var(--stroke);
+	--shadow-sm: 2px 2px 0 var(--stroke);
+	--shadow-lg: 5px 5px 0 var(--stroke);
+	--shadow-press: 1px 1px 0 var(--stroke);
+	--press: translate(calc(var(--lift) - 1px), calc(var(--lift) - 1px));
+	--page-bg: radial-gradient(var(--dot) 1.4px, transparent 1.6px) 0 0 / 22px 22px, var(--bg);
+}
+
+/* A font with no bold (Archivo Black) must not be made fake-bold. */
+:root {
+	font-synthesis: none;
+}
+
+/* Helpers every game can use. */
+.ck-display {
+	font-family: var(--font-display);
+	font-weight: var(--display-weight);
+	letter-spacing: var(--display-spacing);
+}

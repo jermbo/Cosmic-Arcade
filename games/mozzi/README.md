@@ -229,7 +229,7 @@ Coins come from mended windows (each window pays once): 10/15/20/30 by level, +1
 
 | Kind | Items (price) |
 | ---- | ------------- |
-| Themes | Linen (free), Dusk (free, dark), Meadow 60, Blossom 60, Deep Sea 90 (dark), Ember 90 (dark) |
+| Themes | The cozy kit's seven: Oat (free), Plum (free, dark), Sage 60, Blossom 60, Sky 60, Tide 90 (dark), Hearth 90 (dark). Plus the free Style setting: Soft or Bold. |
 | Tile styles | Clay (free), Paper 80, Glass 120, Gem 150 |
 | Sound packs | Glass Bells (free), Kalimba 100, Felt Piano 100 |
 
@@ -244,7 +244,7 @@ All sound is made in code with Web Audio (`src/app/audio.ts`). Each sound pack i
 - The board is a grid for screen readers; each tile reads its name and contents ("B2, 3, ruby, clue").
 - A polite live region says what happened: placements, clashes, finished lines, hints (the full why), and the end.
 - Full keyboard and gamepad play; focus rings follow the theme's accent.
-- **Colors that stay apart.** Each theme's four colors, and its empty tile, are tuned to differ mostly in lightness, so they stay apart under normal vision and the three common kinds of color blindness (protanopia, deuteranopia, tritanopia). `scripts/check-colors.ts` checks this on every `npm test`: it simulates each kind (Machado et al. 2009), measures the smallest color distance (CIELAB ΔE), and fails below 18. It also checks the number ink has a contrast of at least 3.5:1 on every color. Before tuning, ruby and jade were almost the same for deuteranopia (ΔE about 5); now the smallest distance is 21 or more.
+- **Colors that stay apart.** Each theme's four colors, and its empty tile, are tuned to differ mostly in lightness, so they stay apart under normal vision and the three common kinds of color blindness (protanopia, deuteranopia, tritanopia). The cozy kit's color check (`games/cozy-kit/scripts/check-colors.js`) checks this for every theme on every `npm test`: it simulates each kind (Machado et al. 2009), measures the smallest color distance (CIELAB ΔE), and fails below 18. It also checks the number ink has a contrast of at least 3.5:1 on every color. Before tuning, ruby and jade were almost the same for deuteranopia (ΔE about 5); with the kit's palette the smallest distance is 29 or more.
 - **Color shapes** setting (off by default, and on by itself when the device asks for more contrast): ● ruby, ▲ cobalt, ■ amber, ◆ jade, on the tiles, the color keys, notes, the pairs sheet and hint text. Color names also show on the color keys.
 - **Big numbers** setting; buttons are at least 38px (most are 42–68px).
 - Two free themes, one light and one dark.
@@ -278,7 +278,7 @@ One localStorage entry, `mozzi:v1`: settings, windows in progress, finished wind
 
 ## Tests
 
-`npm test` runs `scripts/test-puzzles.ts` and `scripts/check-colors.ts` (see Accessibility). The puzzle test checks 130 practice puzzles per level and 70 daily puzzles (590 in all). For each:
+`npm test` runs `scripts/test-puzzles.ts` and the cozy kit's color check (see Accessibility). The puzzle test checks 130 practice puzzles per level and 70 daily puzzles (590 in all). For each:
 
 - exactly one solution, and it matches the stored answer;
 - the human solver finishes it, and every part it places is right;

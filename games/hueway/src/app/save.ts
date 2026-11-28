@@ -17,6 +17,8 @@ export interface Settings {
 	dotMarks: boolean;
 	/** Tint the squares a line runs through. */
 	fillTint: boolean;
+	/** The cozy kit style: soft clay or bold ink. */
+	style: 'soft' | 'bold';
 }
 
 /** A puzzle in progress. */
@@ -102,6 +104,7 @@ export const defaultSettings = (): Settings => ({
 	haptics: true,
 	dotMarks: false,
 	fillTint: true,
+	style: 'soft',
 });
 
 export const freshSave = (): SaveData => ({
@@ -126,6 +129,10 @@ export function load(): SaveData {
 		const data = JSON.parse(raw) as SaveData;
 		if (data.v !== 1) return freshSave();
 		const base = freshSave();
+		// Old theme ids from before the cozy kit.
+		const alias: Record<string, string> = { apricot: 'blossom' };
+		if (data.looks) data.looks.theme = alias[data.looks.theme] ?? data.looks.theme;
+		data.owned = (data.owned ?? []).map((id) => alias[id] ?? id);
 		return {
 			...base,
 			...data,

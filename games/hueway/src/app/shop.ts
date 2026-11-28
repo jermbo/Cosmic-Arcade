@@ -1,11 +1,12 @@
 /**
  * The shop: every item, every price and every coin reward lives here as data.
  * Add an item: add it to CATALOG, then give it a look:
- *  - theme: a `[data-theme='id']` block of color tokens in style.css;
+ *  - theme: themes come from the cozy kit (games/cozy-kit/themes.js);
  *  - line: a case in LINE_LOOKS (src/ui/Board.tsx);
  *  - dot: a case in DOT_LOOKS (src/ui/Board.tsx);
  *  - sound: an entry in PACKS in audio.ts.
  */
+import { FREE_THEMES, THEMES } from '@arcade/cozy-kit/themes.js';
 import type { Level } from '../core/types.ts';
 
 export type Kind = 'theme' | 'line' | 'dot' | 'sound';
@@ -20,13 +21,12 @@ export interface Item {
 	tone?: 'light' | 'dark';
 }
 
+/** Theme prices. Tune here. The kit's FREE_THEMES (Oat and Plum) are always free. */
+const THEME_PRICE: Record<string, number> = { sage: 60, blossom: 60, sky: 60, tide: 90, hearth: 90 };
+
 export const CATALOG: Item[] = [
-	{ id: 'oat', kind: 'theme', name: 'Oat', blurb: 'Warm cream and soft linen.', price: 0, tone: 'light' },
-	{ id: 'plum', kind: 'theme', name: 'Plum', blurb: 'A quiet plum night.', price: 0, tone: 'dark' },
-	{ id: 'sage', kind: 'theme', name: 'Sage', blurb: 'Garden green and morning light.', price: 60, tone: 'light' },
-	{ id: 'apricot', kind: 'theme', name: 'Apricot', blurb: 'Peach skin and warm clay.', price: 60, tone: 'light' },
-	{ id: 'tide', kind: 'theme', name: 'Tide', blurb: 'Deep blue water, still and calm.', price: 90, tone: 'dark' },
-	{ id: 'hearth', kind: 'theme', name: 'Hearth', blurb: 'Charcoal and the glow of a fire.', price: 90, tone: 'dark' },
+	// Themes are the cozy kit's, shared with the other cozy games. Prices are Hueway's.
+	...THEMES.map((t): Item => ({ id: t.id, kind: 'theme', name: t.name, blurb: t.blurb, price: FREE_THEMES.includes(t.id) ? 0 : (THEME_PRICE[t.id] ?? 60), tone: t.tone })),
 
 	{ id: 'ribbon', kind: 'line', name: 'Ribbon', blurb: 'A soft, round ribbon with a sheen.', price: 0 },
 	{ id: 'yarn', kind: 'line', name: 'Yarn', blurb: 'Twisted wool with little stitches.', price: 80 },

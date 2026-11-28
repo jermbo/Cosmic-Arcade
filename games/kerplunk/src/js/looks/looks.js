@@ -15,9 +15,14 @@ export function onLooksChange(redraw) {
 	redrawOnChange.push(redraw);
 }
 
-/** The theme in use. With Random, the last roll. */
+/** The cozy kit style in use: 'bold' or 'soft' (a free setting). */
+export function activeKitStyle() {
+	return store.settings.bold ? 'bold' : 'soft';
+}
+
+/** The theme in use, in the style in use. With Random, the last roll. */
 export function activeTheme() {
-	return themeFor(store.looks);
+	return themeFor(store.looks, activeKitStyle());
 }
 
 /** The block style in use. */
@@ -29,7 +34,7 @@ export function activeStyle() {
 export function applyLooks() {
 	const theme = activeTheme();
 	writeVariables(theme);
-	loadFonts(theme.displayFont);
+	loadFonts(theme.displayFont, theme.uiFont);
 	paintPalette(theme.blocks);
 	view.setLooks(theme, activeStyle());
 	// The feel goes with the look: the sound profile and the animation style in use.
@@ -56,7 +61,7 @@ export function initLooks() {
 }
 
 /** The canvas draws text in the theme fonts, which the page loads only once some text uses them. */
-function loadFonts(displayFont) {
+function loadFonts(displayFont, uiFont) {
 	if (!document.fonts) return;
-	for (const font of [`20px '${displayFont}'`, "500 20px 'DM Mono'", "700 20px 'Space Grotesk'"]) document.fonts.load(font).catch(() => {});
+	for (const font of [`20px '${displayFont}'`, "500 20px 'DM Mono'", `700 20px '${uiFont}'`]) document.fonts.load(font).catch(() => {});
 }

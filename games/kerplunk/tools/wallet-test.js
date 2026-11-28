@@ -41,17 +41,18 @@ assert.equal(boostsCost({ warmup: false, power: null, ban: 0 }), BAN_COST);
 
 // Buying a look takes its price and owns it.
 const look = (list, id) => list.find((item) => item.id === id);
-const dark = look(THEMES, 'dark');
-assert.deepEqual(buyLook(342, ['light'], dark), { glints: 342 - dark.price, owned: ['light', 'dark'] });
+const tide = look(THEMES, 'tide');
+assert.deepEqual(buyLook(342, ['oat'], tide), { glints: 342 - tide.price, owned: ['oat', 'tide'] });
 
 // With too few Plunks, or an item that is owned, nothing changes.
-const owned = ['light'];
-assert.equal(buyLook(100, owned, look(THEMES, 'dark')), null);
-assert.deepEqual(owned, ['light'], 'the owned list does not change');
-assert.equal(buyLook(999, ['light', 'dark'], look(THEMES, 'dark')), null, 'an owned item is not bought again');
+const owned = ['oat'];
+assert.equal(buyLook(100, owned, look(THEMES, 'tide')), null);
+assert.deepEqual(owned, ['oat'], 'the owned list does not change');
+assert.equal(buyLook(999, ['oat', 'tide'], look(THEMES, 'tide')), null, 'an owned item is not bought again');
 
-// Light and Patterns are free.
-assert.equal(look(THEMES, 'light').price, 0);
+// Oat, Plum and Patterns are free.
+assert.equal(look(THEMES, 'oat').price, 0);
+assert.equal(look(THEMES, 'plum').price, 0);
 assert.equal(look(STYLES, 'patterns').price, 0);
 
 console.log('wallet ok');

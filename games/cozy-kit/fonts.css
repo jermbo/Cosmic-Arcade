@@ -1,0 +1,43 @@
+/* The kit's fonts: Latin only. Soft uses Bricolage Grotesque; Bold uses Archivo Black and Space Grotesk. */
+
+@font-face {
+	font-family: 'Bricolage Grotesque';
+	src: url('./fonts/bricolage-grotesque-latin-500-normal.woff2') format('woff2');
+	font-weight: 500;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Bricolage Grotesque';
+	src: url('./fonts/bricolage-grotesque-latin-700-normal.woff2') format('woff2');
+	font-weight: 700;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Bricolage Grotesque';
+	src: url('./fonts/bricolage-grotesque-latin-800-normal.woff2') format('woff2');
+	font-weight: 800;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Archivo Black';
+	src: url('./fonts/archivo-black-latin-400-normal.woff2') format('woff2');
+	font-weight: 400;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Space Grotesk';
+	src: url('./fonts/space-grotesk-latin-500-normal.woff2') format('woff2');
+	font-weight: 500;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Space Grotesk';
+	src: url('./fonts/space-grotesk-latin-700-normal.woff2') format('woff2');
+	font-weight: 700;
+	font-display: swap;
+}

@@ -19,6 +19,8 @@ export interface Settings {
 	colorShapes: boolean;
 	/** Bigger numbers and notes on the board. */
 	bigText: boolean;
+	/** The cozy kit style: soft clay or bold ink. */
+	style: 'soft' | 'bold';
 }
 
 /** A window in progress. */
@@ -79,6 +81,7 @@ export const defaultSettings = (): Settings => ({
 	haptics: true,
 	colorShapes: false,
 	bigText: false,
+	style: 'soft',
 });
 
 export const freshSave = (): SaveData => ({
@@ -102,6 +105,10 @@ export function load(): SaveData {
 		const data = JSON.parse(raw) as SaveData;
 		if (data.v !== 1) return freshSave();
 		const base = freshSave();
+		// Theme ids from before the cozy kit.
+		const alias: { [id: string]: string } = { linen: 'oat', dusk: 'plum', meadow: 'sage', deepsea: 'tide', ember: 'hearth' };
+		if (data.looks) data.looks.theme = alias[data.looks.theme] ?? data.looks.theme;
+		data.owned = (data.owned ?? []).map((id) => alias[id] ?? id);
 		return {
 			...base,
 			...data,

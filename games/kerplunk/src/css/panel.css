@@ -8,7 +8,7 @@
 	color: var(--text);
 	border: var(--bw) solid var(--ink);
 	border-radius: var(--r);
-	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	box-shadow: var(--shx) var(--sh) 0 var(--shadow);
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -43,7 +43,7 @@
 .panel__title {
 	margin: 0;
 	font-family: var(--font-display);
-	font-weight: 400;
+	font-weight: var(--display-weight, 400);
 	font-size: 1.8rem;
 	line-height: 1.05;
 }
@@ -83,8 +83,9 @@
 	color: var(--on-accent);
 	border: var(--bw) solid var(--ink);
 	border-radius: var(--r);
-	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	box-shadow: var(--shx) var(--sh) 0 var(--shadow);
 	font-family: var(--font-display);
+	font-weight: var(--display-weight, 400);
 	font-size: 2.6rem;
 	line-height: 1;
 	transform: rotate(var(--tilt));
@@ -107,6 +108,7 @@
 	border: 2px solid var(--ink);
 	box-shadow: 3px 3px 0 var(--shadow);
 	font-family: var(--font-display);
+	font-weight: var(--display-weight, 400);
 	font-size: 0.85rem;
 	letter-spacing: 0.02em;
 	text-transform: uppercase;

@@ -446,6 +446,14 @@ export function SettingsModal({ settings, onChange, onClose, onTutorial, onShop,
 				{toggle('helpers', 'Helpers', 'Light up the row, column and matches of the picked tile.')}
 				{toggle('haptics', 'Vibration', 'Small taps on phones that support it.')}
 				<h3>Seeing and motion</h3>
+				<div className="seg" role="radiogroup" aria-label="Style">
+					<span>Style</span>
+					{(['soft', 'bold'] as const).map((st) => (
+						<button key={st} role="radio" aria-checked={settings.style === st} className={settings.style === st ? 'on' : ''} onClick={() => set('style', st)}>
+							{st === 'soft' ? 'Soft' : 'Bold'}
+						</button>
+					))}
+				</div>
 				<div className="seg" role="radiogroup" aria-label="Motion">
 					<span>Motion</span>
 					{(['auto', 'reduced', 'full'] as const).map((m) => (

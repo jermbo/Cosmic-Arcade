@@ -1,53 +1,59 @@
 /* Wordkin. Neo-brutalist paper tiles: thick ink lines, hard shadows, flat bold color. */
 
-:root {
-	--ink: #141414;
-	/* Hard shadows. Same as the ink, except on dark themes. */
-	--shade: var(--ink);
+:root,
+[data-theme] {
+	/* Wordkin's names, made from the cozy kit's tokens (games/cozy-kit). The
+	   themes, the two styles (Soft and Bold) and the fonts come from the kit. */
+	--paper: var(--bg);
+	--paper-dot: var(--dot);
+	--card: var(--surface);
 	/* Text that sits right on the page (header, hints), not on a card. */
 	--page-text: var(--ink);
-	--page-muted: #5e574c;
+	--page-muted: var(--muted);
 	/* Speed of the motion style: 1 is normal, lower is faster. */
 	--t: 1;
-	--paper: #fff4de;
-	--paper-dot: #ecdcbc;
-	--card: #fffdf7;
-	--muted: #5e574c;
-	--l1: #ffd23f;
-	--l2: #ff9a62;
-	--l3: #5cc8f2;
-	--l4: #b993ff;
-	--hit: #3bd68d;
-	--near: #ffd23f;
-	--miss: #cfc7b8;
-	--pink: #ff6b9a;
-	--go: #ff6b9a;
+	/* Group colors, and the letter marks. All from the color-blind-safe five. */
+	--l1: var(--c2);
+	--l2: var(--c0);
+	--l3: var(--c1);
+	--l4: var(--c4);
+	--hit: var(--c3);
+	--near: var(--c2);
+	--miss: var(--surface-2);
+	--pink: var(--c7);
+	--go: var(--accent);
 	/* Text on the ink color (selected tiles, toasts, the chain card). */
-	--on-ink: #fff8ea;
-	/* Known letters shown faintly in empty guess cells (large text: 3:1 or more). */
-	--ghost: #857b6a;
-	/* Edges of empty guess cells and empty stickers (3:1 or more on cards). */
-	--cell-line: #8c8373;
+	--on-ink: var(--surface);
+	/* Known letters shown faintly in empty guess cells. */
+	--ghost: var(--muted);
+	/* Edges of empty guess cells and empty stickers. */
+	--cell-line: color-mix(in srgb, var(--ink) 55%, var(--surface));
 	/* Text on the grey "not in the word" color. */
-	--miss-text: #3f3a32;
+	--miss-text: var(--ink);
 	/* Warning and good-news text: on cards, and on the page. */
-	--alert: #b8234f;
-	--alert-page: #b8234f;
-	--good: #12703f;
-	--good-page: #12703f;
+	--alert: var(--bad);
+	--alert-page: var(--bad);
+	--good-page: var(--good);
 	--gold-text: #8a6500;
-	/* Keyboard focus: a ring in --focus with a halo in --focus-halo, so it shows on the page and on cards. */
+	/* Locked tiles: always dark, with group-color 1 letters. */
+	--locked-bg: var(--ink);
+	/* Keyboard focus: a ring in --focus with a halo in --focus-halo. */
 	--focus: var(--ink);
-	--focus-halo: var(--card);
+	--focus-halo: var(--surface);
+	/* Outline width. It stays the same in both styles; the color is the kit's
+	   --outline (ink in Bold, clear in Soft), so nothing moves when the style changes. */
 	--line: 3px;
-	--shadow: 4px 4px 0 var(--shade);
-	--shadow-sm: 2px 2px 0 var(--shade);
-	--radius: 12px;
-	--display: 'Archivo Black', system-ui, sans-serif;
-	--body: 'Space Grotesk', system-ui, sans-serif;
+	--radius: var(--r);
+	--display: var(--font-display);
+	--body: var(--font-ui);
 	--spring: cubic-bezier(0.3, 1.5, 0.5, 1);
 	--out: cubic-bezier(0.2, 0.8, 0.2, 1);
-	color-scheme: light;
+}
+
+[data-tone='dark'],
+[data-tone='dark'] [data-theme] {
+	--gold-text: #ffcf5c;
+	--locked-bg: var(--on-color);
 }
 
 * {
@@ -58,9 +64,7 @@ html,
 body {
 	margin: 0;
 	min-height: 100%;
-	background-color: var(--paper);
-	background-image: radial-gradient(var(--paper-dot) 1.4px, transparent 1.6px);
-	background-size: 22px 22px;
+	background: var(--page-bg);
 	color: var(--ink);
 	font-family: var(--body);
 	font-weight: 500;
@@ -147,8 +151,8 @@ button:disabled {
 	gap: 6px;
 	min-height: 46px;
 	padding: 0 16px;
-	border: var(--line) solid var(--ink);
-	border-radius: 10px;
+	border: var(--line) solid var(--outline);
+	border-radius: var(--r);
 	background: var(--card);
 	box-shadow: var(--shadow-sm);
 	font-weight: 700;
@@ -172,6 +176,7 @@ button:disabled {
 }
 
 .btn--go {
+	color: var(--accent-ink);
 	background: var(--go);
 }
 
@@ -180,6 +185,7 @@ button:disabled {
 }
 
 .btn--done {
+	color: var(--on-color);
 	background: var(--hit);
 	flex-direction: column;
 	gap: 0;
@@ -231,8 +237,8 @@ button:disabled {
 	width: 42px;
 	height: 42px;
 	flex: none;
-	border: var(--line) solid var(--ink);
-	border-radius: 10px;
+	border: var(--line) solid var(--outline);
+	border-radius: var(--r);
 	background: var(--card);
 	box-shadow: var(--shadow-sm);
 	padding: 0;
@@ -252,7 +258,7 @@ button:disabled {
 .chip {
 	display: inline-block;
 	padding: 3px 9px;
-	border: 2px solid var(--ink);
+	border: 2px solid var(--outline);
 	border-radius: 999px;
 	font-size: 12px;
 	font-weight: 700;
@@ -265,17 +271,19 @@ button:disabled {
 .chip--l4 { background: var(--l4); }
 
 .chip--streak {
+	color: var(--on-color);
 	background: var(--l1);
 }
 
 /* ---------- Kip ---------- */
 
 .kip {
+	color: var(--on-color);
 	--lx: 0px;
 	--ly: 0px;
 	flex: none;
-	border: var(--line) solid var(--ink);
-	border-radius: 14px;
+	border: var(--line) solid var(--outline);
+	border-radius: var(--r);
 	background: var(--pink);
 	box-shadow: var(--shadow-sm);
 	animation: kip-bob 3.6s ease-in-out infinite;
@@ -323,7 +331,7 @@ button:disabled {
 .kip--small {
 	width: 40px;
 	height: 40px;
-	border-radius: 11px;
+	border-radius: var(--r);
 }
 
 .kip--big {
@@ -442,7 +450,7 @@ button:disabled {
 	padding: 0;
 	border: 0;
 	background: none;
-	border-radius: 12px;
+	border-radius: var(--r);
 }
 
 .kipbtn:active .kip {
@@ -451,6 +459,7 @@ button:disabled {
 }
 
 .kipbtn__badge {
+	color: var(--on-color);
 	position: absolute;
 	right: -7px;
 	bottom: -6px;
@@ -459,10 +468,11 @@ button:disabled {
 	min-width: 20px;
 	height: 20px;
 	padding: 0 4px;
-	border: 2.5px solid var(--ink);
+	border: 2.5px solid var(--outline);
 	border-radius: 999px;
 	background: var(--l1);
 	font-family: var(--display);
+	font-weight: var(--display-weight);
 	font-size: 11px;
 	line-height: 1;
 }
@@ -479,8 +489,8 @@ button:disabled {
 	width: max-content;
 	max-width: min(240px, 70vw);
 	padding: 8px 12px;
-	border: var(--line) solid var(--ink);
-	border-radius: 12px;
+	border: var(--line) solid var(--outline);
+	border-radius: var(--r);
 	background: var(--card);
 	box-shadow: var(--shadow-sm);
 	font-size: 14px;
@@ -504,8 +514,8 @@ button:disabled {
 	translate: -50% 0;
 	rotate: 45deg;
 	background: var(--card);
-	border-left: var(--line) solid var(--ink);
-	border-top: var(--line) solid var(--ink);
+	border-left: var(--line) solid var(--outline);
+	border-top: var(--line) solid var(--outline);
 }
 
 .bubble--show {
@@ -523,11 +533,12 @@ button:disabled {
 	place-items: center;
 	width: 22px;
 	height: 22px;
-	border: 2.5px solid var(--ink);
+	border: 2.5px solid var(--outline);
 	border-radius: 50%;
 	background: var(--pink);
-	color: var(--ink);
+	color: var(--on-color);
 	font-family: var(--display);
+	font-weight: var(--display-weight);
 	font-size: 11px;
 	line-height: 1;
 	z-index: 1;
@@ -558,13 +569,14 @@ button:disabled {
 }
 
 .update-note {
+	color: var(--on-color);
 	position: fixed;
 	left: 50%;
 	bottom: max(16px, env(safe-area-inset-bottom));
 	z-index: 65;
 	translate: -50% 0;
 	padding: 10px 16px;
-	border: var(--line) solid var(--ink);
+	border: var(--line) solid var(--outline);
 	border-radius: 999px;
 	background: var(--l1);
 	box-shadow: var(--shadow-sm);
@@ -590,10 +602,11 @@ button:disabled {
 	--i: 0;
 	width: clamp(50px, 15vw, 68px);
 	height: clamp(50px, 15vw, 68px);
-	border: var(--line) solid var(--ink);
-	border-radius: 12px;
+	border: var(--line) solid var(--outline);
+	border-radius: var(--r);
 	box-shadow: var(--shadow);
 	font-family: var(--display);
+	font-weight: var(--display-weight);
 	font-size: clamp(28px, 9vw, 40px);
 	line-height: 1;
 	padding: 0;
@@ -636,8 +649,8 @@ button:disabled {
 	display: grid;
 	grid-template-columns: repeat(3, 1fr);
 	width: min(100%, 360px);
-	border: var(--line) solid var(--ink);
-	border-radius: 12px;
+	border: var(--line) solid var(--outline);
+	border-radius: var(--r);
 	background: var(--card);
 	box-shadow: var(--shadow-sm);
 	overflow: hidden;
@@ -646,7 +659,7 @@ button:disabled {
 .diff__btn {
 	min-height: 44px;
 	border: 0;
-	border-right: var(--line) solid var(--ink);
+	border-right: var(--line) solid var(--outline);
 	background: transparent;
 	font-weight: 700;
 	font-size: 15px;
@@ -663,7 +676,7 @@ button:disabled {
 
 .diff__btn[aria-checked='true'] {
 	font-family: var(--display);
-	font-weight: 400;
+	font-weight: var(--display-weight);
 }
 
 .diff__btn--pop {
@@ -694,7 +707,7 @@ button:disabled {
 		'actions actions';
 	gap: 6px 12px;
 	padding: 14px;
-	border: var(--line) solid var(--ink);
+	border: var(--line) solid var(--outline);
 	border-radius: var(--radius);
 	background: var(--card);
 	box-shadow: var(--shadow);
@@ -709,7 +722,7 @@ button:disabled {
 	position: absolute;
 	inset: 0 auto 0 0;
 	width: 10px;
-	border-right: var(--line) solid var(--ink);
+	border-right: var(--line) solid var(--outline);
 	border-radius: 9px 0 0 9px;
 }
 
@@ -736,8 +749,8 @@ button:disabled {
 .mode__name {
 	margin: 0;
 	font-family: var(--display);
+	font-weight: var(--display-weight);
 	font-size: 26px;
-	font-weight: 400;
 	line-height: 1;
 }
 
@@ -782,10 +795,10 @@ button:disabled {
 	display: grid;
 	place-items: center;
 	height: 26px;
-	border: 2px solid var(--ink);
+	border: 2px solid var(--outline);
 	border-radius: 6px;
 	background: var(--card);
-	box-shadow: 2px 2px 0 var(--shade);
+	box-shadow: calc(2px * var(--sx)) 2px 0 var(--shade);
 	font-weight: 700;
 	font-size: 10px;
 }
@@ -800,6 +813,7 @@ button:disabled {
 }
 
 .mini__t--lock::after {
+	color: var(--on-color);
 	content: '';
 	width: 10px;
 	height: 8px;
@@ -814,10 +828,12 @@ button:disabled {
 }
 
 .mini__t--on {
+	color: var(--on-color);
 	background: var(--hit);
 }
 
 .mini--link .mini__t {
+	color: var(--on-color);
 	justify-items: start;
 	padding-left: 5px;
 	font-size: 12px;
@@ -829,16 +845,16 @@ button:disabled {
 	gap: 10px;
 	width: 100%;
 	padding: 14px;
-	border: var(--line) solid var(--ink);
+	border: var(--line) solid var(--outline);
 	border-radius: var(--radius);
 	background: var(--ink);
 	color: var(--on-ink);
-	box-shadow: 4px 4px 0 var(--pink);
+	box-shadow: calc(4px * var(--sx)) 4px 0 var(--pink);
 	animation: screen-in 0.45s 0.24s var(--out) backwards;
 }
 
 .chain--won {
-	box-shadow: 4px 4px 0 var(--hit);
+	box-shadow: calc(4px * var(--sx)) 4px 0 var(--hit);
 }
 
 .chain__head {
@@ -854,7 +870,7 @@ button:disabled {
 .chain__title {
 	margin: 0;
 	font-family: var(--display);
-	font-weight: 400;
+	font-weight: var(--display-weight);
 	font-size: 20px;
 }
 
@@ -870,10 +886,11 @@ button:disabled {
 	place-items: center;
 	aspect-ratio: 1;
 	border: var(--line) solid var(--on-ink);
-	border-radius: 8px;
+	border-radius: var(--r-sm);
 	border-bottom-width: 7px;
 	background: #2a2a2a;
 	font-family: var(--display);
+	font-weight: var(--display-weight);
 	font-size: 22px;
 }
 
@@ -889,12 +906,12 @@ button:disabled {
 
 .chain--won .chain__slot {
 	background: var(--hit);
-	color: var(--ink);
+	color: var(--on-color);
 }
 
 .chain__slot--lost {
 	background: var(--l4);
-	color: var(--ink);
+	color: var(--on-color);
 }
 
 .chain__key {
@@ -960,8 +977,8 @@ button:disabled {
 
 .hud__title strong {
 	font-family: var(--display);
+	font-weight: var(--display-weight);
 	font-size: 22px;
-	font-weight: 400;
 }
 
 .hud__tag {
@@ -985,6 +1002,7 @@ button:disabled {
 .hud__score {
 	position: relative;
 	font-family: var(--display);
+	font-weight: var(--display-weight);
 	font-size: 17px;
 	line-height: 1;
 	font-variant-numeric: tabular-nums;
@@ -1006,6 +1024,7 @@ button:disabled {
 	right: 0;
 	top: -4px;
 	font-family: var(--display);
+	font-weight: var(--display-weight);
 	font-size: 14px;
 	color: var(--alert-page);
 	pointer-events: none;
@@ -1128,8 +1147,8 @@ button:disabled {
 	place-items: center;
 	min-height: 68px;
 	padding: 4px 2px;
-	border: var(--line) solid var(--ink);
-	border-radius: 10px;
+	border: var(--line) solid var(--outline);
+	border-radius: var(--r);
 	background: var(--card);
 	box-shadow: var(--shadow-sm);
 	font-weight: 700;
@@ -1209,7 +1228,7 @@ button:disabled {
 }
 
 .tile--locked {
-	background: var(--ink);
+	background: var(--locked-bg);
 	color: var(--l1);
 	cursor: pointer;
 	background-image: repeating-linear-gradient(-45deg, transparent 0 8px, rgba(255, 210, 63, 0.09) 8px 16px);
@@ -1248,6 +1267,7 @@ button:disabled {
 }
 
 .tile__dots i {
+	color: var(--on-color);
 	width: 6px;
 	height: 6px;
 	border-radius: 2px;
@@ -1256,7 +1276,7 @@ button:disabled {
 
 .tile__dots b {
 	font-family: var(--display);
-	font-weight: 400;
+	font-weight: var(--display-weight);
 	font-size: 12px;
 	line-height: 1;
 	color: var(--l1);
@@ -1277,6 +1297,7 @@ button:disabled {
 }
 
 .tile--cracked::after {
+	color: var(--on-color);
 	content: '';
 	position: absolute;
 	top: 5px;
@@ -1285,7 +1306,7 @@ button:disabled {
 	height: 7px;
 	border-radius: 50%;
 	background: var(--hit);
-	border: 2px solid var(--ink);
+	border: 2px solid var(--outline);
 }
 
 .tile--given {
@@ -1345,8 +1366,8 @@ button:disabled {
 	align-items: center;
 	min-height: 68px;
 	padding: 8px 12px;
-	border: var(--line) solid var(--ink);
-	border-radius: 10px;
+	border: var(--line) solid var(--outline);
+	border-radius: var(--r);
 	box-shadow: var(--shadow-sm);
 	text-align: center;
 	line-height: 1.2;
@@ -1363,7 +1384,7 @@ button:disabled {
 
 .bar__theme {
 	font-family: var(--display);
-	font-weight: 400;
+	font-weight: var(--display-weight);
 	font-size: 15px;
 	text-transform: uppercase;
 	letter-spacing: 0.02em;
@@ -1385,6 +1406,7 @@ button:disabled {
 }
 
 .bar__letter {
+	color: var(--on-color);
 	position: absolute;
 	right: 8px;
 	top: 50%;
@@ -1393,10 +1415,11 @@ button:disabled {
 	place-items: center;
 	width: 30px;
 	height: 30px;
-	border: var(--line) solid var(--ink);
-	border-radius: 8px;
+	border: var(--line) solid var(--outline);
+	border-radius: var(--r-sm);
 	background: var(--hit);
 	font-family: var(--display);
+	font-weight: var(--display-weight);
 	font-size: 16px;
 	box-shadow: var(--shadow-sm);
 }
@@ -1451,9 +1474,10 @@ button:disabled {
 	place-items: center;
 	height: var(--cell, 48px);
 	border: var(--line) solid var(--cell-line);
-	border-radius: 8px;
+	border-radius: var(--r-sm);
 	background: var(--card);
 	font-family: var(--display);
+	font-weight: var(--display-weight);
 	font-size: calc(var(--cell, 48px) * 0.5);
 	text-transform: uppercase;
 	transition: border-color 0.1s;
@@ -1469,7 +1493,7 @@ button:disabled {
 }
 
 .cell--filled {
-	border-color: var(--ink) !important;
+	border-color: var(--outline) !important;
 	box-shadow: var(--shadow-sm);
 }
 
@@ -1492,10 +1516,12 @@ button:disabled {
 }
 
 .cell[data-mark='hit'] {
+	color: var(--on-color);
 	background: var(--hit);
 }
 
 .cell[data-mark='near'] {
+	color: var(--on-color);
 	background: var(--near);
 }
 
@@ -1521,7 +1547,7 @@ button:disabled {
 }
 
 .cell[data-mark='near']::after {
-	border: 2px solid var(--ink);
+	border: 2px solid var(--outline);
 	width: 4px;
 	height: 4px;
 }
@@ -1531,6 +1557,7 @@ button:disabled {
 }
 
 .cell--answer {
+	color: var(--on-color);
 	background: var(--l4);
 	border-style: dashed;
 }
@@ -1567,8 +1594,8 @@ button:disabled {
 	height: min(52px, 6.6dvh);
 	min-height: 40px;
 	padding: 0;
-	border: 2.5px solid var(--ink);
-	border-radius: 8px;
+	border: 2.5px solid var(--outline);
+	border-radius: var(--r-sm);
 	background: var(--card);
 	box-shadow: 0 3px 0 var(--shade);
 	font-weight: 700;
@@ -1614,7 +1641,7 @@ button:disabled {
 	flex-direction: column;
 	gap: 10px;
 	padding: 10px 10px 12px;
-	border: var(--line) solid var(--ink);
+	border: var(--line) solid var(--outline);
 	border-radius: var(--radius);
 	background: #fffaf0;
 	box-shadow: var(--shadow);
@@ -1657,7 +1684,7 @@ button:disabled {
 .panel__title {
 	display: block;
 	font-family: var(--display);
-	font-weight: 400;
+	font-weight: var(--display-weight);
 	font-size: 17px;
 }
 
@@ -1669,10 +1696,11 @@ button:disabled {
 /* ---------- Secret strip ---------- */
 
 .secret {
+	color: var(--on-color);
 	display: grid;
 	gap: 8px;
 	padding: 10px 12px 12px;
-	border: var(--line) solid var(--ink);
+	border: var(--line) solid var(--outline);
 	border-radius: var(--radius);
 	background: var(--l3);
 	box-shadow: var(--shadow);
@@ -1688,6 +1716,7 @@ button:disabled {
 
 .secret__label {
 	font-family: var(--display);
+	font-weight: var(--display-weight);
 	font-size: 14px;
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
@@ -1711,10 +1740,11 @@ button:disabled {
 	display: grid;
 	place-items: center;
 	aspect-ratio: 1;
-	border: var(--line) solid var(--ink);
-	border-radius: 8px;
+	border: var(--line) solid var(--outline);
+	border-radius: var(--r-sm);
 	background: rgba(255, 255, 255, 0.55);
 	font-family: var(--display);
+	font-weight: var(--display-weight);
 	font-size: 22px;
 	color: rgba(20, 20, 20, 0.28);
 }
@@ -1731,7 +1761,7 @@ button:disabled {
 
 .slot--win {
 	background: var(--hit);
-	color: var(--ink);
+	color: var(--on-color);
 }
 
 .slot--hop {
@@ -1739,7 +1769,7 @@ button:disabled {
 }
 
 .slot--lost {
-	color: var(--ink);
+	color: var(--on-color);
 	background: var(--l4);
 	border-style: dashed;
 }
@@ -1787,7 +1817,7 @@ button:disabled {
 .pip {
 	width: 34px;
 	height: 12px;
-	border: 2.5px solid var(--ink);
+	border: 2.5px solid var(--outline);
 	border-radius: 999px;
 	background: var(--card);
 	transition: background-color 0.3s;
@@ -1815,7 +1845,7 @@ button:disabled {
 	display: grid;
 	gap: 10px;
 	padding: 10px 12px 12px;
-	border: var(--line) solid var(--ink);
+	border: var(--line) solid var(--outline);
 	border-radius: var(--radius);
 	background: var(--card);
 	box-shadow: var(--shadow);
@@ -1841,7 +1871,7 @@ button:disabled {
 .round__title {
 	margin: 0;
 	font-family: var(--display);
-	font-weight: 400;
+	font-weight: var(--display-weight);
 	font-size: 16px;
 }
 
@@ -1851,7 +1881,7 @@ button:disabled {
 
 .round__left b {
 	font-family: var(--display);
-	font-weight: 400;
+	font-weight: var(--display-weight);
 	font-size: 16px;
 }
 
@@ -1872,8 +1902,8 @@ button:disabled {
 	gap: 3px;
 	min-height: 46px;
 	padding: 6px 4px;
-	border: var(--line) solid var(--ink);
-	border-radius: 10px;
+	border: var(--line) solid var(--outline);
+	border-radius: var(--r);
 	background: var(--card);
 	box-shadow: var(--shadow-sm);
 	align-items: center;
@@ -1887,6 +1917,7 @@ button:disabled {
 	height: 1.35em;
 	border-bottom: 3px solid #b9b0a0;
 	font-family: var(--display);
+	font-weight: var(--display-weight);
 	font-size: 16px;
 	line-height: 1;
 }
@@ -1917,6 +1948,7 @@ button:disabled {
 }
 
 .slot-word--found {
+	color: var(--on-color);
 	background: var(--hit);
 	cursor: default;
 }
@@ -1946,16 +1978,18 @@ button:disabled {
 }
 
 .round__banner {
+	color: var(--on-color);
 	position: absolute;
 	left: 50%;
 	top: 52%;
 	translate: -50% -50%;
 	padding: 10px 18px;
-	border: var(--line) solid var(--ink);
-	border-radius: 10px;
+	border: var(--line) solid var(--outline);
+	border-radius: var(--r);
 	background: var(--pink);
 	box-shadow: var(--shadow);
 	font-family: var(--display);
+	font-weight: var(--display-weight);
 	font-size: 20px;
 	text-transform: uppercase;
 	white-space: nowrap;
@@ -1971,6 +2005,7 @@ button:disabled {
 }
 
 .round__banner--lost {
+	color: var(--on-color);
 	background: var(--l4);
 }
 
@@ -2013,8 +2048,8 @@ button:disabled {
 .option {
 	min-height: 54px;
 	padding: 8px 14px;
-	border: var(--line) solid var(--ink);
-	border-radius: 10px;
+	border: var(--line) solid var(--outline);
+	border-radius: var(--r);
 	background: var(--card);
 	box-shadow: var(--shadow-sm);
 	font-weight: 700;
@@ -2035,6 +2070,7 @@ button:disabled {
 }
 
 .option--right {
+	color: var(--on-color);
 	background: var(--hit);
 }
 
@@ -2074,10 +2110,10 @@ button:disabled {
 	max-height: calc(100dvh - 32px);
 	overflow-y: auto;
 	padding: 16px;
-	border: var(--line) solid var(--ink);
-	border-radius: 14px;
+	border: var(--line) solid var(--outline);
+	border-radius: var(--r);
 	background: var(--card);
-	box-shadow: 6px 6px 0 var(--shade);
+	box-shadow: calc(6px * var(--sx)) 6px 0 var(--shade);
 	animation: modal-in 0.36s var(--spring);
 }
 
@@ -2107,7 +2143,7 @@ button:disabled {
 .modal__title {
 	margin: 0;
 	font-family: var(--display);
-	font-weight: 400;
+	font-weight: var(--display-weight);
 	font-size: 22px;
 	line-height: 1.1;
 }
@@ -2141,15 +2177,17 @@ button:disabled {
 }
 
 .steps li::before {
+	color: var(--on-color);
 	content: counter(step);
 	display: grid;
 	place-items: center;
 	width: 28px;
 	height: 28px;
-	border: 2.5px solid var(--ink);
-	border-radius: 8px;
+	border: 2.5px solid var(--outline);
+	border-radius: var(--r-sm);
 	background: var(--l1);
 	font-family: var(--display);
+	font-weight: var(--display-weight);
 	font-size: 14px;
 }
 
@@ -2163,8 +2201,8 @@ button:disabled {
 	gap: 10px 14px;
 	justify-content: center;
 	padding: 10px;
-	border: 2px dashed #b9b0a0;
-	border-radius: 10px;
+	border: 2px dashed var(--line-color, var(--cell-line));
+	border-radius: var(--r);
 }
 
 .legend__item {
@@ -2184,8 +2222,8 @@ button:disabled {
 	align-items: center;
 	gap: 12px;
 	padding: 10px 12px;
-	border: 2.5px solid var(--ink);
-	border-radius: 10px;
+	border: 2.5px solid var(--outline);
+	border-radius: var(--r);
 	cursor: pointer;
 	position: relative;
 }
@@ -2211,7 +2249,7 @@ button:disabled {
 	flex: none;
 	width: 50px;
 	height: 28px;
-	border: 2.5px solid var(--ink);
+	border: 2.5px solid var(--outline);
 	border-radius: 999px;
 	background: var(--miss);
 	position: relative;
@@ -2225,13 +2263,14 @@ button:disabled {
 	left: 2px;
 	width: 19px;
 	height: 19px;
-	border: 2.5px solid var(--ink);
+	border: 2.5px solid var(--outline);
 	border-radius: 50%;
 	background: var(--card);
 	transition: transform 0.25s var(--spring);
 }
 
 .switch__input:checked ~ .switch__knob {
+	color: var(--on-color);
 	background: var(--hit);
 }
 
@@ -2246,8 +2285,8 @@ button:disabled {
 
 .statrow {
 	padding: 10px 12px;
-	border: 2.5px solid var(--ink);
-	border-radius: 10px;
+	border: 2.5px solid var(--outline);
+	border-radius: var(--r);
 	border-left-width: 10px;
 }
 
@@ -2258,7 +2297,7 @@ button:disabled {
 .statrow h3 {
 	margin: 0 0 6px;
 	font-family: var(--display);
-	font-weight: 400;
+	font-weight: var(--display-weight);
 	font-size: 16px;
 }
 
@@ -2272,7 +2311,7 @@ button:disabled {
 .stat strong {
 	display: block;
 	font-family: var(--display);
-	font-weight: 400;
+	font-weight: var(--display-weight);
 	font-size: 18px;
 }
 
@@ -2294,7 +2333,7 @@ button:disabled {
 
 .book__count strong {
 	font-family: var(--display);
-	font-weight: 400;
+	font-weight: var(--display-weight);
 	font-size: 18px;
 	color: var(--ink);
 }
@@ -2310,8 +2349,8 @@ button:disabled {
 	justify-items: center;
 	gap: 2px;
 	padding: 8px 4px 6px;
-	border: 2.5px solid var(--ink);
-	border-radius: 10px;
+	border: 2.5px solid var(--outline);
+	border-radius: var(--r);
 	background: var(--card);
 	box-shadow: var(--shadow-sm);
 }
@@ -2338,6 +2377,7 @@ button:disabled {
 }
 
 .hatpick--on {
+	color: var(--on-color);
 	background: var(--l1);
 	transform: translate(2px, 2px);
 	box-shadow: none;
@@ -2357,7 +2397,7 @@ button:disabled {
 .bookset__head h3 {
 	margin: 0;
 	font-family: var(--display);
-	font-weight: 400;
+	font-weight: var(--display-weight);
 	font-size: 16px;
 }
 
@@ -2374,7 +2414,7 @@ button:disabled {
 .bookset__bar {
 	--p: 0;
 	height: 10px;
-	border: 2.5px solid var(--ink);
+	border: 2.5px solid var(--outline);
 	border-radius: 999px;
 	background: linear-gradient(90deg, var(--hit) calc(var(--p) * 100%), var(--card) 0);
 }
@@ -2391,9 +2431,9 @@ button:disabled {
 	place-items: center;
 	min-height: 52px;
 	padding: 6px;
-	border: 2.5px solid var(--ink);
-	border-radius: 9px;
-	box-shadow: 2px 2px 0 var(--shade);
+	border: 2.5px solid var(--outline);
+	border-radius: var(--r);
+	box-shadow: calc(2px * var(--sx)) 2px 0 var(--shade);
 	text-align: center;
 	font-size: 12px;
 	line-height: 1.15;
@@ -2424,6 +2464,7 @@ button:disabled {
 	box-shadow: none;
 	color: var(--cell-line);
 	font-family: var(--display);
+	font-weight: var(--display-weight);
 	font-size: 18px;
 	rotate: 0deg !important;
 }
@@ -2496,17 +2537,18 @@ button:disabled {
 
 .results__score {
 	font-family: var(--display);
-	font-weight: 400;
+	font-weight: var(--display-weight);
 	font-size: 44px;
 	line-height: 1;
 	font-variant-numeric: tabular-nums;
 }
 
 .badge {
+	color: var(--on-color);
 	display: inline-block;
 	margin-top: 4px;
 	padding: 3px 10px;
-	border: 2.5px solid var(--ink);
+	border: 2.5px solid var(--outline);
 	border-radius: 999px;
 	background: var(--pink);
 	font-size: 12px;
@@ -2558,14 +2600,14 @@ button:disabled {
 	z-index: 60;
 	translate: -50% -140%;
 	padding: 10px 18px;
-	border: var(--line) solid var(--ink);
+	border: var(--line) solid var(--outline);
 	border-radius: 999px;
 	background: var(--ink);
 	color: var(--on-ink);
 	font-weight: 700;
 	font-size: 15px;
 	white-space: nowrap;
-	box-shadow: 3px 3px 0 var(--pink);
+	box-shadow: calc(3px * var(--sx)) 3px 0 var(--pink);
 	pointer-events: none;
 	transition: translate 0.3s var(--spring);
 }
@@ -2586,7 +2628,7 @@ button:disabled {
 	position: absolute;
 	left: 0;
 	top: 0;
-	border: 2px solid var(--ink);
+	border: 2px solid var(--outline);
 }
 
 /* ---------- A game fits one screen ----------
@@ -2671,7 +2713,7 @@ button:disabled {
 .board--compact .tile {
 	min-height: 0;
 	border-width: 2.5px;
-	box-shadow: 1px 1px 0 var(--shade);
+	box-shadow: calc(1px * var(--sx)) 1px 0 var(--shade);
 }
 
 /* Guess rows fill the room the panel leaves and size their cells to fit it. */
@@ -2804,16 +2846,16 @@ button:disabled {
 .logo__tile {
 	width: clamp(34px, 10vw, 54px);
 	height: clamp(34px, 10vw, 54px);
-	border-radius: 9px;
+	border-radius: var(--r);
 	font-size: clamp(20px, 6.2vw, 32px);
-	box-shadow: 3px 3px 0 var(--shade);
+	box-shadow: calc(3px * var(--sx)) 3px 0 var(--shade);
 }
 
 .kip--big {
 	width: clamp(38px, 11vw, 58px);
 	height: clamp(38px, 11vw, 58px);
-	border-radius: 11px;
-	box-shadow: 3px 3px 0 var(--shade);
+	border-radius: var(--r);
+	box-shadow: calc(3px * var(--sx)) 3px 0 var(--shade);
 	margin-left: 2px;
 }
 
@@ -2955,8 +2997,8 @@ button:disabled {
 	flex: 1;
 	max-width: 110px;
 	padding: 6px 4px 5px;
-	border: var(--line) solid var(--ink);
-	border-radius: 10px;
+	border: var(--line) solid var(--outline);
+	border-radius: var(--r);
 	background: var(--card);
 	box-shadow: var(--shadow-sm);
 	font-size: 11.5px;
@@ -2991,11 +3033,13 @@ button:disabled {
 
 .step__perfect {
 	font-family: var(--display);
+	font-weight: var(--display-weight);
 	font-size: 18px;
 	color: var(--good);
 }
 
 .dock__btn--install {
+	color: var(--on-color);
 	background: var(--l1);
 }
 
@@ -3157,65 +3201,13 @@ button:disabled {
 /* ---------- Shop looks: themes ----------
    A theme only sets color tokens. It works on <html> and on any shop preview box. */
 
-[data-theme='sorbet'] {
-	--paper: #ffeaf1;
-	--paper-dot: #f7cada;
-	--card: #fffafc;
-	--muted: #6d5260;
-	--page-muted: #6d5260;
-	--l1: #ffd86b;
-	--l2: #ff9fb6;
-	--l3: #8dd3ff;
-	--l4: #c9a8ff;
-	--go: #ff7aa8;
-	--pink: #ff7aa8;
-}
 
-[data-theme='meadow'] {
-	--paper: #ecf6e2;
-	--paper-dot: #cfe4bd;
-	--card: #fbfff6;
-	--muted: #4f5d46;
-	--page-muted: #4f5d46;
-	--l1: #f4d843;
-	--l2: #f59b5d;
-	--l3: #5cc6b8;
-	--l4: #a592f2;
-	/* Not green: the main button must not look like a finished (green) one. */
-	--go: #ff8a73;
-	--hit: #49c97a;
-}
 
-[data-theme='sky'] {
-	--paper: #e4f1ff;
-	--paper-dot: #c3dbf5;
-	--card: #fafdff;
-	--muted: #4d5a6b;
-	--page-muted: #4d5a6b;
-	--l1: #ffd23f;
-	--l2: #ff8f70;
-	--l3: #4fb6f0;
-	--l4: #9d8cff;
-	--go: #6c96ff;
-}
 
-[data-theme='dusk'] {
-	--paper: #2c2850;
-	--paper-dot: #3f3a6c;
-	--card: #fff6e6;
-	--shade: #0b0918;
-	--page-text: #fff4de;
-	--page-muted: #c8c0e8;
-	--alert-page: #ff9cbd;
-	--good-page: #7deab0;
-	--focus: #fff4de;
-	--focus-halo: #141414;
-	--l1: #ffd23f;
-	--l2: #ff9a62;
-	--l3: #5cc8f2;
-	--l4: #c0a0ff;
-	--go: #ff6b9a;
-}
+
+
+
+
 
 /* Text that sits on the page, not on a card, follows the theme. */
 .hud,
@@ -3225,16 +3217,8 @@ button:disabled {
 	color: var(--page-text);
 }
 
-/* Buttons are cards: their text and icons stay ink, whatever the page color. */
-.hud :is(.iconbtn, .btn),
-.iconbtn,
-.btn,
-.dock__btn,
-.option,
-.tile,
-.slot-word {
-	color: var(--ink);
-}
+
+
 
 .tile--on,
 .slot-word--active {
@@ -3254,10 +3238,8 @@ button:disabled {
 	color: var(--page-muted);
 }
 
-/* The chain card is dark on light themes; on Dusk it lifts off with a bright edge. */
-[data-theme='dusk'] .chain {
-	border-color: var(--page-text);
-}
+
+
 
 /* ---------- Shop looks: tile styles ---------- */
 
@@ -3273,7 +3255,7 @@ button:disabled {
 	border-width: 3.5px;
 	box-shadow:
 		inset 0 0 0 2.5px rgba(255, 255, 255, 0.85),
-		3px 3px 0 var(--shade);
+		calc(3px * var(--sx)) 3px 0 var(--shade);
 }
 
 [data-tiles='sticker'] .tile:nth-child(3n) {
@@ -3294,7 +3276,7 @@ button:disabled {
 }
 
 [data-tiles='block'] :is(.tile, .bar, .slot-word) {
-	border-radius: 8px;
+	border-radius: var(--r-sm);
 	box-shadow: 0 6px 0 var(--shade);
 }
 
@@ -3345,14 +3327,16 @@ button:disabled {
 }
 
 .wallet {
+	color: var(--on-color);
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
 	padding: 4px 12px 4px 6px;
-	border: var(--line) solid var(--ink);
+	border: var(--line) solid var(--outline);
 	border-radius: 999px;
 	background: var(--l1);
 	font-family: var(--display);
+	font-weight: var(--display-weight);
 	font-size: 16px;
 	box-shadow: var(--shadow-sm);
 }
@@ -3373,15 +3357,15 @@ button:disabled {
 .shop__tabs {
 	display: grid;
 	grid-template-columns: repeat(4, 1fr);
-	border: var(--line) solid var(--ink);
-	border-radius: 10px;
+	border: var(--line) solid var(--outline);
+	border-radius: var(--r);
 	overflow: hidden;
 }
 
 .shop__tab {
 	min-height: 40px;
 	border: 0;
-	border-right: 2.5px solid var(--ink);
+	border-right: 2.5px solid var(--outline);
 	background: var(--card);
 	font-size: 13px;
 	font-weight: 700;
@@ -3407,8 +3391,8 @@ button:disabled {
 	align-items: center;
 	gap: 10px;
 	padding: 8px;
-	border: 2.5px solid var(--ink);
-	border-radius: 12px;
+	border: 2.5px solid var(--outline);
+	border-radius: var(--r);
 	background: var(--card);
 }
 
@@ -3459,8 +3443,8 @@ button:disabled {
 	display: grid;
 	place-items: center;
 	height: 60px;
-	border: 2px solid var(--ink);
-	border-radius: 8px;
+	border: 2px solid var(--outline);
+	border-radius: var(--r-sm);
 	background-color: var(--paper);
 	background-image: radial-gradient(var(--paper-dot) 1.2px, transparent 1.4px);
 	background-size: 10px 10px;
@@ -3485,7 +3469,7 @@ button.preview {
 	padding: 0;
 	font-size: 10px;
 	border-width: 2px;
-	box-shadow: 2px 2px 0 var(--shade);
+	box-shadow: calc(2px * var(--sx)) 2px 0 var(--shade);
 }
 
 .preview .tile {
@@ -3495,7 +3479,7 @@ button.preview {
 }
 
 .preview[data-tiles='pillow'] .tile {
-	border-radius: 10px;
+	border-radius: var(--r);
 }
 
 .preview[data-tiles='block'] .tile {
@@ -3503,13 +3487,14 @@ button.preview {
 }
 
 .preview .tile.preview__go {
+	color: var(--accent-ink);
 	background: var(--go);
 }
 
 .preview__swatch {
 	width: 11px;
 	height: 24px;
-	border: 2px solid var(--ink);
+	border: 2px solid var(--outline);
 	border-radius: 4px;
 }
 
@@ -3525,6 +3510,7 @@ button.preview {
 }
 
 .dock__btn--shop {
+	color: var(--on-color);
 	background: var(--l1);
 }
 
@@ -3541,16 +3527,18 @@ button.preview {
 
 /* Coins earned, on the results card. */
 .results__coins {
+	color: var(--on-color);
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
 	gap: 6px;
 	margin: 0 auto;
 	padding: 4px 14px 4px 8px;
-	border: var(--line) solid var(--ink);
+	border: var(--line) solid var(--outline);
 	border-radius: 999px;
 	background: var(--l1);
 	font-family: var(--display);
+	font-weight: var(--display-weight);
 	font-size: 18px;
 	box-shadow: var(--shadow-sm);
 }
@@ -3571,13 +3559,14 @@ button.preview {
 
 .clock__bar {
 	height: 16px;
-	border: var(--line) solid var(--ink);
+	border: var(--line) solid var(--outline);
 	border-radius: 999px;
 	background: var(--card);
 	overflow: hidden;
 }
 
 .clock__fill {
+	color: var(--on-color);
 	display: block;
 	height: 100%;
 	background: var(--hit);
@@ -3586,6 +3575,7 @@ button.preview {
 }
 
 .clock--low .clock__fill {
+	color: var(--on-color);
 	background: var(--l2);
 }
 
@@ -3598,7 +3588,7 @@ button.preview {
 
 .clock__secs {
 	font-family: var(--display);
-	font-weight: 400;
+	font-weight: var(--display-weight);
 	font-size: 22px;
 	font-variant-numeric: tabular-nums;
 }
@@ -3619,6 +3609,7 @@ button.preview {
 	top: 18px;
 	translate: -50% 0;
 	font-family: var(--display);
+	font-weight: var(--display-weight);
 	font-size: 18px;
 	color: var(--good-page);
 	pointer-events: none;
@@ -3666,7 +3657,7 @@ button.preview {
 /* A card that takes focus itself (no button to focus) keeps its own shadow. */
 .modal__card:focus-visible {
 	outline: none;
-	box-shadow: 6px 6px 0 var(--shade) !important;
+	box-shadow: calc(6px * var(--sx)) 6px 0 var(--shade) !important;
 }
 
 /* Keyboard keys show the same shape cues as guess cells: a dot for the right spot,
@@ -3691,7 +3682,7 @@ button.preview {
 	width: 3px;
 	height: 3px;
 	background: none;
-	border: 1.5px solid var(--ink);
+	border: 1.5px solid var(--outline);
 }
 
 .kb__key[data-mark='miss'] {

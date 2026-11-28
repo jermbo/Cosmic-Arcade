@@ -10,13 +10,14 @@ const SHAPES_KEY = 'glintwell.shapes.v1';
 
 const DEFAULTS = {
 	best: { endless: 0, timed: 0 },
-	settings: { sfx: true, music: true, vibrate: true, shake: true },
+	// bold: the cozy kit style. Off is Soft (the default), on is Bold.
+	settings: { sfx: true, music: true, vibrate: true, shake: true, bold: false },
 	lab: { ...DEFAULT_LAB },
 	glints: 0, // the wallet: the player sees these as Plunks
 	perks: { bag: 0 }, // bag upgrades bought
 	// The looks: the owned and the active theme, block style, sound profile and animation style,
 	// and the last Random roll.
-	looks: { themes: ['light'], theme: 'light', styles: ['patterns'], style: 'patterns', roll: null, sounds: ['wooden'], sound: 'wooden', motions: ['classic'], motion: 'classic' },
+	looks: { themes: ['oat', 'plum'], theme: 'oat', styles: ['patterns'], style: 'patterns', roll: null, sounds: ['wooden'], sound: 'wooden', motions: ['classic'], motion: 'classic' },
 	tutorialDone: false,
 	iosHintDismissed: false,
 	hintDone: false, // the drag hint of a first game
@@ -42,6 +43,13 @@ function writeJson(key, value) {
 
 const saved = readJson(SAVE_KEY) || {};
 
+/** Theme ids from before the cozy kit: Light is Oat, Dark is Plum. The kit's free themes are owned by all. */
+function kitThemeIds(looks) {
+	const alias = { light: 'oat', dark: 'plum' };
+	const themes = [...new Set(['oat', 'plum', ...(looks.themes || []).map((id) => alias[id] || id)])];
+	return { ...looks, theme: alias[looks.theme] || looks.theme, themes };
+}
+
 /** The saved data of the player. Change it, then call save() in play/session.js. */
 export const store = {
 	best: { ...DEFAULTS.best, ...saved.best },
@@ -49,7 +57,7 @@ export const store = {
 	lab: { ...DEFAULTS.lab, ...saved.lab },
 	glints: Math.max(0, Math.floor(Number(saved.glints) || 0)),
 	perks: { ...DEFAULTS.perks, ...saved.perks },
-	looks: { ...DEFAULTS.looks, ...saved.looks },
+	looks: kitThemeIds({ ...DEFAULTS.looks, ...saved.looks }),
 	tutorialDone: Boolean(saved.tutorialDone),
 	iosHintDismissed: Boolean(saved.iosHintDismissed),
 	hintDone: Boolean(saved.hintDone),

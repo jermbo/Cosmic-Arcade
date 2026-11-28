@@ -35,3 +35,5 @@ Hueway works offline after the first visit. Tap **Install** on the title screen 
 
 - **Touch or mouse:** drag from a dot to its match. Drag back to shorten a line. Draw over a line to cut it. Tap a dot to clear its line.
 - **Keyboard:** arrows move, Space or Enter picks up and drops a line, Z undo, H hint, Esc back.
+
+**Style:** Soft (soft clay) or Bold (ink outlines and hard shadows), a free setting. The themes are shared with the arcade's other cozy puzzle games.

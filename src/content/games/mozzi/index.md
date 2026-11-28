@@ -44,3 +44,5 @@ Mozzi works offline after the first visit. Tap **Install** on the title screen t
 ## Hints
 
 A hint goes in three steps: where to look, why it must be so, and what goes there. Mozzi always checks for a wrong tile first. Every window can be finished with hints alone, with no guessing.
+
+**Style:** Soft (soft clay) or Bold (ink outlines and hard shadows), a free setting. The themes are shared with the arcade's other cozy puzzle games.

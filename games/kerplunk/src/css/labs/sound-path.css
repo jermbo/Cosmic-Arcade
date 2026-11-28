@@ -91,7 +91,7 @@ main {
 	background: var(--card);
 	border: var(--bw) solid var(--ink);
 	border-radius: var(--r);
-	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	box-shadow: var(--shx) var(--sh) 0 var(--shadow);
 }
 
 .scope-card canvas {
@@ -129,7 +129,7 @@ main {
 
 .intro h2 {
 	font-family: var(--font-display);
-	font-weight: 400;
+	font-weight: var(--display-weight, 400);
 	font-size: 1.3rem;
 	letter-spacing: 0;
 	text-transform: none;
@@ -168,7 +168,7 @@ main {
 	background: var(--card);
 	border: var(--bw) solid var(--ink);
 	border-radius: var(--r);
-	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	box-shadow: var(--shx) var(--sh) 0 var(--shadow);
 	cursor: pointer;
 	transition: transform 0.08s, box-shadow 0.08s;
 }
@@ -179,7 +179,7 @@ main {
 }
 
 .body-card:focus-visible {
-	outline: 3px solid var(--ink);
+	outline: 3px solid var(--text);
 	outline-offset: 3px;
 }
 
@@ -198,7 +198,7 @@ main {
 .body-head h3 {
 	margin: 0;
 	font-family: var(--font-display);
-	font-weight: 400;
+	font-weight: var(--display-weight, 400);
 	font-size: 1.15rem;
 }
 
@@ -272,7 +272,7 @@ main {
 
 .lockbar b {
 	font-family: var(--font-display);
-	font-weight: 400;
+	font-weight: var(--display-weight, 400);
 	font-size: 1.1rem;
 }
 
@@ -288,7 +288,7 @@ main {
 	background: var(--card);
 	border: var(--bw) solid var(--ink);
 	border-radius: var(--r);
-	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	box-shadow: var(--shx) var(--sh) 0 var(--shadow);
 }
 
 .summary dl {
@@ -315,7 +315,7 @@ main {
 
 .summary dd b {
 	font-family: var(--font-display);
-	font-weight: 400;
+	font-weight: var(--display-weight, 400);
 }
 
 .summary dd button {

@@ -27,7 +27,7 @@ body {
 h1 {
 	margin: 0;
 	font-family: var(--font-display);
-	font-weight: 400;
+	font-weight: var(--display-weight, 400);
 	font-size: 1.8rem;
 	text-shadow: 3px 3px 0 var(--accent);
 }
@@ -91,7 +91,7 @@ button:active {
 button:focus-visible,
 .cell:focus-visible,
 .card:focus-visible {
-	outline: 3px solid var(--ink);
+	outline: 3px solid var(--text);
 	outline-offset: 2px;
 }
 
@@ -127,7 +127,7 @@ button:disabled {
 	background: var(--card);
 	border: var(--bw) solid var(--ink);
 	border-radius: var(--r);
-	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	box-shadow: var(--shx) var(--sh) 0 var(--shadow);
 	padding: 14px;
 }
 
@@ -299,7 +299,7 @@ label.weight {
 
 input[type='range'] {
 	flex: 1;
-	accent-color: var(--ink);
+	accent-color: var(--text);
 }
 
 /* drop test */
@@ -312,7 +312,7 @@ input[type='range'] {
 	background: var(--well);
 	border: var(--bw) solid var(--ink);
 	border-radius: var(--r);
-	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	box-shadow: var(--shx) var(--sh) 0 var(--shadow);
 	position: relative;
 	touch-action: manipulation;
 }
@@ -392,7 +392,7 @@ textarea {
 	color: var(--on-accent2);
 	border: var(--bw) solid var(--ink);
 	border-radius: var(--r);
-	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	box-shadow: var(--shx) var(--sh) 0 var(--shadow);
 	font-weight: 700;
 	padding: 10px 16px;
 	max-width: calc(100vw - 32px);

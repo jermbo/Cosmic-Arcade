@@ -1,5 +1,6 @@
 /** Screens, saving, settings, and the back button. */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { applyLooks } from '@arcade/cozy-kit/themes.js';
 import { audio } from '../app/audio.ts';
 import { moveFocus, useKeys } from '../app/input.ts';
 import { canInstall, isStandalone, promptInstall, setupPwa } from '../app/pwa.ts';
@@ -51,12 +52,9 @@ export function App() {
 
 	// Looks live on <html>, so every screen and dialog follows them.
 	useEffect(() => {
-		const root = document.documentElement;
-		root.dataset.theme = data.looks.theme;
-		root.classList.toggle('calm', calm);
-		const bg = getComputedStyle(root).getPropertyValue('--bg').trim();
-		document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg || '#f4eee4');
-	}, [data.looks.theme, calm]);
+		applyLooks(data.looks.theme, data.settings.style);
+		document.documentElement.classList.toggle('calm', calm);
+	}, [data.looks.theme, data.settings.style, calm]);
 	useEffect(() => audio.setPack(data.looks.sound), [data.looks.sound]);
 
 	// The date can roll over while the game is open.

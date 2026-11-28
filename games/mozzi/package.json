@@ -7,7 +7,7 @@
 		"dev": "vite --open --host --port 4015",
 		"build": "npm test && tsc && vite build",
 		"preview": "vite preview",
-		"test": "node scripts/test-puzzles.ts && node scripts/check-colors.ts",
+		"test": "node scripts/test-puzzles.ts && node ../cozy-kit/scripts/check-colors.js",
 		"compare-controls": "node scripts/compare-controls.ts",
 		"icons": "node scripts/make-icons.ts"
 	},
@@ -16,7 +16,7 @@
 		"outDir": "dist"
 	},
 	"dependencies": {
-		"@fontsource/bricolage-grotesque": "5.3.0",
+		"@arcade/cozy-kit": "1.0.0",
 		"react": "19.3.1",
 		"react-dom": "19.3.1"
 	},

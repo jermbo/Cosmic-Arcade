@@ -328,6 +328,19 @@ export function SettingsModal({ settings: s, onChange, onClose, onShop, onTutori
 					<span>Music</span>
 					<input type="range" min={0} max={1} step={0.05} value={s.music} onChange={(e) => set('music', Number(e.target.value))} />
 				</label>
+				<div className="setting">
+					<span>
+						Style
+						<small>Soft clay or bold ink</small>
+					</span>
+					<span className="seg" role="group" aria-label="Style">
+						{(['soft', 'bold'] as const).map((st) => (
+							<button key={st} type="button" aria-pressed={s.style === st} onClick={() => set('style', st)}>
+								{st === 'soft' ? 'Soft' : 'Bold'}
+							</button>
+						))}
+					</span>
+				</div>
 				<Toggle label="Timer" on={s.showTimer} onChange={(v) => set('showTimer', v)} />
 				<Toggle label="Dot marks" hint="A symbol on each dot" on={s.dotMarks} onChange={(v) => set('dotMarks', v)} />
 				<Toggle label="Tint squares" hint="Color the squares a line fills" on={s.fillTint} onChange={(v) => set('fillTint', v)} />

@@ -35,7 +35,7 @@
 	color: var(--on-accent);
 	border: var(--bw) solid var(--ink);
 	border-radius: var(--r);
-	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	box-shadow: var(--shx) var(--sh) 0 var(--shadow);
 	transform: rotate(var(--tilt));
 }
 
@@ -43,7 +43,7 @@
 	display: block;
 	margin-top: 2px;
 	font-family: var(--font-display);
-	font-weight: 400;
+	font-weight: var(--display-weight, 400);
 	font-size: clamp(1.6rem, 9vw, 2.3rem);
 	line-height: 1;
 	letter-spacing: -0.02em;
@@ -66,7 +66,7 @@
 	padding: 5px 10px;
 	border: var(--bw) solid var(--ink);
 	border-radius: var(--r);
-	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	box-shadow: var(--shx) var(--sh) 0 var(--shadow);
 	font-weight: 700;
 	font-size: 0.95rem;
 }
@@ -99,7 +99,7 @@
 	border: var(--bw) solid var(--ink);
 	border-radius: var(--r);
 	background: var(--card);
-	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	box-shadow: var(--shx) var(--sh) 0 var(--shadow);
 	font-weight: 700;
 	font-size: 0.8rem;
 	cursor: pointer;
@@ -108,7 +108,7 @@
 
 .hud__reroll:active,
 .icon-button:active {
-	transform: translate(var(--sh), var(--sh));
+	transform: translate(var(--shx), var(--sh));
 	box-shadow: 0 0 0 var(--shadow);
 }
 
@@ -118,7 +118,7 @@
 
 .hud__reroll:focus-visible,
 .icon-button:focus-visible {
-	outline: 3px solid var(--ink);
+	outline: 3px solid var(--text);
 	outline-offset: 3px;
 }
 
@@ -131,7 +131,7 @@
 	border: var(--bw) solid var(--ink);
 	border-radius: var(--r);
 	background: var(--card);
-	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	box-shadow: var(--shx) var(--sh) 0 var(--shadow);
 	cursor: pointer;
 	transition: transform 0.08s, box-shadow 0.08s;
 }
@@ -164,11 +164,12 @@
 	background: var(--card);
 	border: var(--bw) solid var(--ink);
 	border-radius: var(--r);
-	box-shadow: var(--sh) var(--sh) 0 var(--shadow);
+	box-shadow: var(--shx) var(--sh) 0 var(--shadow);
 }
 
 .hud__time-text {
 	font-family: var(--font-display);
+	font-weight: var(--display-weight, 400);
 	font-size: 1.05rem;
 	min-width: 3.2em;
 }
@@ -211,6 +212,7 @@
 	border: 2px solid var(--ink);
 	box-shadow: 3px 3px 0 var(--shadow);
 	font-family: var(--font-display);
+	font-weight: var(--display-weight, 400);
 	font-size: 0.95rem;
 	pointer-events: none;
 	opacity: 0;

@@ -11,7 +11,7 @@ export const EXTEND_COST = 20; // +EXTEND_SECONDS in Timed, once per game
 export const EXTEND_SECONDS = 15;
 export const BAG_UPGRADE_COSTS = [150, 300]; // permanent: the bag holds 1 more power-up each time
 // The looks, bought once in the shop. Drafts: the owner tunes them.
-export const THEME_PRICES = { light: 0, dark: 150, random: 300 };
+export const THEME_PRICES = { sage: 150, blossom: 150, sky: 150, tide: 200, hearth: 200, random: 300 };
 export const STYLE_PRICES = { patterns: 0, symbols: 100, pips: 100, silhouettes: 150, faces: 250 };
 // The feel, bought once in the shop: sound profiles and animation styles. Drafts too.
 export const SOUND_PRICES = { wooden: 0, bubbles: 100, thumbPiano: 100, woodshop: 100, musicBox: 150, glass: 150, island: 150, cozyKeys: 150, zen: 150, cartoon: 200, arcade: 200, space: 250 };

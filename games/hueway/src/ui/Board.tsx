@@ -68,14 +68,14 @@ export const DOT_LOOKS: Record<string, DotLook> = {
 	pebble: (x, y, k) => (
 		<>
 			<ellipse cx={x} cy={y + 0.9} rx={3.5} ry={3.2} className="dt-shadow" />
-			<circle cx={x} cy={y} r={3.5} fill={col(k)} />
+			<circle cx={x} cy={y} r={3.5} fill={col(k)} className="dt-body" />
 			<ellipse cx={x - 1.1} cy={y - 1.3} rx={1.4} ry={0.9} className="dt-shine" />
 		</>
 	),
 	button: (x, y, k) => (
 		<>
 			<ellipse cx={x} cy={y + 0.9} rx={3.6} ry={3.3} className="dt-shadow" />
-			<circle cx={x} cy={y} r={3.6} fill={col(k)} />
+			<circle cx={x} cy={y} r={3.6} fill={col(k)} className="dt-body" />
 			<circle cx={x} cy={y} r={2.6} className="dt-rim" />
 			{[
 				[-0.8, -0.8],
@@ -97,7 +97,7 @@ export const DOT_LOOKS: Record<string, DotLook> = {
 		return (
 			<>
 				<ellipse cx={x} cy={y + 1} rx={3.4} ry={3} className="dt-shadow" />
-				<polygon points={p(pts)} fill={col(k)} strokeLinejoin="round" stroke={col(k)} strokeWidth={0.6} />
+				<polygon points={p(pts)} fill={col(k)} strokeLinejoin="round" stroke={col(k)} strokeWidth={0.6} className="dt-body" />
 				<polygon points={p([pts[5], pts[0], pts[1], [x, y]])} className="dt-facet" />
 				<polygon points={p([pts[2], pts[3], pts[4], [x, y]])} className="dt-dark" />
 			</>
@@ -107,7 +107,7 @@ export const DOT_LOOKS: Record<string, DotLook> = {
 		<>
 			<ellipse cx={x} cy={y + 1} rx={3.6} ry={3.2} className="dt-shadow" />
 			{petals.map((a, i) => (
-				<circle key={i} cx={x + Math.cos(a) * 2} cy={y + Math.sin(a) * 2} r={1.9} fill={col(k)} />
+				<circle key={i} cx={x + Math.cos(a) * 2} cy={y + Math.sin(a) * 2} r={1.9} fill={col(k)} className="dt-body" />
 			))}
 			<circle cx={x} cy={y} r={1.5} className="dt-heart" />
 		</>

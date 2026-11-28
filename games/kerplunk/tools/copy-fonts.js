@@ -1,4 +1,5 @@
-// Copies the latin woff2 files of the four fonts from the Fontsource packages to src/fonts/.
+// Copies the latin woff2 file of DM Mono (Kerplunk's label font) from Fontsource to src/fonts/.
+// The other fonts come with the cozy kit (src/kit/fonts/, see copy-kit.js).
 // The files in src/fonts/ are part of the game, so the game shows its type offline.
 // Run: npm run fonts
 import { copyFileSync, mkdirSync } from 'node:fs';
@@ -7,13 +8,7 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 
-const FONTS = [
-	['archivo-black', 400],
-	['dm-mono', 500],
-	['space-grotesk', 500],
-	['space-grotesk', 700],
-	['bricolage-grotesque', 800],
-];
+const FONTS = [['dm-mono', 500]];
 
 const out = new URL('../src/fonts/', import.meta.url);
 mkdirSync(out, { recursive: true });

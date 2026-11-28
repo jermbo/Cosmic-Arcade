@@ -55,7 +55,7 @@
 }
 
 .toggle__input:focus-visible {
-	outline: 3px solid var(--ink);
+	outline: 3px solid var(--text);
 	outline-offset: 2px;
 }
 
@@ -120,6 +120,14 @@
 }
 
 .seg__input:focus-visible + .seg__label {
-	outline: 3px solid var(--ink);
+	outline: 3px solid var(--text);
 	outline-offset: 2px;
+}
+
+/* A short note under a setting's name (the Bold style switch). */
+.toggle small {
+	display: block;
+	font-size: 0.8em;
+	opacity: 0.75;
+	font-weight: 500;
 }
