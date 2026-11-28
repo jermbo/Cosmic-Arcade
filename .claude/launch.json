@@ -25,6 +25,11 @@
       "name": "hueway",
       "url": "http://localhost:4016",
       "port": 4016
+    },
+    {
+      "name": "flippity",
+      "url": "http://localhost:4018",
+      "port": 4018
     }
   ]
 }
