@@ -16,6 +16,7 @@
 	"scripts": {
 		"css": "node scripts/make-css.js",
 		"fonts": "node scripts/copy-fonts.js",
-		"test": "node scripts/check-colors.js"
+		"test": "node scripts/check-colors.js",
+		"page": "node scripts/make-page.js"
 	}
 }

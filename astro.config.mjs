@@ -1,5 +1,6 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
+import { kitPageInDev } from './scripts/kit-page-in-dev.js';
 import { playPagesInDev } from './scripts/play-pages-in-dev.js';
 
 // https://astro.build/config
@@ -9,5 +10,5 @@ export default defineConfig({
 	redirects: {
 		'/': '/games/',
 	},
-	integrations: [playPagesInDev()],
+	integrations: [playPagesInDev(), kitPageInDev()],
 });

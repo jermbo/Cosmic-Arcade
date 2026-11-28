@@ -20,6 +20,7 @@ Each tone (light, dark) has one 10-color palette (`--c0` to `--c9`). The first f
 | `fonts.css`, `fonts/` | Bricolage Grotesque (Soft), Archivo Black and Space Grotesk (Bold). Latin only, copied from the installed @fontsource packages by `npm run fonts -w @arcade/cozy-kit`. |
 | `components.css` | Shared parts that read only kit tokens: page, `.btn`, `.icon-btn`, `.coin-chip`, `.bar`, `.card`, `.sheet-back` + `.sheet`, `.setting` + `.toggle` + `.seg`, `.tabs`, `.badge`, `.row`. Hueway uses them. |
 | `scripts/check-colors.js` | The color check (`npm test -w @arcade/cozy-kit`). Mozzi's build runs it too. |
+| `page/template.html`, `scripts/make-page.js` | The kit page: all 14 looks (7 themes × Soft and Bold), every shared part, the palettes and the color roles. Run `npm run page -w @arcade/cozy-kit`, then open `page/index.html`. Built from the kit's own files, so it always matches the games. |
 
 ## Use it in a game
 
@@ -27,8 +28,8 @@ Each tone (light, dark) has one 10-color palette (`--c0` to `--c9`). The first f
 2. Load the CSS first: `@arcade/cozy-kit/fonts.css`, `@arcade/cozy-kit/kit.css`, and for a new game `@arcade/cozy-kit/components.css`.
 3. Call `applyLooks(theme, style)` from `@arcade/cozy-kit/themes.js` whenever either one changes. It sets `data-theme`, `data-tone` and `data-style` on `<html>`, and the browser's theme color.
 4. Save `style: 'soft' | 'bold'` in the game's settings (Soft by default), and show it as a free setting.
-5. Sell the kit's `THEMES` in the shop, at the game's own prices. Keep an alias map in the save loader if old theme ids exist.
-6. Write the game's own parts with kit tokens only, so they follow every theme and both styles.
+5. Sell the kit's `THEMES` in the shop, at the game's own prices. `FREE_THEMES` (Oat and Plum) are always free: read it, do not copy it. Soft and Bold are always free too. Keep an alias map in the save loader if old theme ids exist.
+6. Write the game's own parts with kit tokens only, so they follow every theme and both styles. In Bold, outline with `--outline` and shadow with `--shade`, never `--ink`: on dark themes the ink is near-white.
 
 A game without a bundler (Kerplunk) copies `themes.js`, `fonts.css` and `fonts/` into its own folder: see `games/kerplunk/tools/copy-kit.js`.
 

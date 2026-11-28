@@ -1,0 +1,446 @@
+<title>Cozy Kit Looks</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#f6efe3">
+<!--
+	The cozy kit's own page: every look (7 themes × Soft and Bold) and every shared part.
+	scripts/make-page.js fills in the markers below from the kit's real files and writes page/index.html.
+	Edit this template, not index.html. Build: npm run page -w @arcade/cozy-kit
+-->
+<style>
+/*FONTS*/
+/*KIT_CSS*/
+/*COMPONENTS_CSS*/
+
+/* Layout: full-width bands. Each band wears the picked theme and style; the "All looks" band
+   lets every card wear its own. The page outside the bands only needs a ground color. */
+:root {
+	--host-bg: #f6efe3;
+	--host-ink: #2e2730;
+	--gutter-l: max(16px, env(safe-area-inset-left, 0px));
+	--gutter-r: max(16px, env(safe-area-inset-right, 0px));
+	--mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+	color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) { --host-bg: #221c27; --host-ink: #f5eef6; color-scheme: dark; }
+}
+:root[data-theme='dark'] { --host-bg: #221c27; --host-ink: #f5eef6; color-scheme: dark; }
+body { margin: 0; background: var(--host-bg); color: var(--host-ink); font-synthesis: none; }
+
+.band { background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-weight: 500; line-height: 1.5; }
+.band[data-style='bold'] { background: var(--page-bg); }
+.band.glow[data-style='soft'] { background: radial-gradient(120% 70% at 50% -10%, var(--glow), transparent 70%), var(--bg); }
+.band + .band { box-shadow: inset 0 1px 0 var(--line); }
+.top { border-bottom: max(1px, var(--bw)) solid var(--line); }
+.top[data-style='bold'] { border-bottom-color: var(--outline); }
+.inner { max-width: 1120px; margin: 0 auto; padding-left: var(--gutter-l); padding-right: var(--gutter-r); padding-block: 40px; display: grid; gap: 24px; }
+
+/* Top bar */
+body::before { content: ''; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--host-bg); }
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; }
+.top .inner { padding-block: 12px; gap: 10px; }
+.top-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+.brand b { font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: var(--display-spacing); font-size: 1.25rem; }
+.band[id], .band { scroll-margin-top: 130px; }
+@media (max-width: 520px) {
+	.brand .name { display: none; }
+	.top .inner { padding-block: 8px; gap: 6px; }
+	.top .seg button { min-height: 32px; }
+}
+.chips { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 8px; margin: 0 -2px; scrollbar-width: thin; }
+.chip {
+	display: inline-flex; align-items: center; gap: 8px; flex: none;
+	min-height: 40px; padding: 0 12px 0 6px;
+	border: max(1.5px, var(--bw)) solid var(--line); border-radius: 999px;
+	background: var(--surface); color: var(--ink); font-weight: 700; font-size: 0.92rem;
+}
+.chip[aria-pressed='true'] { border-color: var(--ink); box-shadow: var(--shadow-sm); }
+.chip .dot { width: 26px; height: 26px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15); }
+.chip svg { width: 13px; height: 13px; opacity: 0.7; }
+
+/* Type */
+.eyebrow { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.band h1 { margin: 0; font-size: clamp(2.2rem, 7vw, 3.8rem); line-height: 1; text-wrap: balance; }
+.band h2 { margin: 0; font-size: 1.7rem; line-height: 1.1; text-wrap: balance; }
+.band h3 { margin: 0; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: var(--display-spacing); font-size: 1.15rem; }
+.band p { margin: 0; }
+.lede { max-width: 62ch; color: var(--muted); font-size: 1.05rem; }
+.head { display: grid; gap: 6px; }
+.head p { color: var(--muted); max-width: 62ch; }
+code, .code { font-family: var(--mono); font-size: 0.82em; }
+.name { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+
+.rules { display: flex; flex-wrap: wrap; gap: 8px; }
+.rules .badge { align-self: auto; display: inline-flex; align-items: center; gap: 6px; }
+.rules .badge.prize { background: var(--surface); }
+.rules svg { width: 13px; height: 13px; }
+
+/* All looks */
+.looks { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 20px; }
+.look { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.look-cap { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.look-cap p { color: var(--muted); font-size: 0.88rem; }
+.look-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tag { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
+.tag.free { background: var(--accent); color: var(--accent-ink); }
+.tag.prize { border: 1.5px solid var(--ink); color: var(--ink); }
+.tag svg { width: 10px; height: 10px; }
+.pair-label { font-size: 0.75rem; font-weight: 700; color: var(--muted); text-align: center; margin-top: -4px; }
+.look-blurb { color: var(--muted); font-size: 0.88rem; margin-top: -6px !important; }
+.wear {
+	min-height: 40px; border-radius: var(--r-sm); border: 1.5px solid var(--line);
+	background: var(--surface); color: var(--ink); font-weight: 700;
+}
+.wear[aria-pressed='true'] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+/* A mini game screen. Wears its own data-theme and data-style. */
+.mini {
+	display: grid; gap: 9px; align-content: start; padding: 10px;
+	border-radius: 18px; color: var(--ink); font-family: var(--font-ui); font-size: 11.5px; font-weight: 500;
+	background: var(--page-bg); box-shadow: 0 0 0 1.5px var(--line); overflow: hidden; min-width: 0;
+}
+.mini[data-style='soft'] { background: radial-gradient(120% 55% at 50% -10%, var(--glow), transparent 70%), var(--bg); }
+.m-bar { display: flex; align-items: center; gap: 6px; }
+.m-title { flex: 1; min-width: 0; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: var(--display-spacing); font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-coin { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 4px; border: min(2px, var(--bw)) solid var(--outline); border-radius: 999px; background: var(--surface); box-shadow: var(--shadow-sm); font-weight: 700; font-variant-numeric: tabular-nums; }
+.m-coin i { width: 11px; height: 11px; border-radius: 50%; background: #e5b02a; box-shadow: inset 0 -2px 0 rgba(0,0,0,0.18); }
+.m-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 6px; border: var(--bw) solid var(--outline); border-radius: var(--r); background: var(--board); box-shadow: var(--shadow-lg); }
+.m-board span { aspect-ratio: 1; border-radius: calc(var(--r-sm) * 0.6); background: var(--well); }
+.m-board span.on { border: min(2px, var(--bw)) solid var(--outline); box-shadow: 0 2px 0 var(--edge), inset 0 2px 0 var(--shine); }
+.mini[data-style='bold'] .m-board span.on { box-shadow: calc(2px * var(--sx)) 2px 0 var(--shade); }
+.mini[data-style='bold'] .m-board span:not(.on) { box-shadow: inset 0 0 0 1.5px var(--line); }
+.m-row { display: grid; grid-template-columns: 1.4fr 1fr; gap: 6px; }
+.m-btn { display: flex; align-items: center; justify-content: center; min-height: 30px; border: var(--bw) solid var(--outline); border-radius: var(--r-sm); background: var(--surface-2); color: var(--ink); font-weight: 700; box-shadow: var(--shadow); }
+.m-btn.primary { background: var(--accent); color: var(--accent-ink); }
+/* The knob shrinks by the outline width, so it keeps a 3px gap inside the border. */
+.m-set { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border: var(--bw) solid var(--outline); border-radius: var(--r-sm); background: var(--surface); box-shadow: var(--shadow-sm); font-weight: 700; }
+.m-toggle { position: relative; width: 42px; height: 24px; border-radius: 999px; background: var(--accent); border: var(--bw) solid var(--outline); flex: none; }
+.m-toggle::after { content: ''; position: absolute; top: 3px; right: 3px; width: calc(18px - 2 * var(--bw)); height: calc(18px - 2 * var(--bw)); border-radius: 50%; background: var(--surface); border: min(2px, var(--bw)) solid var(--outline); }
+
+/* Parts */
+.parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 20px; align-items: start; }
+.part { display: grid; gap: 12px; padding: 18px; min-width: 0; }
+.part > .name { margin-top: -4px; }
+.part .row { justify-content: flex-start; flex-wrap: wrap; }
+.part .row > .btn { flex: 0 0 auto; }
+.icon-btn svg, .btn svg { width: 20px; height: 20px; }
+.coin-chip .icon { width: 18px; height: 18px; }
+.stack { display: grid; gap: 4px; }
+.setting + .setting { border-top: 1px solid var(--line); padding-top: 6px; }
+.sheet.demo { animation: none; max-width: none; }
+.sheet .earn { display: grid; gap: 6px; padding: 12px; border-radius: var(--r); background: var(--surface-2); }
+.sheet .earn div { display: flex; justify-content: space-between; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sheet .earn div:last-child { border-top: 1px solid var(--line); padding-top: 6px; }
+.shop-list { display: grid; gap: 8px; }
+.shop-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: var(--bw) solid var(--outline); border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow-sm); }
+.shop-row .swatch { width: 34px; height: 34px; border-radius: var(--r-sm); flex: none; display: grid; place-items: end; padding: 4px; border: min(2px, var(--bw)) solid var(--outline); }
+.shop-row .swatch i { width: 12px; height: 12px; border-radius: 50%; }
+.shop-row b { flex: 1; min-width: 0; }
+.shop-row .price { font-size: 0.85rem; font-weight: 700; color: var(--muted); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.shop-row .price svg { width: 12px; height: 12px; }
+
+/* Palette */
+.pal-row { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 8px; }
+.core { grid-column: 1 / 6; border-top: 2px solid var(--ink); padding-top: 4px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.sw { appearance: none; border: 0; padding: 0; font: inherit; color: inherit; background: none; cursor: pointer; text-align: left; display: grid; gap: 4px; min-width: 0; }
+.sw i { display: grid; place-items: center; aspect-ratio: 1; border-radius: var(--r-sm); border: min(2px, var(--bw)) solid var(--outline); box-shadow: inset 0 -3px 0 rgba(0,0,0,0.12), inset 0 2px 0 var(--shine); font-style: normal; font-family: var(--font-display); font-weight: var(--display-weight); color: var(--on-color); font-size: 1.05rem; }
+.sw b { font-size: 0.82rem; }
+.sw small { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+	.pal-row { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+	.core { grid-column: 1 / -1; border-top: 0; padding-top: 0; }
+}
+
+/* Roles */
+.roles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 10px; }
+.role { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: var(--r); background: var(--surface); border: var(--bw) solid var(--outline); text-align: left; cursor: pointer; font: inherit; color: inherit; min-width: 0; }
+.role i { width: 38px; height: 38px; border-radius: var(--r-sm); flex: none; box-shadow: inset 0 0 0 1px rgba(128,128,128,0.35); }
+.role span { display: grid; min-width: 0; line-height: 1.25; }
+.role b { font-size: 0.9rem; }
+.role small { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); overflow-wrap: anywhere; }
+
+/* How to */
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 20px; align-items: start; }
+.steps .card { padding: 20px; display: grid; gap: 10px; }
+.steps ol, .steps ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+.steps li::marker { color: var(--accent); font-weight: 700; }
+pre { margin: 0; padding: 14px; border-radius: var(--r); background: var(--surface-2); overflow-x: auto; font-family: var(--mono); font-size: 0.8rem; line-height: 1.55; }
+.code-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 20px); padding: 10px 16px; border-radius: 999px; background: var(--ink); color: var(--bg); font-weight: 700; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; z-index: 30; font-family: var(--font-ui); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+@media (prefers-reduced-motion: reduce) { .toast, .btn, .icon-btn { transition: none; } }
+</style>
+
+<header class="band top" data-theme="oat" data-style="soft">
+	<div class="inner">
+		<div class="top-row">
+			<div class="brand"><b>Cozy Kit</b><span class="name">@arcade/cozy-kit</span></div>
+			<div class="seg" role="group" aria-label="Style">
+				<button type="button" id="style-soft" data-pick-style="soft" aria-pressed="true">Soft</button>
+				<button type="button" id="style-bold" data-pick-style="bold" aria-pressed="false">Bold</button>
+			</div>
+		</div>
+		<div class="chips" id="chips" role="group" aria-label="Theme"></div>
+	</div>
+</header>
+
+<section class="band glow" data-theme="oat" data-style="soft">
+	<div class="inner">
+		<span class="eyebrow">Cosmic Arcade · cozy puzzle games</span>
+		<h1>7 themes. 2 styles. 14 looks.</h1>
+		<p class="lede">A theme sets the colors. A style sets the shape: Soft is round clay, Bold is ink outlines and hard shadows. Every theme works in both styles, so a new cozy game starts with all of this done. Pick a theme and style above to see the whole page wear it.</p>
+		<div class="rules">
+			<span class="badge">Free: Soft and Bold</span>
+			<span class="badge">Free: Oat (light) and Plum (dark)</span>
+			<span class="badge prize"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>Prizes: Sage, Blossom, Sky, Tide, Hearth</span>
+		</div>
+	</div>
+</section>
+
+<section class="band" data-theme="oat" id="looks-band">
+	<div class="inner">
+		<div class="head">
+			<span class="eyebrow">All looks</span>
+			<h2>Every theme in Soft and Bold</h2>
+			<p>Tap Wear to put a theme on the whole page. Light themes cost less, so players unlock one early. Dark themes come later.</p>
+		</div>
+		<div class="looks" id="looks"></div>
+	</div>
+</section>
+
+<section class="band" data-theme="oat" data-style="soft">
+	<div class="inner">
+		<div class="head">
+			<span class="eyebrow">Shared parts</span>
+			<h2>Parts every game gets</h2>
+			<p>From <code>components.css</code>. They read only kit tokens, so they follow every theme and both styles. The class name is under each one.</p>
+		</div>
+		<div class="parts">
+			<div class="card part">
+				<h3>Buttons</h3>
+				<span class="name">.btn · .primary · .ghost · .bad · .small</span>
+				<div class="row"><button type="button" class="btn primary">Play</button><button type="button" class="btn">Shop</button><button type="button" class="btn ghost">Skip</button></div>
+				<div class="row"><button type="button" class="btn bad small">Reset</button><button type="button" class="btn small">Small</button><button type="button" class="btn small" disabled>Locked</button></div>
+			</div>
+			<div class="card part">
+				<h3>Top bar</h3>
+				<span class="name">.bar · .bar-title · .icon-btn · .coin-chip</span>
+				<div class="bar">
+					<button type="button" class="icon-btn small" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+					<div class="bar-title"><b>Daily puzzle</b><span>Friday · No. 112</span></div>
+					<span class="coin-chip"><svg class="icon" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" fill="currentColor"/><circle cx="10" cy="10" r="4.5" fill="none" stroke="rgba(0,0,0,0.25)" stroke-width="1.6"/></svg>240</span>
+				</div>
+				<div class="row">
+					<button type="button" class="icon-btn" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M5.5 18.5l1.8-1.8M16.7 7.3l1.8-1.8"/></svg></button>
+					<button type="button" class="icon-btn" aria-label="Hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg></button>
+					<span class="badge">New</span>
+				</div>
+			</div>
+			<div class="card part">
+				<h3>Settings</h3>
+				<span class="name">.setting · .toggle · .seg · range</span>
+				<div class="stack">
+					<label class="setting toggle"><span>Sound<small>Kalimba</small></span><input type="checkbox" id="demo-sound" checked></label>
+					<label class="setting toggle"><span>Haptics</span><input type="checkbox" id="demo-haptics"></label>
+					<div class="setting"><span>Style<small>Free, always</small></span>
+						<div class="seg" role="group" aria-label="Style">
+							<button type="button" data-pick-style="soft" aria-pressed="true">Soft</button>
+							<button type="button" data-pick-style="bold" aria-pressed="false">Bold</button>
+						</div>
+					</div>
+					<label class="setting"><span>Volume</span><input type="range" id="demo-volume" min="0" max="100" value="70"></label>
+				</div>
+			</div>
+			<div class="card part">
+				<h3>Tabs and shop</h3>
+				<span class="name">.tabs · .card</span>
+				<div class="tabs" role="tablist">
+					<button type="button" role="tab" aria-selected="true">Themes</button>
+					<button type="button" role="tab" aria-selected="false">Pieces</button>
+					<button type="button" role="tab" aria-selected="false">Sounds</button>
+				</div>
+				<div class="shop-list" id="shop"></div>
+			</div>
+			<div class="sheet demo">
+				<span class="name">.sheet (inside .sheet-back)</span>
+				<h2>Solved!</h2>
+				<p class="muted">2 min 14 s · no hints</p>
+				<div class="earn"><div><span>Medium puzzle</span><span>+30</span></div><div><span>No hints</span><span>+10</span></div><div><span>Total</span><span>+40</span></div></div>
+				<div class="row"><button type="button" class="btn primary">Next</button><button type="button" class="btn">Share</button></div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<section class="band" data-theme="oat" data-style="soft">
+	<div class="inner">
+		<div class="head">
+			<span class="eyebrow">Pieces on the board</span>
+			<h2 id="pal-title">The light palette</h2>
+			<p>Ten colors for board pieces, one set per tone. Use the first five first: they stay apart for color-blind players. Dark text reads on all ten. Tap a color to copy it.</p>
+		</div>
+		<div class="pal-row"><div class="core">Core five · color-blind safe</div></div>
+		<div class="pal-row" id="pal"></div>
+	</div>
+</section>
+
+<section class="band" data-theme="oat" data-style="soft">
+	<div class="inner">
+		<div class="head">
+			<span class="eyebrow">Color roles</span>
+			<h2 id="roles-title">Oat, role by role</h2>
+			<p>A game never picks a hex by hand. It uses these tokens, so every theme just works. Tap one to copy its token.</p>
+		</div>
+		<div class="roles" id="roles"></div>
+	</div>
+</section>
+
+<section class="band" data-theme="oat" data-style="soft">
+	<div class="inner">
+		<div class="head">
+			<span class="eyebrow">Starting a new cozy game</span>
+			<h2>Bring the kit to a game</h2>
+		</div>
+		<div class="steps">
+			<div class="card">
+				<h3>Steps</h3>
+				<ol>
+					<li>Add <code>"@arcade/cozy-kit": "1.0.0"</code> to the game's <code>package.json</code>, then <code>npm install</code> at the repo root.</li>
+					<li>Load the fonts, tokens and parts CSS before the game's own CSS.</li>
+					<li>Call <code>applyLooks(theme, style)</code> on load and after every change.</li>
+					<li>Save <code>style</code> as a free setting, Soft by default.</li>
+					<li>Sell <code>THEMES</code> in the shop. <code>FREE_THEMES</code> are always free; set the rest at the game's own prices.</li>
+					<li>Draw the board with kit tokens only. In Bold, outline with <code>--outline</code> and shadow with <code>--shade</code>, never <code>--ink</code>.</li>
+				</ol>
+			</div>
+			<div class="card">
+				<div class="code-head"><h3>The code</h3><button type="button" class="btn small" id="copy-code">Copy</button></div>
+				<pre id="code">import '@arcade/cozy-kit/fonts.css';
+import '@arcade/cozy-kit/kit.css';
+import '@arcade/cozy-kit/components.css';
+import { applyLooks, FREE_THEMES, THEMES }
+  from '@arcade/cozy-kit/themes.js';
+
+applyLooks(save.theme, save.style);
+
+const price = (id) =&gt;
+  FREE_THEMES.includes(id) ? 0 : THEME_PRICE[id];</pre>
+				<p class="muted">A game with no bundler copies the kit in, like Kerplunk does with <code>npm run kit</code>.</p>
+			</div>
+			<div class="card">
+				<h3>What each game makes</h3>
+				<ul>
+					<li>Its board pieces: tiles, lines, dots, faces</li>
+					<li>Its sounds</li>
+					<li>Its prices and coin rewards</li>
+					<li>Its name, icon and hero art</li>
+				</ul>
+				<p class="muted">Today: Kerplunk, Mozzi, Wordkin and Hueway.</p>
+			</div>
+		</div>
+	</div>
+</section>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const KIT = /*KIT_DATA*/;
+const { THEMES, PALETTES, COLOR_NAMES, FREE_THEMES } = KIT;
+const BOARD = [0,0,1,-1,2, 0,3,1,1,2, -1,3,4,4,2, 3,3,4,-1,0, 1,-1,4,2,0];
+const LOCK = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>';
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const byId = (id) => THEMES.find((t) => t.id === id) || THEMES[0];
+const isFree = (id) => FREE_THEMES.includes(id);
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+
+// ---- the picked look
+let picked = store.get('ck-theme');
+let style = store.get('ck-style') === 'bold' ? 'bold' : 'soft';
+function hostDark() {
+	const t = document.documentElement.getAttribute('data-theme');
+	if (t === 'dark') return true;
+	if (t === 'light') return false;
+	return matchMedia('(prefers-color-scheme: dark)').matches;
+}
+const currentTheme = () => byId(picked || (hostDark() ? 'plum' : 'oat'));
+
+function mini(t, s) {
+	const pal = PALETTES[t.tone];
+	const tiles = BOARD.map((i) => i < 0 ? '<span></span>' : `<span class="on" style="background:${pal[i]}"></span>`).join('');
+	return `<div class="mini" data-theme="${t.id}" data-style="${s}" aria-hidden="true">
+		<div class="m-bar"><span class="m-title">Daily</span><span class="m-coin"><i></i>240</span></div>
+		<div class="m-board">${tiles}</div>
+		<div class="m-row"><span class="m-btn primary">Play</span><span class="m-btn">Shop</span></div>
+		<div class="m-set"><span>Sound</span><span class="m-toggle"></span></div>
+	</div>`;
+}
+
+document.getElementById('looks').innerHTML = THEMES.map((t) => `
+	<div class="look">
+		<div class="look-cap"><h3>${esc(t.name)} <span class="name">${t.tone}</span></h3>${isFree(t.id) ? '<span class="tag free">Free</span>' : `<span class="tag prize">${LOCK}Prize</span>`}</div>
+		<p class="look-blurb">${esc(t.blurb)}</p>
+		<div class="look-pair">${mini(t, 'soft')}${mini(t, 'bold')}</div>
+		<div class="look-pair"><span class="pair-label">Soft</span><span class="pair-label">Bold</span></div>
+		<button type="button" class="wear" data-pick-theme="${t.id}">Wear ${esc(t.name)}</button>
+	</div>`).join('');
+
+document.getElementById('chips').innerHTML = THEMES.map((t) => `
+	<button type="button" class="chip" data-pick-theme="${t.id}" aria-pressed="false">
+		<span class="dot" style="background:linear-gradient(135deg, ${t.bg} 0 50%, ${t.accent} 50% 100%)"></span>${esc(t.name)}${isFree(t.id) ? '' : LOCK}
+	</button>`).join('');
+
+function render() {
+	const t = currentTheme();
+	document.querySelectorAll('.band').forEach((b) => {
+		b.setAttribute('data-theme', t.id);
+		if (b.id !== 'looks-band') b.setAttribute('data-style', style);
+	});
+	document.querySelectorAll('[data-pick-style]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.pickStyle === style)));
+	document.querySelectorAll('.chip, .wear').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.pickTheme === t.id)));
+	document.querySelectorAll('.wear').forEach((b) => { b.textContent = b.dataset.pickTheme === t.id ? `Wearing ${t.name}` : `Wear ${byId(b.dataset.pickTheme).name}`; });
+
+	const pal = PALETTES[t.tone];
+	document.getElementById('pal-title').textContent = t.tone === 'light' ? 'The light palette' : 'The dark palette';
+	document.getElementById('pal').innerHTML = pal.map((c, i) =>
+		`<button type="button" class="sw" data-copy="${c}" aria-label="Copy ${COLOR_NAMES[i]} ${c}"><i style="background:${c}">${i + 1}</i><b>${COLOR_NAMES[i]}</b><small>--c${i} ${c}</small></button>`).join('');
+
+	const ROLES = [['bg', 'Page'], ['surface', 'Card'], ['surface2', 'Quiet card'], ['board', 'Board'], ['well', 'Empty cell'], ['ink', 'Text'], ['muted', 'Quiet text'], ['line', 'Thin line'], ['stroke', 'Bold outline'], ['accent', 'Accent'], ['accentInk', 'Accent text'], ['accentSoft', 'Soft badge'], ['good', 'Good'], ['bad', 'Bad']];
+	const kebab = (k) => '--' + k.replace(/[A-Z0-9]+/g, (m) => '-' + m.toLowerCase());
+	document.getElementById('roles-title').textContent = `${t.name}, role by role`;
+	document.getElementById('roles').innerHTML = ROLES.map(([k, label]) =>
+		`<button type="button" class="role" data-copy="var(${kebab(k)})" aria-label="Copy ${label} token"><i style="background:${t[k]}"></i><span><b>${label}</b><small>${kebab(k)} ${t[k]}</small></span></button>`).join('');
+
+	document.getElementById('shop').innerHTML = THEMES.slice(0, 4).concat(THEMES.slice(5, 6)).map((x) => `
+		<div class="shop-row"><span class="swatch" style="background:${x.bg}"><i style="background:${x.accent}"></i></span><b>${esc(x.name)}</b>
+		<span class="price">${isFree(x.id) ? 'Free' : x.id === t.id ? 'Wearing' : LOCK + 'Prize'}</span></div>`).join('');
+
+	const meta = document.querySelector('meta[name="theme-color"]');
+	if (meta) meta.setAttribute('content', t.bg);
+}
+
+document.addEventListener('click', (e) => {
+	const th = e.target.closest('[data-pick-theme]');
+	if (th) { picked = th.dataset.pickTheme; store.set('ck-theme', picked); render(); return; }
+	const st = e.target.closest('[data-pick-style]');
+	if (st) { style = st.dataset.pickStyle; store.set('ck-style', style); render(); return; }
+	const tab = e.target.closest('.tabs [role=tab]');
+	if (tab) { tab.parentElement.querySelectorAll('[role=tab]').forEach((b) => b.setAttribute('aria-selected', String(b === tab))); return; }
+	const cp = e.target.closest('[data-copy]');
+	if (cp) copy(cp.dataset.copy);
+	if (e.target.closest('#copy-code')) copy(document.getElementById('code').textContent);
+});
+
+const toast = document.getElementById('toast');
+let tt;
+function say(msg) { toast.textContent = msg; toast.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => toast.classList.remove('show'), 1400); }
+function copy(text) {
+	const done = () => say(text.length > 40 ? 'Copied the code' : `Copied ${text}`);
+	try { navigator.clipboard.writeText(text).then(done, () => say('Copy did not work here')); } catch (e) { say('Copy did not work here'); }
+}
+
+// Follow the viewer's light or dark mode until they pick a theme.
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (!picked) render(); });
+new MutationObserver(() => { if (!picked) render(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+render();
+</script>
